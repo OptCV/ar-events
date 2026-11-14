@@ -1,0 +1,86 @@
+{
+  "generator": "scripts/generate-fixtures.ts",
+  "fixtures": [
+    {
+      "file": "opaque_photo.jpg",
+      "role": "display-image",
+      "description": "Opaque JPEG; must produce OPAQUE material.",
+      "expectedAutoAlpha": "OPAQUE",
+      "path": "images/opaque_photo.jpg",
+      "bytes": 21204,
+      "sha256": "cabb931bdf770dd366056e18f0e4605c60f1da26ef5305fe6974af0a2e66b5ab"
+    },
+    {
+      "file": "logo_transparent_border.png",
+      "role": "display-image",
+      "description": "Opaque logo with fully transparent border; binary alpha.",
+      "expectedAutoAlpha": "MASK",
+      "path": "images/logo_transparent_border.png",
+      "bytes": 1124,
+      "sha256": "d29380414eae70706240897f1e5bdc378fd9efd7ecdabf78f340741f7be6020f"
+    },
+    {
+      "file": "ring_inner_hole.png",
+      "role": "display-image",
+      "description": "Ring with transparent outside AND transparent inner hole; quad stays rectangular.",
+      "expectedAutoAlpha": "MASK",
+      "path": "images/ring_inner_hole.png",
+      "bytes": 6880,
+      "sha256": "360a75b3fd5169447b0a1756076c18603135350671161982d20fbb29f7897769"
+    },
+    {
+      "file": "alpha_steps.png",
+      "role": "display-image",
+      "description": "Five bands alpha 0/0.2/0.5/0.8/1.0 (green); semitransparency fidelity.",
+      "expectedAutoAlpha": "BLEND",
+      "path": "images/alpha_steps.png",
+      "bytes": 462,
+      "sha256": "c72cde25b79d9e9a0c56c58954ab53cf57b7c40cb4efd7ca3d899a0c083a258a"
+    },
+    {
+      "file": "aa_disc_dark_fringe.png",
+      "role": "display-image",
+      "description": "White AA disc with almost-invisible black fringe; dark halo = premultiply/filter bug.",
+      "expectedAutoAlpha": "BLEND",
+      "path": "images/aa_disc_dark_fringe.png",
+      "bytes": 7886,
+      "sha256": "22ce6a48856a2910a4be3a6d48a8726ccb5d9012b11f42a6152d97fc972556b1"
+    },
+    {
+      "file": "tall_npot.png",
+      "role": "display-image",
+      "description": "101x701 NPOT tall strip with transparent side margins.",
+      "expectedAutoAlpha": "MASK",
+      "path": "images/tall_npot.png",
+      "bytes": 1845,
+      "sha256": "c9f86628a97dbef56b90538a08692bd959111ef9cb436a54824f95120f16871e"
+    },
+    {
+      "file": "wide_npot.png",
+      "role": "display-image",
+      "description": "903x117 NPOT wide banner with transparent top/bottom margins.",
+      "expectedAutoAlpha": "MASK",
+      "path": "images/wide_npot.png",
+      "bytes": 1100,
+      "sha256": "47f900c36c3631c5cc496288579a5e17cc934f5d3a7d657f4094d8bbd4289a1e"
+    },
+    {
+      "file": "orientation_probe.png",
+      "role": "display-image",
+      "description": "Opaque. TL red, TR green, BL blue, BR yellow, black arrow points to image top.",
+      "expectedAutoAlpha": "OPAQUE",
+      "path": "images/orientation_probe.png",
+      "bytes": 2313,
+      "sha256": "407ebe706b5834b4fcc19a4c569b9681f0bac832f64aa73808ce4c47312783c3"
+    },
+    {
+      "file": "tracking_target_20cm.png",
+      "role": "tracking-image",
+      "description": "Tracking reference, print at 20.0 cm width (3:2). Opaque, feature-dense, asymmetric.",
+      "expectedAutoAlpha": "OPAQUE",
+      "path": "images/tracking_target_20cm.png",
+      "bytes": 11890,
+      "sha256": "c5b8d19084260df315634bfa813260d844b29769454f58d356757f26828a2504"
+    }
+  ]
+}

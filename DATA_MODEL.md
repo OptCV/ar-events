@@ -1,0 +1,78 @@
+# DATA_MODEL.md — Canonical Scene, Assets, Revisions
+
+## Principles
+
+- Typed, versioned JSON canonical scene; never derive core scene meaning from USD or GLB outputs.
+- **Tracking targets** and **display images** are different semantic asset roles.
+- Every generated asset has a recorded source, transform settings, converter version and validation status.
+- Published revisions are immutable; drafts are mutable; public URL points to an atomically promoted ready revision.
+- Store position in **meters**, rotation as **quaternion `[x,y,z,w]`**, scale as `[x,y,z]`.
+
+## TypeScript sketch
+
+```ts
+type Vec3 = [number, number, number];
+type Quat = [number, number, number, number];
+type Transform = { position: Vec3; rotation: Quat; scale: Vec3 };
+type Placement =
+  | { mode: 'image'; trackingTargetAssetId: string; physicalWidthMeters: number }
+  | { mode: 'floor'; preferredSurface: 'horizontal' }
+  | { mode: 'wall'; preferredSurface: 'vertical' };
+type SceneNode =
+  | { id: string; kind: 'model'; assetId: string; transform: Transform; parentId?: string }
+  | { id: string; kind: 'image-object'; derivativeId: string; transform: Transform; parentId?: string }
+  | { id: string; kind: 'text'; text: string; style: Record<string, unknown>; transform: Transform; parentId?: string }
+  | { id: string; kind: 'panel'; content: string; transform: Transform; parentId?: string }
+  | { id: string; kind: 'primitive'; shape: 'box'|'sphere'|'cylinder'|'plane'; transform: Transform; parentId?: string }
+  | { id: string; kind: 'hotspot'; actionId: string; transform: Transform; parentId?: string };
+type Action =
+  | { id: string; type: 'open-url'; url: string; label?: string }
+  | { id: string; type: 'mailto'; address: string }
+  | { id: string; type: 'tel'; number: string }
+  | { id: string; type: 'play-animation'; nodeId: string; clip: string }
+  | { id: string; type: 'toggle-visibility'; nodeId: string };
+interface ExperienceRevision {
+  schemaVersion: number;
+  placement: Placement;
+  nodes: SceneNode[];
+  actions: Action[];
+  primaryActionId?: string;
+  appearance: { accentColor: string; logoAssetId?: string };
+}
+```
+
+This is a *sketch*, not final Zod schema. Ensure every node has optional style, visibility and capabilities as needed; write exhaustive schema validation and typed migrations.
+
+## Relational models
+
+| Table | Key fields |
+|---|---|
+| `users` | id, email, auth provider, created_at |
+| `experiences` | id, owner_id, slug, draft_revision_id, published_revision_id, visibility, timestamps |
+| `experience_revisions` | id, experience_id, schema_version, config_json, validation_report, created_at |
+| `assets` | id, owner_id, purpose, mime, size, checksum, r2_key, metadata, state |
+| `asset_derivatives` | id, source_asset_id, output_type, settings_json, converter_version, r2_key, checksum, status |
+| `processing_jobs` | id, type, idempotency_key, revision_id/asset_id, attempt, state, diagnostics, timestamps |
+| `generated_outputs` | id, revision_id, runtime, r2_key, validation_json, state |
+| `analytics` | id, public_experience_id, event_type, anonymous aggregate fields, timestamp |
+
+Use foreign keys, owner checks, unique slugs and constrained state enums. Store image object and target references separately; do not infer role from MIME type.
+
+## R2 keys
+
+```
+users/{userId}/assets/{assetId}/original
+users/{userId}/assets/{assetId}/derivatives/{hash}/display.glb
+users/{userId}/assets/{assetId}/derivatives/{hash}/display.usdz
+experiences/{expId}/revisions/{revId}/scene.json
+experiences/{expId}/revisions/{revId}/ios/experience.usdz
+experiences/{expId}/revisions/{revId}/android/experience.glb
+```
+
+Use immutable revision keys for published outputs and signed access for drafts. Standardize MIME types: GLB `model/gltf-binary`, USDZ `model/vnd.usdz+zip`.
+
+## API surface
+
+`POST /api/experiences`, `PUT /api/experiences/:id/draft`, `POST /api/assets/uploads`, `POST /api/assets/:id/convert-image-to-ar`, `GET /api/assets/:id/derivatives`, `POST /api/experiences/:id/validate`, `POST /api/experiences/:id/publish`, `GET /api/experiences/:id/jobs`, `GET /api/public/experiences/:slug`.
+
+All private routes require ownership checks; public ones resolve published revision only.

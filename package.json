@@ -1,0 +1,32 @@
+{
+  "name": "ar-creator",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "fixtures": "node --experimental-strip-types scripts/generate-fixtures.ts",
+    "usd:build": "node --experimental-strip-types scripts/usd.ts build",
+    "usd:test": "node --experimental-strip-types scripts/usd.ts test",
+    "check": "npm run typecheck && npm run test",
+    "fixtures:geometry": "node --experimental-strip-types scripts/generate-geometry-golden.ts",
+    "p0:build": "node --experimental-strip-types scripts/build-p0.ts",
+    "check:all": "npm run check && npm run usd:test"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/pngjs": "6.0.5",
+    "gltf-validator": "2.0.0-dev.3.10",
+    "jpeg-js": "0.4.4",
+    "pngjs": "7.0.0",
+    "typescript": "5.9.3",
+    "vitest": "4.1.12"
+  }
+}

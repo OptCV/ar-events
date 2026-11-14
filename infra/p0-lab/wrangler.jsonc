@@ -1,0 +1,9 @@
+// Assets-only Worker hosting the P0 device lab (out/p0). NOT deployed by any agent.
+// Deploy (requires your Cloudflare account):  npx wrangler@4 deploy -c infra/p0-lab/wrangler.jsonc
+// Then rebuild links with the real origin:    P0_BASE_URL=https://<name>.<subdomain>.workers.dev npm run p0:build
+// and deploy again. MIME types + CSP come from out/p0/_headers.
+{
+  "name": "ar-creator-p0-lab",
+  "compatibility_date": "2026-11-01",
+  "assets": { "directory": "../../out/p0" }
+}

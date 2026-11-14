@@ -1,0 +1,12 @@
+{
+  "name": "@ar-creator/platform-launch",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@ar-creator/schema": "0.0.0"
+  }
+}

@@ -1,0 +1,62 @@
+# AR Creator — Specification and AI Maintenance Pack
+
+This repository holds the specification pack plus the first P0 proof-of-concept code (no app yet). The product is a Vite + React + Hono + PostgreSQL + Cloudflare no-code AR creator. Read `MASTER_PROMPT.md` for the full requested build.
+
+## Start here
+
+1. **Human product owner:** read `MASTER_PROMPT.md`, `PLATFORM_ROUTING.md`, `IMAGE_TO_AR.md`, `DESIGN.md`, and `ROADMAP.md`.
+2. **Any coding agent:** read `AGENTS.md` and `PROGRESS.md` first, then `TASKS.md`, `DECISIONS.md`, `PLATFORM_ROUTING.md`, and `CAPABILITIES.md`. Follow `CLAUDE.md` if applicable.
+3. **Runtime engineer:** read `ARCHITECTURE.md`, `DATA_MODEL.md`, `CAPABILITIES.md`, `TESTING.md`, `SECURITY.md`.
+4. **Before changing routing or exporters:** read `PLATFORM_ROUTING.md` and log an ADR in `DECISIONS.md`.
+
+## Development quickstart
+
+Prerequisites: Node ≥ 22, Docker. (No host Python needed; OpenUSD runs in a container.)
+
+```sh
+npm install
+npm run check          # typecheck + Vitest
+npm run usd:build      # build the sandboxed OpenUSD processor image
+npm run usd:test       # pytest inside the sandbox
+npm run check:all      # both
+npm run fixtures       # regenerate golden fixtures (must be byte-identical)
+P0_BASE_URL=https://<host> npm run p0:build   # P0 device kit → out/p0/
+```
+
+Layout: `packages/{schema,platform-launch,capabilities,image-to-ar}`, `services/usd-processor`, `tests/fixtures`, `scripts`, `infra/p0-lab`. `apps/web` and `apps/api` do not exist yet. See `PROGRESS.md` for verified status.
+
+## Product invariants
+
+- iOS image / floor / wall -> appropriately anchored USDZ -> Quick Look.
+- Android image -> experimental browser WebXR image tracking; no fallback tracker SDK.
+- Android floor / wall -> Google Scene Viewer; wall requests `enable_vertical_placement=true`.
+- A tracking target image and a displayed image-in-AR are different asset roles.
+- Image-to-AR generates **both GLB and USDZ**, preserving transparency.
+- Creator allows custom artifacts; exporter must map them to supported native features or visible landing-page fallbacks.
+- Vite/React/CSS Modules + Hono Workers + PostgreSQL/Drizzle/Hyperdrive + R2 + Workflows + Containers.
+
+## File map
+
+| File | Authority |
+|---|---|
+| `MASTER_PROMPT.md` | Complete generation/build brief |
+| `AGENTS.md` | Shared AI agent behavior and guardrails |
+| `AGENT.md` | Singular compatibility entry point |
+| `CLAUDE.md` | Claude-specific context and session checklist |
+| `DESIGN.md` | UX, layout, design system, accessibility |
+| `ARCHITECTURE.md` | Modules, Cloudflare services, build/deploy boundaries |
+| `PLATFORM_ROUTING.md` | Exactly which runtime each placement uses |
+| `CAPABILITIES.md` | Per-element and action capabilities/fallbacks |
+| `IMAGE_TO_AR.md` | Transparent PNG-to-GLB/USDZ rules |
+| `DATA_MODEL.md` | Scene schema, provenance and APIs |
+| `TESTING.md` | Reproducible and device test protocols |
+| `SECURITY.md` | Threat model and controls |
+| `ROADMAP.md` | Phases and go/no-go gates |
+| `TASKS.md` | Checkable backlog |
+| `DECISIONS.md` | ADR history, append-only |
+| `PROGRESS.md` | Current verified status and blockers |
+| `CHANGELOG.md` | Record of document/code changes |
+
+## Document update rule
+
+Update the smallest authoritative document that owns a decision; cross-link instead of duplicating. When a change affects behavior, update capability/routing docs, tests, tasks, and decision history together. Do **not** claim code or device test completion until artifacts and evidence exist.

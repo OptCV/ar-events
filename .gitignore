@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+.wrangler/
+.dev.vars
+.env
+.env.*
+*.log
+__pycache__/
+.pytest_cache/
+# generated P0 outputs (rebuild with npm run p0:glb / usd scripts)
+out/
