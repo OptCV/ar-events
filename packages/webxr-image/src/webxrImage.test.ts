@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   IDENTITY,
   ImageAnchorTracker,
+  collectDeviceInfo,
+  isReducedUserAgent,
   TrackingStateMachine,
   WidthStats,
   buildSessionInit,
@@ -89,7 +91,16 @@ describe('WidthStats', () => {
   it('reports median and ratio to the registered width', () => {
     const w = new WidthStats();
     for (const v of [0.19, 0.2, 0.21, Number.NaN, -1]) w.add(v);
-    expect(w.summary(0.2)).toEqual({ samples: 3, min: 0.19, max: 0.21, median: 0.2, ratioToRegistered: 1 });
+    expect(w.summary(0.2)).toEqual({
+      samples: 3,
+      min: 0.19,
+      max: 0.21,
+      median: 0.2,
+      distinctValues: 3,
+      ratioToRegistered: 1,
+      echoesRegistered: false,
+      usableAsSizeEvidence: true,
+    });
     expect(new WidthStats().summary(0.2)).toBeNull();
   });
 });
@@ -172,5 +183,68 @@ describe('ImageAnchorTracker', () => {
     t.see('tracked');
     expect(t.tracker.onFrame(t.frame, null)).toMatchObject({ status: 'tracked', visible: false, anchorMatrix: null });
     expect(t.tracker.widths.summary(0.2)?.samples).toBe(1);
+  });
+});
+
+describe('AND-IMG-01 findings (2026-11-14 device report)', () => {
+  it('flags the UA-reported width as an echo of the registered width, not a measurement', () => {
+    const w = new WidthStats();
+    for (let i = 0; i < 478; i++) w.add(0.20000000298023224); // exact device values
+    expect(w.summary(0.2)).toMatchObject({ samples: 478, distinctValues: 1, echoesRegistered: true, usableAsSizeEvidence: false });
+    const real = new WidthStats();
+    for (const v of [0.197, 0.2013, 0.199]) real.add(v);
+    expect(real.summary(0.2)).toMatchObject({ echoesRegistered: false, usableAsSizeEvidence: true });
+  });
+
+  it('detects the reduced Chromium UA from the device report', () => {
+    const ua = 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Mobile Safari/537.36';
+    expect(isReducedUserAgent(ua)).toBe(true);
+    expect(isReducedUserAgent('Mozilla/5.0 (Linux; Android 15; Pixel 9) Chrome/157.0.7012.55 Mobile')).toBe(false);
+  });
+
+  it('collects model / OS / full versions from UA client hints', async () => {
+    const info = await collectDeviceInfo({
+      userAgent: 'Mozilla/5.0 (Linux; Android 10; K) Chrome/157.0.0.0 Mobile',
+      userAgentData: {
+        platform: 'Android',
+        mobile: true,
+        getHighEntropyValues: async () => ({
+          model: 'Pixel 8',
+          platformVersion: '16.0.0',
+          fullVersionList: [
+            { brand: 'Not)A;Brand', version: '99.0.0.0' },
+            { brand: 'Google Chrome', version: '157.0.7012.55' },
+          ],
+        }),
+      },
+    });
+    expect(info).toMatchObject({ source: 'ua-client-hints', reducedUserAgent: true, model: 'Pixel 8', platformVersion: '16.0.0', mobile: true, gaps: [] });
+    expect(info.fullVersionList).toEqual([{ brand: 'Google Chrome', version: '157.0.7012.55' }]);
+  });
+
+  it('degrades honestly without client hints or when they hang', async () => {
+    const none = await collectDeviceInfo({ userAgent: 'x' });
+    expect(none.source).toBe('user-agent-only');
+    expect(none.gaps[0]).toMatch(/manually/);
+    const hang = await collectDeviceInfo({ userAgent: 'x', userAgentData: { getHighEntropyValues: () => new Promise(() => {}) } }, 20);
+    expect(hang.model).toBeUndefined();
+    expect(hang.gaps.join(' ')).toMatch(/timeout/);
+  });
+
+  it('counts raw UA states so lost / re-acquire can be diagnosed', () => {
+    const imageSpace = {} as XRSpace;
+    let next: XRImageTrackingResult[] = [];
+    const api = { kind: 'chrome-image-tracking' as const, getScores: async () => [], getResults: () => next };
+    const pose = { transform: { matrix: new Float32Array(IDENTITY) } };
+    const t = new ImageAnchorTracker(api, { lostAfterFrames: 2 });
+    const frame = { getPose: () => pose };
+    const ref = {} as XRSpace;
+    t.onFrame(frame, ref); // scanning
+    next = [{ index: 0, imageSpace, trackingState: 'tracked', measuredWidthInMeters: 0.2 } as XRImageTrackingResult];
+    t.onFrame(frame, ref);
+    next = [{ index: 0, imageSpace, trackingState: 'emulated', measuredWidthInMeters: 0.2 } as XRImageTrackingResult];
+    t.onFrame(frame, ref);
+    t.onFrame(frame, null); // result but no reference space → no pose
+    expect(t.counts).toEqual({ frames: 4, tracked: 1, emulated: 2, noResult: 1, resultWithoutPose: 1, visible: 3 });
   });
 });

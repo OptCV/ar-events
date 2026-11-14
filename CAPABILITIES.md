@@ -5,7 +5,7 @@
 | Element / behavior | iOS Quick Look | Android image WebXR | Android floor/wall Scene Viewer |
 |---|---|---|---|
 | 3D model | compatible USDZ geometry | Three.js GLB | composed GLB |
-| Target image recognition | image anchoring | experimental WebXR extension | **unsupported** |
+| Target image recognition | image anchoring | experimental WebXR extension (pose acquisition + DOM overlay seen on 1 device, Chrome 157 — AND-IMG-01 PARTIAL; stays `experimental`) | **unsupported** |
 | Floor surface placement | plane anchoring | not selected in this product | Scene Viewer native |
 | Wall surface placement | vertical plane anchoring | not selected in this product | Scene Viewer with `enable_vertical_placement=true` |
 | PNG-to-AR flat card | USD textured quad with alpha | GLB textured quad with alpha | GLB textured quad with alpha |

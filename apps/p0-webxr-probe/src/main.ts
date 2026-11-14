@@ -11,6 +11,8 @@ import {
   ImageAnchorTracker,
   WidthStats,
   buildSessionInit,
+  collectDeviceInfo,
+  type DeviceInfo,
   describeStartError,
   preflight,
   resolveImageTrackingApi,
@@ -19,7 +21,8 @@ import {
   type TrackingStatus,
 } from '@ar-creator/webxr-image';
 
-const PROBE_VERSION = 'p0-webxr-probe@0.1.0';
+// 0.2.0: device client hints, tester observations, raw frame counts, duration/end reason, width-echo flag.
+const PROBE_VERSION = 'p0-webxr-probe@0.2.0';
 const TARGET_URL = '../images/tracking_target_20cm.png';
 const TARGET_WIDTH_M = 0.2;
 const GLB_URL = '../glb/img-overlay.glb';
@@ -63,6 +66,12 @@ interface Report {
   overlayCtaTapped?: boolean;
   outcome?: string;
   error?: string;
+  device?: DeviceInfo;
+  /** Human-observed results; the browser cannot verify these. */
+  observations: Record<string, string>;
+  frameCounts?: ImageAnchorTracker['counts'];
+  durationMs?: number;
+  endedBy?: 'user-exit' | 'probe' | 'system';
 }
 
 const report: Report = {
@@ -71,7 +80,17 @@ const report: Report = {
   userAgent: navigator.userAgent,
   assets: { target: TARGET_URL, targetWidthMeters: TARGET_WIDTH_M },
   transitions: [],
+  observations: {},
 };
+
+document.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-obs]').forEach((el) => {
+  el.addEventListener('change', () => {
+    const key = el.dataset.obs!;
+    if (el.value) report.observations[key] = el.value;
+    else delete report.observations[key];
+    renderReport();
+  });
+});
 const renderReport = () => (ui.report.textContent = JSON.stringify(report, null, 2));
 
 function showResult(text: string, bad = false) {
@@ -108,6 +127,10 @@ async function preload() {
 
 async function init() {
   ui.flagHelp.textContent = FLAG_HELP;
+  void collectDeviceInfo(navigator as unknown as Parameters<typeof collectDeviceInfo>[0]).then((d) => {
+    report.device = d;
+    renderReport();
+  });
   // Preflight and asset preload run in parallel; each renders as soon as it settles.
   let assets: boolean | null = null;
   let pf: PreflightResult | null = null;
@@ -177,6 +200,11 @@ async function runSession(session: XRSession) {
   report.transitions = [];
   for (const k of ['outcome', 'error', 'firstTrackedMs', 'measuredWidth', 'overlayCtaTapped'] as const) delete report[k];
   report.date = new Date().toISOString();
+  delete report.frameCounts;
+  delete report.durationMs;
+  delete report.endedBy;
+  const sessionStart = performance.now();
+  let endedBy: NonNullable<Report['endedBy']> = 'system';
   let tracker: ImageAnchorTracker | null = null; // read by the end handler
   document.body.classList.add('in-xr');
 
@@ -190,6 +218,7 @@ async function runSession(session: XRSession) {
   let ended = false;
   const end = (outcome: string, message: string, bad: boolean) => {
     report.outcome ??= outcome;
+    endedBy = 'probe';
     showResult(message, bad);
     if (!ended) session.end().catch(() => undefined);
   };
@@ -203,13 +232,19 @@ async function runSession(session: XRSession) {
     ui.overlay.hidden = true;
     ui.start.disabled = false;
     report.measuredWidth = tracker?.widths.summary(TARGET_WIDTH_M) ?? null;
+    if (tracker) report.frameCounts = { ...tracker.counts };
+    report.durationMs = Math.round(performance.now() - sessionStart);
+    report.endedBy = endedBy;
     report.outcome ??= report.firstTrackedMs !== undefined ? 'tracked' : 'never-tracked';
     if (!ui.result.textContent || ui.result.textContent === 'Starting AR…') {
       showResult(report.firstTrackedMs !== undefined ? 'Session ended. Image was tracked — record the report.' : 'Session ended without tracking the image.', report.firstTrackedMs === undefined);
     }
     renderReport();
   });
-  ui.exit.onclick = () => session.end().catch(() => undefined);
+  ui.exit.onclick = () => {
+    endedBy = 'user-exit';
+    session.end().catch(() => undefined);
+  };
   ui.cta.onclick = () => {
     report.overlayCtaTapped = true;
     ui.status.textContent = 'Overlay CTA tap received';
@@ -284,7 +319,7 @@ async function runSession(session: XRSession) {
       anchor.matrixWorldNeedsUpdate = true;
     }
     anchor.visible = u.visible;
-    if (++frames % 30 === 0 && u.measuredWidthMeters !== null) ui.width.textContent = `measured ${(u.measuredWidthMeters * 100).toFixed(1)} cm / 20.0 cm`;
+    if (++frames % 30 === 0 && u.measuredWidthMeters !== null) ui.width.textContent = `UA width ${(u.measuredWidthMeters * 100).toFixed(1)} cm (may echo the registered 20.0 cm)`;
     renderer.render(scene, camera);
   });
 }

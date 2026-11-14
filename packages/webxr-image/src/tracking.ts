@@ -56,10 +56,26 @@ export class WidthStats {
   add(w: number) {
     if (Number.isFinite(w) && w > 0) this.values.push(w);
   }
+  /**
+   * `echoesRegistered`: every sample equals the registered width (to float32 precision). Observed on
+   * Chrome 157 / ARCore (2026-11-14, 478 samples): the UA reports back the width we supplied, so the
+   * value is NOT an independent physical measurement and must not be used as size evidence.
+   */
   summary(registeredMeters: number) {
     if (this.values.length === 0) return null;
     const s = [...this.values].sort((a, b) => a - b);
     const median = s[Math.floor(s.length / 2)]!;
-    return { samples: s.length, min: s[0]!, max: s[s.length - 1]!, median, ratioToRegistered: median / registeredMeters };
+    const reg32 = Math.fround(registeredMeters);
+    const echoesRegistered = s.every((v) => Math.abs(v - reg32) <= 1e-6);
+    return {
+      samples: s.length,
+      min: s[0]!,
+      max: s[s.length - 1]!,
+      median,
+      distinctValues: new Set(s).size,
+      ratioToRegistered: median / registeredMeters,
+      echoesRegistered,
+      usableAsSizeEvidence: !echoesRegistered,
+    };
   }
 }

@@ -32,6 +32,27 @@
         <p id="result" class="result" role="status" aria-live="polite"></p>
       </section>
 
+      <section aria-labelledby="obs-h">
+        <h2 id="obs-h">Tester observations</h2>
+        <p class="muted">The browser cannot observe these; fill them in after the run. They are copied into the report.</p>
+        <div class="obs">
+          <label>Chrome flag “WebXR Incubations”
+            <select data-obs="webxrIncubationsFlag"><option value="">not recorded</option><option>on</option><option>off</option><option>unknown</option></select></label>
+          <label>Printed target width measured with a ruler (cm)
+            <input data-obs="printedWidthCm" type="number" inputmode="decimal" min="1" max="100" step="0.1" /></label>
+          <label>Card exactly covers the printed target
+            <select data-obs="cardCoversPrint"><option value="">not checked</option><option>yes</option><option>partly</option><option>no</option></select></label>
+          <label>Red corner top-left, arrow toward the top of the print
+            <select data-obs="orientationCorrect"><option value="">not checked</option><option>yes</option><option>mirrored</option><option>rotated</option><option>no</option></select></label>
+          <label>Axes: red → image right, green → out of print, blue → image bottom (H3)
+            <select data-obs="axesMatchH3"><option value="">not checked</option><option>yes</option><option>no</option></select></label>
+          <label>Moved print out of view and back; content reappeared on it
+            <select data-obs="reacquireAfterLoss"><option value="">not done</option><option>yes</option><option>no</option></select></label>
+          <label>Content stable (no visible drift/jitter) while tracked
+            <select data-obs="poseStable"><option value="">not checked</option><option>yes</option><option>minor jitter</option><option>drifts</option></select></label>
+        </div>
+      </section>
+
       <section aria-labelledby="rep-h">
         <h2 id="rep-h">Report</h2>
         <p class="muted">No camera images are captured. Copy this JSON into the AND-IMG-01 evidence.</p>

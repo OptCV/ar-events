@@ -25,6 +25,11 @@ export interface FrameUpdate {
 export class ImageAnchorTracker {
   readonly state: TrackingStateMachine;
   readonly widths = new WidthStats();
+  /**
+   * Raw per-frame counts (UA result state, not our hysteresis state). Lets a report show whether the
+   * target ever left view: `emulated` / `noResult` frames after acquisition, and frames without a pose.
+   */
+  readonly counts = { frames: 0, tracked: 0, emulated: 0, noResult: 0, resultWithoutPose: 0, visible: 0 };
   private hasPose = false;
   private readonly api: ImageTrackingApi;
   private readonly targetIndex: number;
@@ -52,6 +57,15 @@ export class ImageAnchorTracker {
       }
     }
     if (!this.state.contentVisible) this.hasPose = false; // re-acquire before showing again after `lost`
-    return { status: this.state.status, transition, anchorMatrix, visible: this.state.contentVisible && this.hasPose, measuredWidthMeters };
+    const visible = this.state.contentVisible && this.hasPose;
+    const c = this.counts;
+    c.frames++;
+    if (!r) c.noResult++;
+    else {
+      c[r.trackingState]++;
+      if (!anchorMatrix) c.resultWithoutPose++;
+    }
+    if (visible) c.visible++;
+    return { status: this.state.status, transition, anchorMatrix, visible, measuredWidthMeters };
   }
 }

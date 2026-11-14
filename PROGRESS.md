@@ -1,7 +1,7 @@
 # PROGRESS.md — Actual Implementation State
 
 **Updated:** 2026-11-14  
-**State:** P0 runtime-proof kit (incl. Android WebXR image probe) implemented and **structurally validated / desktop-tested**. **No physical-device test has been executed.** No app/API/database code yet.  
+**State:** P0 runtime-proof kit (incl. Android WebXR image probe) implemented and **structurally validated / desktop-tested**. **First device result: AND-IMG-01 PARTIAL** (native WebXR image tracking + DOM overlay worked on one Android/Chrome 157 device; visual/geometry checks outstanding). All other device rows NOT TESTED. No app/API/database code yet.  
 **Current phase:** P0 — automated half done; device half blocked on hosting + devices.
 
 ## Implemented (automated evidence)
@@ -67,3 +67,11 @@ Not available yet: lint (ESLint/Prettier not configured), DB migrations, `apps/w
 - Device evidence: none. AND-IMG-01 needs an ARCore phone with Chrome "WebXR Incubations" enabled; quick local route: `npm run p0:build && npm run p0:webxr:dev`, then `adb reverse tcp:5173 tcp:5173` and open `http://localhost:5173` on the phone.
 - ADRs: ADR-010, ADR-011.
 - Next smallest testable step: run AND-IMG-01 (flag on) and AND-IMG-02 (flag off) and paste the probe's JSON report into `TESTING.md`.
+
+## Session handoff — 2026-11-14 (3) / Claude Code
+
+- Goal: review the AND-IMG-01 device report, fix probe defects, commit Phase 0, plan Phase 1.
+- Device evidence: AND-IMG-01 PARTIAL (see `TESTING.md` "Device results").
+- Fixed (probe 0.2.0, ADR-012): UA width echo flagged; device identity via UA Client Hints; tester-observation fields; raw frame counts; duration and end reason.
+- Commands: `npm run check:all` → Vitest 91/91, pytest 55/55; `npm run test:e2e` → 2/2; `p0:build` → `img-overlay.glb` SHA unchanged (`2b1167ae…`), so the device result applies to the current asset.
+- Next device step: re-run AND-IMG-01 with probe 0.2.0, filling in every observation; run AND-IMG-02 (flag off).

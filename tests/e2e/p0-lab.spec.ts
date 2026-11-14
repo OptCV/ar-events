@@ -41,6 +41,16 @@ test('webxr probe: desktop takes the honest unsupported path without errors', as
   expect(report.outcome).toBe('preflight-failed');
   expect(report.assets.glbSha256).toMatch(/^[0-9a-f]{64}$/);
   expect(report.error).toBeUndefined();
+  expect(report.probe).toBe('p0-webxr-probe@0.2.0');
+  expect(['ua-client-hints', 'user-agent-only']).toContain(report.device?.source);
+  // Tester observations flow into the report; clearing removes them.
+  await page.getByLabel('Card exactly covers the printed target').selectOption('partly');
+  await page.getByLabel('Printed target width measured with a ruler (cm)').fill('19.8');
+  await page.getByLabel('Printed target width measured with a ruler (cm)').blur();
+  const withObs = JSON.parse((await page.locator('#report').textContent()) ?? '{}');
+  expect(withObs.observations).toEqual({ cardCoversPrint: 'partly', printedWidthCm: '19.8' });
+  await page.getByLabel('Card exactly covers the printed target').selectOption('');
+  expect(JSON.parse((await page.locator('#report').textContent()) ?? '{}').observations).toEqual({ printedWidthCm: '19.8' });
   expect(problems).toEqual([]); // includes CSP violations (blob: textures, module scripts)
 });
 

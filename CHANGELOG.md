@@ -2,6 +2,16 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-14 — First device result (AND-IMG-01) and probe 0.2.0
+
+### Verified on device (PARTIAL)
+- Android / Chrome 157: native WebXR `image-tracking` granted, target rated trackable, pose acquired in 6.9 s, DOM overlay shown and tappable. Size, alignment, axes, re-acquire and device identity are not yet verified.
+
+### Fixed
+- Probe treated the UA-reported image width as a measurement; Chrome echoes the registered width. It is now flagged and never used as size evidence (ADR-012).
+- Probe reports could not identify the device under Chromium's reduced UA; they now use UA Client Hints.
+- Probe reports now include tester observations, raw per-frame state counts, session duration and end reason.
+
 ## 2026-11-14 — Android WebXR image-tracking probe
 
 ### Added

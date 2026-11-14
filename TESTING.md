@@ -7,7 +7,7 @@
 - **Structurally validated:** file parses/validates, but native viewer not tested.
 - **Device verified:** target device + OS + browser/viewer version recorded with visible result.
 
-**Current baseline (2026-11-14):** schema, launch URLs, capability registry and flat Image-to-AR GLB/USDZ conversion are **Implemented + structurally validated**. Every device row below is **NOT TESTED**.
+**Current baseline (2026-11-14):** schema, launch URLs, capability registry and flat Image-to-AR GLB/USDZ conversion are **Implemented + structurally validated**. Device rows are **NOT TESTED** except AND-IMG-01, which is **PARTIAL** (runtime path verified on one Android/Chrome 157 device; visual/geometry checks outstanding).
 
 ## Automated evidence log
 
@@ -21,6 +21,8 @@
 | 2026-11-14 | `npm run usd:test` | + cross-time reproducibility (ADR-011) | 55/55 pass |
 | 2026-11-14 | `npm run test:e2e` (Playwright 1.64.1, Edge channel, desktop) | device-lab links per runtime; WebXR probe unsupported path, CSP, GLB load, no console errors | 2/2 pass |
 | 2026-11-14 | `npm run p0:build` ×2, 3 s apart | USDZ reproducibility | identical hashes |
+| 2026-11-14 | `npm run check:all` | + device-report regressions (width echo, reduced UA, client hints, frame counts) | Vitest 91/91, pytest 55/55 |
+| 2026-11-14 | `npm run test:e2e` | + probe 0.2.0 observations form and device info | 2/2 pass |
 
 Validators: GLB — Khronos `gltf-validator` 2.0.0-dev.3.10 (0 errors and 0 warnings required). USDZ — OpenUSD 26.8 `UsdValidation` (28 validators) + Quick Look profile checks (ADR-008). Neither is evidence of on-device behavior.
 
@@ -46,7 +48,8 @@ Record the asset SHA-256 from `manifest.json` with each result.
 
 1. ARCore-supported Android phone, Chrome (record version from `chrome://version`), Google Play Services for AR version.
 2. **AND-IMG-02 (flag off, default):** open the probe, tap Start AR. Expected: report `outcome: "image-tracking-unavailable"`, `unavailableReason: "feature-not-granted"`, and the fallback message. This is what most real visitors will see.
-3. **AND-IMG-01 (flag on):** enable `chrome://flags` → "WebXR Incubations", relaunch, print the target at exactly 20.0 cm wide, tap Start AR and point at the print. Expected: status goes scanning → tracked; the card covers the print exactly; red top-left corner and arrow toward the top of the print; axis helper red → image right, green → out of the print, blue → image bottom (H3); `measuredWidth.ratioToRegistered` ≈ 1; "Overlay CTA" tap recorded (`overlayCtaTapped: true`), which verifies the DOM overlay.
+3. **AND-IMG-01 (flag on):** enable `chrome://flags` → "WebXR Incubations", relaunch, print the target and **measure it with a ruler** (enter the width in the probe), tap Start AR and point at the print. Expected: status goes scanning → tracked; the card covers the print exactly; red top-left corner and arrow toward the top of the print; axis helper red → image right, green → out of the print, blue → image bottom (H3); "Overlay CTA" tap recorded (`overlayCtaTapped: true`), which verifies the DOM overlay. **Do not use `measuredWidth` as size evidence:** on Chrome 157 it echoes the registered width (`echoesRegistered: true`); physical size is judged only by the card covering the ruler-checked print.
+   Fill in every "Tester observations" field before copying the report (probe ≥ 0.2.0).
 4. Move the print out of view and back: expect lost → tracked transitions.
 5. Paste the probe's JSON report (contains UA, enabled features, scores, transitions, measured width, GLB SHA-256; no imagery) into the Evidence column.
 
@@ -97,13 +100,34 @@ Local alternative to hosting: `npm run p0:build && npm run p0:webxr:dev`, `adb r
 | IOS-FLR-01 | TBD | Safari + Quick Look | horizontal place | horizontal anchor | NOT TESTED | — |
 | IOS-WAL-01 | TBD | Safari + Quick Look | vertical place | vertical anchor | NOT TESTED | — |
 | IOS-ALPHA-01 | TBD | Quick Look | alpha 0/0.5/1 PNG | no opaque background | NOT TESTED | — |
-| AND-IMG-01 | TBD | Chrome WebXR experimental (flag on) | image tracking | real tracked pose, H3 axes, width ratio ≈ 1, overlay CTA | NOT TESTED | — |
+| AND-IMG-01 | Android device — model and OS version **not recorded** (reduced UA "Android 10; K") | Chrome 157 (major only; flag state not recorded) | image tracking | tracked pose, card covers print, H3 axes, re-acquire, overlay CTA | **PARTIAL** — runtime path verified; visual/geometry items NOT VERIFIED (see AND-IMG-01 result below) | probe 0.1.0 report, 2026-11-14T18:38:12Z, GLB `2b1167ae…5f36` |
 | AND-IMG-02 | TBD | Chrome default (flag off) | image tracking unavailable | honest fallback, `feature-not-granted` | NOT TESTED | — |
 | AND-FLR-01 | TBD | Scene Viewer | horizontal model | native Scene Viewer AR | NOT TESTED | — |
 | AND-WAL-01 | TBD | Scene Viewer | vertical option | wall placement | NOT TESTED | — |
 | AND-ALPHA-01 | TBD | Scene Viewer | transparent GLB | see-through pixels | NOT TESTED | — |
 | AND-LINK-01 | TBD | Scene Viewer | `link` parameter | native CTA | NOT TESTED | — |
 | IOS-LINK-01 | TBD | Safari + Quick Look | `callToAction` banner | banner tap posts message; page opens link | NOT TESTED | — |
+
+## Device results
+
+### AND-IMG-01 — 2026-11-14 (probe 0.1.0) — PARTIAL
+
+Device: Android phone, Chrome 157; exact model, Android version, full Chrome version and flag state were **not captured** (reduced UA; probe 0.1.0 had no client hints). Asset: `img-overlay.glb` SHA-256 `2b1167aebb509bd72e06ea0e9abbd3f51ddc4904c8ac7858f1ef2da061e55f36` (matches current build). Target registered at 0.20 m.
+
+| Item | Evidence in report | Status |
+|---|---|---|
+| HTTPS + `immersive-ar` supported | `preflight` all true | **Device verified** |
+| Native `image-tracking` granted, API shape = Chrome `trackedImages`/`getTrackedImageScores`/`getImageTrackingResults` | `enabledFeatures` incl. `image-tracking`; `api: chrome-image-tracking` | **Device verified** (validates ADR-010 adapter) |
+| Target image rated trackable | `scores: ["trackable"]` | **Device verified** for `tracking_target_20cm.png` |
+| Pose acquired | `scanning → tracked` at frame 202 / 6.9 s (includes aiming time) | **Device verified** |
+| DOM overlay shown and tappable during AR | `domOverlayType: "screen"`, `overlayCtaTapped: true` | **Device verified** |
+| Physical size (card = 20 cm print) | `measuredWidth` = registered value on all 478 samples → UA echo, not a measurement | **NOT VERIFIED** — needs tester observation |
+| Card alignment / orientation / H3 axes | not observable by the page | **NOT VERIFIED** |
+| `emulated` / `lost` / re-acquire | no transitions after `tracked`; unknown whether the print left view | **NOT VERIFIED** |
+| Pose stability / drift | not recorded | **NOT VERIFIED** |
+| Flag-off fallback (AND-IMG-02) | not run | **NOT TESTED** |
+
+Probe defects found from this report and fixed in probe 0.2.0 (ADR-012): width echo flagged (`echoesRegistered`, `usableAsSizeEvidence`), device model/OS/full versions via UA Client Hints, tester-observation fields, raw frame counts, duration and end reason. **Re-run AND-IMG-01 with probe 0.2.0** and run AND-IMG-02 to complete the row.
 
 ## Recording protocol
 

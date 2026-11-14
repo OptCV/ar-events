@@ -106,3 +106,13 @@ Accepted decisions may be superseded by new numbered entries; never rewrite prev
 **Context:** Rebuilding the P0 kit changed every USDZ SHA-256 with identical inputs. Cause: `UsdUtils` packaging stamps ZIP entries with wall-clock time. The in-process determinism test missed it because both builds ran in the same second.  
 **Decision:** After packaging, overwrite the DOS time/date of every local and central-directory entry with 1980-01-01 00:00. These fields are fixed-width and not covered by the CRC, so alignment and checksums are unchanged (`usd_processor/reproducible.py`). A regression test builds 2.1 s apart and re-validates.  
 **Consequences:** Asset hashes in `manifest.json` / device evidence are stable across rebuilds, as content-addressed derivative keys (DATA_MODEL.md R2 layout) require.
+
+## ADR-012 — Device evidence rules from the first WebXR device run
+
+**Date:** 2026-11-14  
+**Status:** Accepted  
+**Context:** The first AND-IMG-01 report (Chrome 157) proved the native image-tracking runtime path, but showed that (a) `measuredWidthInMeters` returned exactly the registered width on all 478 samples, (b) the reduced User-Agent ("Android 10; K", "Chrome/157.0.0.0") cannot identify the device, and (c) the report could not capture visual correctness or tracking loss.  
+**Decision:** (1) A UA-reported width that equals the registered width is never size evidence; `WidthStats` flags `echoesRegistered` / `usableAsSizeEvidence`, and physical size is verified only by human observation against a ruler-measured print. (2) Device identity in evidence comes from User-Agent Client Hints (`model`, `platformVersion`, `fullVersionList`), or else is recorded manually; it is never used for routing. (3) Visual results (alignment, orientation, H3 axes, re-acquire, stability, flag state) are explicit tester fields in the report; unfilled fields mean NOT VERIFIED. (4) Raw per-frame UA state counts are recorded so tracking loss can be diagnosed. Probe bumped to 0.2.0.  
+**Alternatives:** Estimate physical size from camera geometry (rejected: complex, not needed for P0); trust UA width (rejected: proven to echo).  
+**Consequences:** AND-IMG-01 is PARTIAL until re-run with probe 0.2.0. Routing (ADR-002) is unchanged: Android image remains experimental native WebXR only, `experimental` in the capability registry.  
+**Verification:** Regression tests use the exact device values (`webxrImage.test.ts`, "AND-IMG-01 findings").

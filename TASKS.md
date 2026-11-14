@@ -18,7 +18,9 @@ Where a task has an automated half and a device half, they are tracked separatel
 - [ ] Prototype Android Scene Viewer wall with `enable_vertical_placement=true` + hypothesis H2. (AND-WAL-01)
 - [ ] Test Scene Viewer `link` and Quick Look banner CTA on device. (AND-LINK-01, IOS-LINK-01)
 - [x] Android WebXR image-tracking probe page: adapter, preflight, tracker state machine, DOM overlay, JSON report (`packages/webxr-image`, `apps/p0-webxr-probe` → `out/p0/webxr/`; ADR-010). *(unit + desktop e2e only)*
-- [ ] Run the WebXR probe on an ARCore Android phone with Chrome "WebXR Incubations" on, and with it off. (AND-IMG-01, AND-IMG-02)
+- [-] Run the WebXR probe on an ARCore Android phone with Chrome "WebXR Incubations" on, and with it off. (AND-IMG-01 **PARTIAL** 2026-11-14: tracking, trackable score, DOM overlay verified on Chrome 157; visual/H3/re-acquire/device identity outstanding. AND-IMG-02 not run.)
+- [x] Probe 0.2.0: fix evidence gaps found on device (width echo, reduced UA, tester observations, frame counts; ADR-012).
+- [ ] Re-run AND-IMG-01 with probe 0.2.0 and fill all tester observations; run AND-IMG-02 (flag off).
 - [x] Byte-reproducible USDZ output (ADR-011).
 - [ ] Benchmark Cloudflare Containers conversion resource requirements (local Docker baseline recorded in `TESTING.md`).
 - [ ] Run Apple `usdchecker` (macOS) on the P0 USDZ set as an extra gate (ADR-008).

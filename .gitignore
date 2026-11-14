@@ -1,14 +1,50 @@
+# --- dependencies
 node_modules/
-dist/
-coverage/
-.wrangler/
-.dev.vars
+
+# --- secrets / local config (SECURITY.md: secrets only in env/bindings, never committed)
 .env
 .env.*
-*.log
-__pycache__/
-.pytest_cache/
-# generated P0 outputs (rebuild with npm run p0:glb / usd scripts)
+.dev.vars
+.dev.vars.*
+*.local
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+.secrets/
+secrets/
+
+# --- Cloudflare / build output / caches
+.wrangler/
+dist/
+build/
+coverage/
+.vite/
+*.tsbuildinfo
+
+# --- generated P0 outputs (rebuild with `npm run p0:build`)
 out/
+
+# --- test artifacts
 test-results/
 playwright-report/
+blob-report/
+playwright/.cache/
+
+# --- Python (usd-processor runs in Docker; host artifacts if any)
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# --- OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+
+# --- logs
+*.log
+npm-debug.log*
