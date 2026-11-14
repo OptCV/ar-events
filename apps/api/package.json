@@ -1,0 +1,12 @@
+{
+  "name": "@ar-creator/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Hono API running in the single AR Creator Worker (bundled by apps/web via @cloudflare/vite-plugin).",
+  "exports": { ".": "./src/app.ts" },
+  "dependencies": {
+    "@ar-creator/contracts": "0.0.0",
+    "hono": "4.13.16"
+  }
+}

@@ -15,18 +15,21 @@ Prerequisites: Node ≥ 22, Docker. (No host Python needed; OpenUSD runs in a co
 
 ```sh
 npm install
-npm run check          # typecheck + Vitest
+npm run dev            # app: SPA + Hono API in one Worker (workerd) at http://localhost:5173
+npm run build          # production build → apps/web/dist (client assets + Worker)
+npm run preview        # serve the production build in workerd
+npm run check          # typecheck (regenerates Worker types) + Vitest
 npm run usd:build      # build the sandboxed OpenUSD processor image
 npm run usd:test       # pytest inside the sandbox
 npm run check:all      # both
 npm run fixtures       # regenerate golden fixtures (must be byte-identical)
 P0_BASE_URL=https://<host> npm run p0:build   # P0 device kit → out/p0/ (incl. WebXR probe at out/p0/webxr/)
 npm run p0:serve       # serve out/p0 locally with its _headers
-npm run test:e2e       # Playwright against out/p0 using installed Edge (PW_CHANNEL=chrome to switch)
+npm run test:e2e       # Playwright: p0 lab + app (dev and production build) using installed Edge (PW_CHANNEL=chrome to switch)
 npm run p0:webxr:dev   # probe dev server; phone via `adb reverse tcp:5173 tcp:5173`
 ```
 
-Layout: `packages/{schema,platform-launch,capabilities,image-to-ar,webxr-image}`, `apps/p0-webxr-probe`, `services/usd-processor`, `tests/{fixtures,e2e}`, `scripts`, `infra/p0-lab`. `apps/web` and `apps/api` do not exist yet. See `PROGRESS.md` for verified status.
+Layout: `apps/web` (SPA + deployable Worker config), `apps/api` (Hono API), `packages/{contracts,schema,platform-launch,capabilities,image-to-ar,webxr-image}`, `apps/p0-webxr-probe`, `services/usd-processor`, `spikes/auth-workers` (reference only), `tests/{fixtures,e2e}`, `scripts`, `infra/p0-lab`. See `PROGRESS.md` for verified status.
 
 ## Product invariants
 

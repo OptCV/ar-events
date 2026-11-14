@@ -10,7 +10,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json && tsc -p apps/api/tsconfig.json && tsc -p apps/web/tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "fixtures": "node --experimental-strip-types scripts/generate-fixtures.ts",
@@ -22,7 +22,11 @@
     "check:all": "npm run check && npm run usd:test",
     "p0:serve": "node --experimental-strip-types scripts/serve-p0.ts",
     "p0:webxr:dev": "vite apps/p0-webxr-probe",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "dev": "npm run dev -w @ar-creator/web",
+    "build": "npm run build -w @ar-creator/web",
+    "preview": "npm run preview -w @ar-creator/web",
+    "pretypecheck": "npm run -s cf-typegen -w @ar-creator/web"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",
@@ -33,7 +37,7 @@
     "jpeg-js": "0.4.4",
     "pngjs": "7.0.0",
     "typescript": "5.9.3",
-    "vite": "8.3.8",
+    "vite": "8.3.5",
     "vitest": "4.1.12"
   }
 }

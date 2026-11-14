@@ -1,8 +1,8 @@
 # PROGRESS.md — Actual Implementation State
 
 **Updated:** 2026-11-14  
-**State:** P0 runtime-proof kit (incl. Android WebXR image probe) implemented and **structurally validated / desktop-tested**. **First device result: AND-IMG-01 PARTIAL** (native WebXR image tracking + DOM overlay worked on one Android/Chrome 157 device; visual/geometry checks outstanding). All other device rows NOT TESTED. No app/API/database code yet.  
-**Current phase:** P0 — automated half done; device half blocked on hosting + devices.
+**State:** P0 runtime-proof kit (incl. Android WebXR image probe) implemented and **structurally validated / desktop-tested**. **First device result: AND-IMG-01 PARTIAL** (native WebXR image tracking + DOM overlay worked on one Android/Chrome 157 device; visual/geometry checks outstanding). All other device rows NOT TESTED. **Phase 1 Milestone 1 (app skeleton) done and verified locally in workerd; not deployed.** No database/auth code yet.  
+**Current phase:** P1 Milestone 2 (database) next. P0 device rows still open (AND-IMG-01 re-run, AND-IMG-02, iOS, Scene Viewer).
 
 ## Implemented (automated evidence)
 
@@ -79,3 +79,13 @@ Not available yet: lint (ESLint/Prettier not configured), DB migrations, `apps/w
 - Phase 1 (uncommitted): Better Auth evaluated and accepted (ADR-013) after a local-workerd spike (`spikes/auth-workers`, 16/16 checks); single same-origin Worker proposed (ADR-014); Phase 1 slice plan in `ROADMAP.md`; P1 tasks expanded.
 - Phase 1 blockers (owner decisions): Postgres provider/region, email provider, Workers Paid plan, upload path.
 - Next smallest testable step (P1-1): scaffold `apps/web` + `apps/api` as one Worker with `@cloudflare/vite-plugin` and prove `/api/health` + SPA fallback in `vite dev` and in a production build.
+
+## Session handoff — 2026-11-14 (4) / Claude Code — Phase 1 Milestone 1
+
+- Branch: `feature/p1-m1-skeleton` (from `phase-0` @ `60ec95e`; Phase 0 commits untouched).
+- Goal: application skeleton — one Worker serving the Vite/React SPA and the Hono API from the same origin.
+- Built: `apps/web` (React 19.3.1, React Router 8.5.1, TanStack Query 5.105.0, CSS Modules with DESIGN.md tokens, layout with skip link, home page with live API status, not-found and error routes, typed API client validated by contracts), `apps/api` (Hono 4.13.16: request IDs, security headers, no-store, `/api/health`, JSON error contract), `packages/contracts`, `apps/web/wrangler.jsonc` (SPA fallback + `run_worker_first: ["/api/*"]`, nodejs_compat, observability), `public/_headers`.
+- Verified locally: see `TESTING.md` P1 M1 rows (typecheck, Vitest 96/96, pytest 55/55, Playwright 13/13 in workerd for dev and production builds, `npm audit` 0).
+- Not verified: anything on Cloudflare's edge (no deploy was performed: needs the owner's account); visual QA beyond Edge desktop/phone-width screenshots; no ESLint/Prettier yet.
+- ADRs: ADR-015 (owner decisions), ADR-016 (M1 conventions; ADR-014 verified locally).
+- Next smallest testable step: Milestone 2 — `packages/db` with Drizzle schema + migrations against Dockerised Postgres, Hyperdrive binding with `localConnectionString` from `.dev.vars`/env, a per-request connection helper, and `/api/health` gaining a `database` check.

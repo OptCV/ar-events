@@ -150,3 +150,27 @@ Accepted decisions may be superseded by new numbered entries; never rewrite prev
 **Decision:** One deployable Worker: the Vite/React SPA (`apps/web`) served as static assets with SPA fallback, and the Hono API (`apps/api`) handling `/api/*`, built with `@cloudflare/vite-plugin`. Public published assets are served from R2 under immutable keys (same origin or a dedicated asset hostname; decide in P1-5).  
 **Alternatives:** Separate API and web origins (needs credentialed CORS and cross-site cookie handling); Cloudflare Pages + Functions (superseded by Workers Static Assets).  
 **Verification:** P1-1 must show `vite dev` running both SPA and Worker in workerd, and a production build with `/api/*` routed to the Worker and other paths to the SPA.
+
+## ADR-015 — Phase 1 service choices (product owner approval)
+
+**Date:** 2026-11-14  
+**Status:** Accepted by product owner  
+**Decision:** Neon PostgreSQL (preferably US East) with Drizzle ORM, reached from Workers only through Cloudflare Hyperdrive; Better Auth (ADR-013); Resend for email verification and password recovery; Workers **Paid** plan in production; Cloudflare R2 for storage. Uploads start Worker-streamed for small assets, but the upload service interface must also support presigned URLs and R2 multipart uploads for large 3D models. One Worker serves the SPA and the API from the same origin (ADR-014 → accepted, verification in P1 Milestone 1). Hyperdrive query caching is disabled for authentication, sessions, permissions and other consistency-sensitive reads (ADR-013 §5).  
+**Constraints restated:** no secrets, connection strings or API keys in Git (Wrangler secrets, `.dev.vars` locally); public sign-up stays disabled until email verification and security configuration are complete; platform routing (ADR-002) unchanged.  
+**Consequences:** Phase 1 runs as five sequential milestones (skeleton → database → authentication → experience management → asset storage), each verified and committed separately.
+
+## ADR-016 — Phase 1 Milestone 1: application skeleton conventions
+
+**Date:** 2026-11-14  
+**Status:** Accepted (local verification; not yet deployed)  
+**Context:** Milestone 1 sets up the single same-origin Worker (ADR-014) and the conventions later milestones will follow.  
+**Decision:**
+1. **Layout:** `apps/web` owns the deployable unit (`vite.config.ts` + `wrangler.jsonc`, `main: ../api/src/worker.ts`); `apps/api` holds the Hono app as a plain package (`createApp`) so it is unit-testable in Node; `packages/contracts` holds Zod request/response schemas shared by Worker and SPA.
+2. **Routing:** `assets.not_found_handling = "single-page-application"` and `assets.run_worker_first = ["/api/*"]`. Unknown `/api/*` paths return the JSON error contract, never `index.html`. Unknown non-API paths (including missing static files) return `index.html` with 200.
+3. **Types per runtime:** separate tsconfigs for the Worker (types from `wrangler types`, no DOM) and the SPA (DOM + `vite/client`). The generated `worker-configuration.d.ts` is not committed; `pretypecheck` regenerates it from `wrangler.jsonc`.
+4. **Security defaults:** SPA headers in `public/_headers` (strict CSP without `unsafe-inline`, `frame-ancestors 'none'`, nosniff, Referrer-Policy, restrictive Permissions-Policy); API responses use Hono `secureHeaders` with `default-src 'none'` and `Cache-Control: no-store`; errors return `{ error: { code, message, requestId } }` without internals. **No client source maps** are deployed (they would be public assets); Worker source maps are uploaded privately (`upload_source_maps`).
+5. **Build identity:** `/api/health` reports the package version, the git commit (`-dirty` when uncommitted) and the runtime (`workerd` detected via `navigator.userAgent`).
+6. **Dependencies:** Hono pinned to 4.13.16, deliberately newer than the two-week settling rule, because ≤4.13.15 has five published advisories, including wildcard middleware being skipped. Security fixes override the settling rule. The auth spike still pins 4.13.14 and is reference-only.
+7. **Tests:** Vitest for API logic (Node); Playwright projects run against `vite dev` and `vite preview` (production build), both in workerd, using the local Edge channel.
+
+**Consequences:** ADR-014's same-origin routing is verified locally in workerd (dev and production build). It is **not yet verified on Cloudflare's edge**: the first deploy must confirm `run_worker_first`, `_headers` and SPA fallback behave identically.

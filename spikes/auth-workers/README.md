@@ -18,3 +18,6 @@ Secure cookies over HTTPS, email verification or password reset (no email provid
 
 Key pattern (`src/index.ts`): per request, create `new pg.Client(env.HYPERDRIVE.connectionString)` → `drizzle(client)` → `createAuth(db, env)`,
 and close the client with `executionCtx.waitUntil(client.end())`. Never hold a client or an auth instance bound to one at module scope.
+
+> Reference only — not deployed and not imported by the app. It pins `hono@4.13.14`, which has published advisories
+> (fixed in 4.13.16, used by `apps/api`). Do not copy its dependency pins; Milestone 3 ports only the verified pattern.

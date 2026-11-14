@@ -1,0 +1,18 @@
+// The single AR Creator Worker (ADR-014): SPA via Workers Static Assets + Hono API at /api/*.
+// No secrets here. Secrets: `wrangler secret put <NAME>` (prod) / `.dev.vars` (local, gitignored).
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ar-creator",
+  "main": "../api/src/worker.ts",
+  "compatibility_date": "2026-10-28",
+  // Explicit for Better Auth (node:crypto, AsyncLocalStorage) and pg in later milestones.
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    // Unknown non-API paths return index.html so client-side routes deep-link correctly.
+    "not_found_handling": "single-page-application",
+    // API requests always reach the Worker, even if a static file with the same path existed.
+    "run_worker_first": ["/api/*"]
+  },
+  "observability": { "enabled": true },
+  "upload_source_maps": true
+}

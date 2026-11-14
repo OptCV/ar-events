@@ -2,6 +2,21 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-14 — Phase 1 Milestone 1: application skeleton
+
+### Added
+- `apps/web`: Vite + React SPA (React Router, TanStack Query, CSS Modules with design tokens), accessible layout, home page with live API status, not-found and error routes; deployable Worker config (`wrangler.jsonc`) bundling `apps/api` via `@cloudflare/vite-plugin`.
+- `apps/api`: Hono API under `/api` with `/api/health`, request IDs, security headers, `no-store`, and a JSON error contract that never leaks internals.
+- `packages/contracts`: shared Zod API contracts.
+- Playwright `app-dev` / `app-preview` projects running in workerd; root `dev`, `build`, `preview` scripts.
+- ADR-015 (owner service choices), ADR-016 (skeleton conventions).
+
+### Security
+- Hono pinned to 4.13.16 to avoid five advisories in ≤4.13.15. Client source maps are no longer emitted.
+
+### Status
+- Verified locally only; not deployed.
+
 ## 2026-11-14 — Phase 1 planning and authentication decision
 
 ### Added

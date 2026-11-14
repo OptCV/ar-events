@@ -1,0 +1,9 @@
+{
+  "name": "@ar-creator/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Zod request/response contracts shared by apps/api (Worker) and apps/web (SPA).",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "zod": "4.6.7" }
+}

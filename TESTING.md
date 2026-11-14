@@ -24,6 +24,9 @@
 | 2026-11-14 | `npm run check:all` | + device-report regressions (width echo, reduced UA, client hints, frame counts) | Vitest 91/91, pytest 55/55 |
 | 2026-11-14 | `npm run test:e2e` | + probe 0.2.0 observations form and device info | 2/2 pass |
 | 2026-11-14 | `spikes/auth-workers: npm run verify` (wrangler 4.156.0 / local workerd, Postgres 17 in Docker) | Better Auth 1.7.14 + Hono + Drizzle + pg via Hyperdrive local binding: migrate, sign-up, duplicate, wrong password, sign-in cookie flags, protected route, 12 concurrent requests, hash at rest, sign-out revocation, per-IP DB rate limit, no runtime errors | 16/16 pass (local only — edge NOT VERIFIED) |
+| 2026-11-14 | `npm run check:all` (P1 M1) | typecheck (root + Worker + SPA configs), Vitest 6 files incl. `apps/api` (5 tests: health contract, headers, 404/500 error contract without leaks, non-API paths), pytest | Vitest 96/96, pytest 55/55 |
+| 2026-11-14 | `npm run test:e2e` (P1 M1) | `app-preview` (production build via `vite preview`, workerd) + `app-dev` (`vite dev`, workerd): home + live health, `/api/health` contract/headers/`runtime: workerd`, `/api/*` 404 is JSON (not SPA), deep-link SPA fallback, skip link + focus; prod-only: CSP/frame/nosniff headers, immutable assets, no public client source maps; plus `p0` | 13/13 pass |
+| 2026-11-14 | `npm run build` (P1 M1) | Worker 227.5 KB (54.7 KB gzip), client JS 432.9 KB (133.1 KB gzip), CSS 4.1 KB | builds; not deployed |
 | 2026-11-14 | `spikes/auth-workers: node bench-hash.mjs` | Better Auth default scrypt (native node:crypto, N=16384 r=16 p=1) | hash ≈ 37 ms, verify ≈ 37 ms (local CPU; exceeds the 10 ms Free-plan CPU limit) |
 
 Validators: GLB — Khronos `gltf-validator` 2.0.0-dev.3.10 (0 errors and 0 warnings required). USDZ — OpenUSD 26.8 `UsdValidation` (28 validators) + Quick Look profile checks (ADR-008). Neither is evidence of on-device behavior.

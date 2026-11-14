@@ -88,10 +88,16 @@ P0 device results (axes, alpha, CTA) → P2 converter adjustments → P4 compile
 | P1-5 Uploads (R2) | `POST /api/assets/uploads` → pending asset + generated key `users/{uid}/assets/{id}/original`; Worker-streamed upload with size cap, magic-byte + header checks (reuse `readImageInfo`), SHA-256; explicit role (`tracking-image` / `display-image` / `model`); private read via short-lived signed URL | oversize, spoofed MIME, decompression-bomb dimensions rejected; checksum stored; other users cannot read | P1-4 |
 | P1-6 Dashboard | Login, experience list, create draft, upload asset with progress and errors (DESIGN.md states) | Playwright happy path + accessibility checks | P1-5 |
 
-**Open decisions needed from the product owner:**
-1. Managed PostgreSQL provider and region (Neon, Supabase, AWS RDS, GCP Cloud SQL, …). Hyperdrive works with any of them; data residency drives the choice.
-2. Email provider for verification and password reset (e.g. Cloudflare Email Service, Resend, Postmark). Blocks the public-launch auth gate, not P1 development.
-3. Confirm the Workers **Paid** plan (required by ADR-013).
-4. Upload path: Worker-streamed (simple, bounded by request body limits) vs. presigned R2 S3 URLs (large files; needs an R2 API token secret). Recommendation: Worker-streamed for images now, presigned for large GLB/USDZ later.
+**Owner decisions (resolved 2026-11-14, ADR-015):** Neon PostgreSQL (US East) + Hyperdrive; Resend; Workers Paid; Worker-streamed uploads now, upload service designed for presigned and multipart uploads later.
 
-**Phase 1 risks:** Hyperdrive caching of auth reads (ADR-013 §5); request-body size limits for large model uploads; Better Auth minor-version churn (pin exact, review changelogs); `@cloudflare/vite-plugin` + monorepo layout (validated in P1-1 before anything else).
+**Execution order agreed with the owner (one milestone per session, each verified and committed separately):**
+
+| Milestone | Slices | Status |
+|---|---|---|
+| M1 Application skeleton | P1-1 | **Done locally** (ADR-016); edge deploy not yet verified |
+| M2 Database | P1-2 (+ Hyperdrive binding, connection management, no-cache config for consistency-sensitive reads) | Next |
+| M3 Authentication | P1-3 (+ Resend email verification and password recovery; public sign-up gated until complete) | — |
+| M4 Experience management | P1-4 + dashboard layout + image/floor/wall placement selector + scene configuration API | — |
+| M5 Asset storage | P1-5 (+ previews and metadata; storage logic separate from UI; presigned/multipart-ready interface) | — |
+
+**Phase 1 risks:** Hyperdrive caching of auth reads (ADR-013 §5); request-body size limits for large model uploads; Better Auth minor-version churn (pin exact, review changelogs); `@cloudflare/vite-plugin` + monorepo layout (validated locally in M1; edge deploy pending). Client bundle is 133 KB gzip for a skeleton, mostly React + Zod 4; watch it as features land (consider `zod/mini` on the client).
