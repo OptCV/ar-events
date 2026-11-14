@@ -1,0 +1,6 @@
+{
+  // Integration tests run in Node but import Worker code: Worker types + Node types.
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "types": ["node"] },
+  "include": ["src/**/*.ts", "test/**/*.ts", "worker-configuration.d.ts", "vitest.integration.config.ts"]
+}

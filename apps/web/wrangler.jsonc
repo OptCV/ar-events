@@ -17,6 +17,17 @@
   // The ID is not a secret. No connection string or localConnectionString is stored here: local dev reads
   // CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE from the gitignored repo-root .env (npm run db:env).
   "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "8de2df3d333b4a1b9b07c18fbdd49d18" }],
+  // Fail-closed production defaults (ADR-019). Local values come from apps/web/.dev.vars (npm run dev:env).
+  // Before enabling auth in a deployed environment set: BETTER_AUTH_URL (https origin), EMAIL_FROM (verified
+  // Resend domain), and the secrets BETTER_AUTH_SECRET + RESEND_API_KEY via `wrangler secret put`.
+  // With BETTER_AUTH_URL empty, every /api/auth endpoint answers 503; sign-up stays off until explicitly enabled.
+  "vars": {
+    "APP_ENV": "production",
+    "BETTER_AUTH_URL": "",
+    "EMAIL_TRANSPORT": "resend",
+    "EMAIL_FROM": "",
+    "AUTH_SIGNUP_ENABLED": "false"
+  },
   "observability": { "enabled": true },
   "upload_source_maps": true
 }

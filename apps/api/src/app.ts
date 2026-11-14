@@ -1,9 +1,13 @@
 import { Hono, type Context } from 'hono';
 import { requestId } from 'hono/request-id';
 import { secureHeaders } from 'hono/secure-headers';
-import { HealthResponse, type ApiError, type ApiErrorCode, type DatabaseCheck } from '@ar-creator/contracts';
+import { AuthConfigResponse, HealthResponse, MeResponse, SessionResponse, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, type ApiError, type ApiErrorCode, type DatabaseCheck, type SessionUser } from '@ar-creator/contracts';
 import { checkDatabase, classifyDbError, DatabaseError, type DbHandle } from '@ar-creator/db';
 import { dbMiddleware, hyperdriveConnector, logError, type DbConnector } from './db.ts';
+import type { Auth } from './auth/auth.ts';
+import type { AuthConfig } from './auth/config.ts';
+import { AuthUnavailableError, authContext, isAllowedAuthRoute, redirectsOffOrigin, requireSession, sameOriginMutations, unsafeRedirectIn } from './auth/middleware.ts';
+import { DevMailbox, type Mailer } from './email/mailer.ts';
 
 export interface BuildInfo {
   version: string;
@@ -13,11 +17,13 @@ export interface BuildInfo {
 export interface AppDeps {
   /** Defaults to the Hyperdrive connector; tests inject fakes. */
   connectDb?: DbConnector;
+  /** Tests inject a capturing mailer. */
+  mailer?: (cfg: AuthConfig) => Mailer;
 }
 
 /** Runtime bindings, generated from apps/web/wrangler.jsonc by `npm run cf-typegen -w @ar-creator/web`. */
 export type AppBindings = Env;
-export type AppEnv = { Bindings: AppBindings; Variables: { requestId: string; db: () => Promise<DbHandle> } };
+export type AppEnv = { Bindings: AppBindings; Variables: { requestId: string; db: () => Promise<DbHandle>; authConfig: AuthConfig; auth: () => Promise<Auth>; user: SessionUser } };
 
 function detectRuntime(): HealthResponse['runtime'] {
   // workerd sets this exact UA (https://developers.cloudflare.com/workers/runtime-apis/web-standards/#navigatoruseragent).
@@ -34,6 +40,32 @@ export function isDatabaseError(err: unknown): boolean {
   return e.name === 'DrizzleQueryError' || (typeof e.cause?.code === 'string' && SQLSTATE.test(e.cause.code));
 }
 
+/**
+ * Better Auth returns the session token in JSON bodies (for bearer-token clients). This app authenticates only
+ * with the HttpOnly cookie on one origin, so tokens are removed from bodies: script on the page (e.g. via an XSS
+ * bug) must never be able to read a session token. Set-Cookie headers are untouched.
+ */
+export async function stripSessionTokens(res: Response): Promise<Response> {
+  if (!(res.headers.get('content-type') ?? '').includes('application/json')) return res;
+  const text = await res.text();
+  let body: unknown;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    return new Response(text, res);
+  }
+  const scrub = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(scrub);
+    if (v && typeof v === 'object') {
+      return Object.fromEntries(Object.entries(v as Record<string, unknown>).filter(([k]) => k !== 'token').map(([k, x]) => [k, scrub(x)]));
+    }
+    return v;
+  };
+  const headers = new Headers(res.headers);
+  headers.delete('content-length');
+  return new Response(JSON.stringify(scrub(body)), { status: res.status, statusText: res.statusText, headers });
+}
+
 export function apiError(c: Context<AppEnv>, status: 400 | 401 | 403 | 404 | 405 | 500 | 503, code: ApiErrorCode, message: string) {
   const body: ApiError = { error: { code, message, requestId: c.get('requestId') } };
   return c.json(body, status);
@@ -48,6 +80,8 @@ export function createApp(info: BuildInfo, deps: AppDeps = {}) {
 
   app.use('*', requestId());
   app.use('*', dbMiddleware(deps.connectDb ?? hyperdriveConnector));
+  app.use('*', authContext(deps.mailer ? { mailer: deps.mailer } : {}));
+  app.use('*', sameOriginMutations);
   app.use(
     '*',
     secureHeaders({
@@ -87,9 +121,60 @@ export function createApp(info: BuildInfo, deps: AppDeps = {}) {
     return c.json(body, degraded ? 503 : 200);
   });
 
+  app.get('/auth-config', (c) => {
+    const cfg = c.get('authConfig');
+    return c.json(AuthConfigResponse.parse({ signupEnabled: cfg.signupEnabled, emailVerificationRequired: true, passwordMinLength: PASSWORD_MIN_LENGTH, passwordMaxLength: PASSWORD_MAX_LENGTH }));
+  });
+
+  app.on(['GET', 'POST'], '/auth/*', async (c) => {
+    const cfg = c.get('authConfig');
+    if (!cfg.ok) return apiError(c, 503, 'unavailable', 'Sign-in is temporarily unavailable.');
+    const authPath = c.req.path.slice('/api/auth'.length);
+    if (!isAllowedAuthRoute(c.req.method, authPath)) return apiError(c, 404, 'not_found', 'No such API route.');
+    if (authPath === '/sign-up/email' && !cfg.signupEnabled) return apiError(c, 403, 'forbidden', 'Sign-up is not open yet.');
+    const badParam = await unsafeRedirectIn(c.req.raw);
+    if (badParam) return apiError(c, 400, 'bad_request', `${badParam} must be a path on this site.`);
+    const auth = await c.get('auth')();
+    const res = await auth.handler(c.req.raw);
+    if (redirectsOffOrigin(res, cfg.baseURL ?? new URL(c.req.url).origin)) {
+      logError(c, 'auth.offsite-redirect-blocked', res.headers.get('location') ?? '');
+      return apiError(c, 400, 'bad_request', 'Redirect target refused.');
+    }
+    return stripSessionTokens(res);
+  });
+
+  app.get('/me', requireSession, (c) => c.json(MeResponse.parse({ user: c.get('user') })));
+
+  /** Public session probe for the UI: 200 with the user or null (no 401 noise for signed-out visitors). */
+  app.get('/session', async (c) => {
+    const auth = await c.get('auth')();
+    const r = await auth.api.getSession({ headers: c.req.raw.headers });
+    const user = r ? { id: r.user.id, email: r.user.email, name: r.user.name, emailVerified: r.user.emailVerified } : null;
+    return c.json(SessionResponse.parse({ user }));
+  });
+
+  /** Public session probe for the UI: 200 with user or null (avoids 401 noise for signed-out visitors). */
+  app.get('/session', async (c) => {
+    const auth = await c.get('auth')();
+    const r = await auth.api.getSession({ headers: c.req.raw.headers });
+    const user = r ? { id: r.user.id, email: r.user.email, name: r.user.name, emailVerified: r.user.emailVerified } : null;
+    return c.json(SessionResponse.parse({ user }));
+  });
+
+  // Local development only (ADR-019): 404 unless APP_ENV=development, dev-mailbox transport and a localhost host.
+  app.get('/dev/mailbox', (c) => {
+    const cfg = c.get('authConfig');
+    const host = new URL(c.req.url).hostname;
+    if (cfg.environment !== 'development' || cfg.email.transport !== 'dev-mailbox' || !['localhost', '127.0.0.1'].includes(host)) {
+      return apiError(c, 404, 'not_found', 'No such API route.');
+    }
+    return c.json({ messages: DevMailbox.list(c.req.query('to') ?? undefined) });
+  });
+
   app.notFound((c) => apiError(c, 404, 'not_found', 'No such API route.'));
   app.onError((err, c) => {
     // Structured, redacted log for Workers Observability; responses never leak internals.
+    if (err instanceof AuthUnavailableError) return apiError(c, 503, 'unavailable', 'Sign-in is temporarily unavailable.');
     if (isDatabaseError(err)) {
       const e = classifyDbError(err);
       logError(c, 'db.error', `${e.kind}: ${e.detail}`);

@@ -4,7 +4,7 @@ import { Client } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 
-export const MIGRATIONS_DIR = fileURLToPath(new URL('../migrations', import.meta.url));
+export const MIGRATIONS_DIR = fileURLToPath(new URL('../migrations', import.meta.url).href);
 
 export function baseUrl(): string {
   const url = process.env.DATABASE_URL;

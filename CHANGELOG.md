@@ -2,6 +2,22 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-14 — Phase 1 Milestone 3: authentication (local)
+
+### Added
+- Better Auth 1.7.16 in the Hono API: email + password with required email verification, password reset, sign-out and revoke-all, 7-day DB-backed sessions (no cookie cache), database rate limits per client IP, allowlisted endpoints, fail-closed configuration; `/api/auth-config`, `/api/session`, protected `/api/me`, `requireSession`.
+- Email: Resend mailer (env/secret-configured) and a localhost-only development mailbox; escaped templates with own-origin links.
+- UI: sign-in, sign-up (closed state), check-inbox with resend, email confirmed, forgot/reset password, account page; `RequireAuth` protected routes; session-aware header; validation, loading and error states.
+- Local secrets: `npm run dev:env` writes the gitignored `apps/web/.dev.vars`; fail-closed production vars in `wrangler.jsonc` (sign-up off).
+- Neon: role model SQL, guarded `npm run db:remote` (status/migrate/verify), runbook `infra/db/NEON.md`, remote runtime-role suite; local rehearsal.
+- Tests: 30 auth integration, 10 role-model, unit and e2e auth flows. ADR-018, ADR-019.
+
+### Security
+- Fixed a password-reset token leak via foreign `redirectTo`, an open redirect on verification, and login CSRF (Better Auth 1.7.16 behaviours); session tokens removed from JSON responses; `@better-auth/core` version skew pinned.
+
+### Status
+- Verified locally only. Neon, Hyperdrive (as `ar_app`), Cloudflare and Resend not verified.
+
 ## 2026-11-14 — Phase 1 Milestone 2: database
 
 ### Added

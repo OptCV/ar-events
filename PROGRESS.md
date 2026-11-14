@@ -1,8 +1,8 @@
 # PROGRESS.md — Actual Implementation State
 
 **Updated:** 2026-11-14  
-**State:** P0 runtime-proof kit (incl. Android WebXR image probe) implemented and **structurally validated / desktop-tested**. **First device result: AND-IMG-01 PARTIAL** (native WebXR image tracking + DOM overlay worked on one Android/Chrome 157 device; visual/geometry checks outstanding). All other device rows NOT TESTED. **Phase 1 Milestones 1 (app skeleton) and 2 (database) done and verified locally; not deployed; production migrations not applied.** No auth code yet.  
-**Current phase:** P1 Milestone 3 (authentication) next. P0 device rows still open (AND-IMG-01 re-run, AND-IMG-02, iOS, Scene Viewer).
+**State:** P0 runtime-proof kit (incl. Android WebXR image probe) implemented and **structurally validated / desktop-tested**. **First device result: AND-IMG-01 PARTIAL** (native WebXR image tracking + DOM overlay worked on one Android/Chrome 157 device; visual/geometry checks outstanding). All other device rows NOT TESTED. **Phase 1 Milestones 1–3 (skeleton, database, authentication) done and verified locally; nothing deployed; no Neon migrations applied; remote auth unverified.**  
+**Current phase:** P1 Milestone 4 next (after owner Neon/Cloudflare actions for remote verification). P0 device rows still open (AND-IMG-01 re-run, AND-IMG-02, iOS, Scene Viewer).
 
 ## Implemented (automated evidence)
 
@@ -106,3 +106,14 @@ Not available yet: lint (ESLint/Prettier not configured), DB migrations, `apps/w
    (an explicitly set `DATABASE_URL` takes precedence over the local `.env`).
 3. Deploy, then confirm `GET /api/health` reports `checks.database.migrations: "current"`.
 4. Record the date, migration tags (`0000_initial_schema`, `0001_immutability_triggers`) and operator in `TESTING.md`.
+
+## Session handoff — 2026-11-14 (6) / Claude Code — Phase 1 Milestone 3 (authentication)
+
+- Branch: `feature/p1-m3-auth` (from `acf89f5`). Milestones 1–2 untouched except the additive auth wiring in `apps/api/src/app.ts` and the session-aware header.
+- **Part A (Neon):** `wrangler hyperdrive get` confirmed caching disabled; origin role is `neondb_owner` on `ep-plain-unit-bcruyo1j` (branch unknown). Built the role model, guarded `db:remote` tool and runbook (`infra/db/NEON.md`, ADR-018); rehearsed locally. **Nothing was run against Neon. Hyperdrive was not modified.**
+- **Part B (auth, local):** Better Auth 1.7.16 integration, UI pages, dev mailbox, Resend mailer, fail-closed config, rate limits; three security findings fixed (ADR-019).
+- **Tests:** typecheck clean; Vitest 124; DB 38; integration 30; USD 55; Playwright 36; `npm audit` 0.
+- **Not verified:** Neon (migrations, roles, runtime suite), Hyperdrive as `ar_app`, anything on Cloudflare (no deploy or preview upload), Resend delivery, edge-set CF-Connecting-IP, Secure cookies over real HTTPS, sign-in CPU on Paid.
+- **Owner actions needed:** NEON.md steps 1–3; approval for `db:remote migrate --env development`; Hyperdrive origin → `ar_app` (dashboard); authorization for a preview upload (`wrangler versions upload`, not a production deploy) to run the remote checks; Resend key + verified domain.
+- **Local setup for new machines:** `npm run db:up` (creates `.env` and `apps/web/.dev.vars` with random local secrets) → `npm run db:migrate` → `npm run dev`. Emails appear at `http://localhost:5173/api/dev/mailbox`.
+- Next: Milestone 4 (dashboard, experiences, drafts, placement selector, scene configuration API). Not started.

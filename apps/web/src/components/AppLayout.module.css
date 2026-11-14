@@ -57,3 +57,16 @@
   padding: var(--ui-space-8) var(--ui-space-4);
 }
 .main:focus { outline: none; }
+.nav { display: flex; align-items: center; gap: var(--ui-space-1); flex-wrap: wrap; }
+.navButton {
+  min-height: var(--ui-touch);
+  padding: 0 var(--ui-space-3);
+  font: inherit;
+  color: var(--ui-text-secondary);
+  background: none;
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  cursor: pointer;
+}
+.navButton:hover { background: var(--ui-surface-muted); color: var(--ui-text); }
+.navButton:disabled { cursor: progress; }

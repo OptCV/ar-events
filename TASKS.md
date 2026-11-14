@@ -35,16 +35,20 @@ Plan and slice order: `ROADMAP.md` "Phase 1 plan".
 - [ ] First Cloudflare deploy of the skeleton (needs account; verify `run_worker_first`, `_headers`, SPA fallback on the edge).
 - [ ] ESLint/Prettier (still not configured).
 - [x] **Milestone 2 / P1-2** `packages/db`: Drizzle schema (Better Auth tables + experiences, revisions, assets, derivatives, jobs, outputs), migrations 0000–0001 incl. immutability triggers, local Postgres in Docker, per-request Hyperdrive connections, `/api/health` database check (ADR-017). Verified locally.
-- [ ] Apply migrations to Neon production — **only with owner approval** (procedure in `PROGRESS.md`).
+- [x] Neon role model + guarded remote tooling (`db:remote`, `infra/db/NEON.md`, ADR-018); rehearsed locally 10/10.
+- [ ] Owner: identify which Neon branch is `ep-plain-unit-bcruyo1j`; create `ar_migrator` + `ar_app` in the Neon Console; set `ar.environment`; run `01-owner-setup.sql` (NEON.md steps 1–3).
+- [ ] `db:remote -- status --env development` (read-only), then **with owner approval** `migrate`, then `verify` (8 checks incl. TLS).
+- [ ] Switch Hyperdrive origin to `ar_app` via the dashboard (caching stays disabled).
+- [ ] Apply migrations to Neon production — **only with owner approval** (`--approved`; procedure in NEON.md).
 - [ ] Edge verification of Hyperdrive: deploy, `/api/health` shows `database.status: ok`, confirm caching disabled (`wrangler hyperdrive get`), check latency.
-- [ ] Recommended: separate Neon roles (migration owner vs least-privilege DML role for Hyperdrive).
 - [ ] Rate limiting or brief caching for `/api/health` before public launch (it opens a DB connection per call).
-- [ ] P1-3 Auth in `apps/api` from the spike; `requireSession`; mutation Origin guard; sign-up/in/out UI.
-- [ ] P1-3 Edge verification on a Paid account: CPU per sign-in, Secure cookies, revocation with Hyperdrive caching disabled.
+- [x] **Milestone 3 / P1-3 (local):** Better Auth 1.7.16 in `apps/api` (per-request instance, allowlisted endpoints, fail-closed config, DB rate limits, token stripping, CSRF + redirect guards), `/api/auth-config`, `/api/session`, `/api/me`, `requireSession`; React sign-in/up, verify, forgot/reset, account, `RequireAuth`; dev mailbox; Resend mailer (ADR-019). Verified locally: integration 30/30, e2e 36/36.
+- [ ] P1-3 edge verification (needs owner authorization for a preview upload): Neon via Hyperdrive as `ar_app`, Secure/`__Secure-` cookies over HTTPS, CF-Connecting-IP set by the edge, sign-in CPU on Paid, revocation through Hyperdrive, Resend delivery.
 - [ ] P1-4 Experiences + draft API with ownership checks (cross-user → 404).
 - [ ] P1-5 R2 uploads: pending asset, streamed upload, magic bytes, size/dimension limits, SHA-256, explicit roles, signed private reads.
 - [ ] P1-6 Dashboard UI: login, experience list, create draft, upload with progress/errors.
-- [ ] Email verification + password reset (blocked on email provider).
+- [x] Email verification + password reset flows (dev mailbox locally).
+- [ ] Resend: API key secret, verified sending domain, `EMAIL_FROM`; then real-delivery test. Public sign-up stays off until done.
 - [x] Implement scene schema / discriminated placement union (`packages/schema`, v1; migrations pending).
 - [-] Add migration, lint, typecheck and automated test scripts. *(typecheck + Vitest + pytest + Playwright (Edge channel) done; ESLint/Prettier and DB migrations pending)*
 

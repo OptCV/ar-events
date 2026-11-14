@@ -192,3 +192,37 @@ Accepted decisions may be superseded by new numbered entries; never rewrite prev
 
 **Alternatives:** Neon serverless HTTP driver (bypasses Hyperdrive; rejected by ADR-015); a module-scope pool (forbidden in Workers); CHECKs/triggers only in application code (rejected: bypassable).  
 **Consequences / follow-ups:** recommend separate Neon roles (a migration owner and a least-privilege DML role used by Hyperdrive). `/api/health` opens a DB connection per call, so add rate limiting or brief caching before public launch. Migration 0001 uses PL/pgSQL, which Neon supports.
+
+## ADR-018 — Neon role model and guarded remote migrations
+
+**Date:** 2026-11-14  
+**Status:** Accepted (rehearsed locally with real roles; NOT yet applied to Neon; awaiting owner actions and approval)  
+**Context:** `wrangler hyperdrive get` (read-only) confirmed config `ar-creator-db` has caching **disabled**, but connects as `neondb_owner` (full owner) to endpoint `ep-plain-unit-bcruyo1j` (us-east-1, direct). Which Neon branch that endpoint belongs to is not visible from Cloudflare.  
+**Decision:**
+1. Three roles: `neondb_owner` (one-time setup only), `ar_migrator` (runs migrations and owns every schema object), `ar_app` (runtime role for Hyperdrive: SELECT/INSERT/UPDATE/DELETE only, read-only on the migration journal, no DDL). SQL: `packages/db/sql/01-owner-setup.sql` (as owner) and `02-app-grants.sql` (as `ar_migrator`, idempotent, applied automatically after migrating). Roles are created in the Neon Console so passwords never appear in SQL or shell history.
+2. Every branch carries a database-level marker `ar.environment` (`development` or `production`), set by the owner. `npm run db:remote -- status|migrate|verify --env <env>` refuses to act unless the marker matches. It also refuses pooled endpoints, non-TLS remote connections, migrating as any role other than `ar_migrator`, production without `--approved`, and any run without a typed confirmation. Connection strings come from a hidden prompt (or secret-manager-injected env vars), are never printed or written, and errors are redacted.
+3. `verify` runs the runtime-role suite (`packages/db/test-remote/runtime-role-suite.ts`) as `ar_app`. All writes are inside transactions that are rolled back. The same suite is rehearsed locally against Docker with real roles (`packages/db/test/roles.test.ts`).
+4. After migrating, the Hyperdrive origin is switched to `ar_app` through the Cloudflare dashboard (no secrets in a shell). Caching stays disabled.
+
+**Consequences:** The runbook is `infra/db/NEON.md`. Nothing remote runs automatically.  
+**Verification:** Local rehearsal 10/10. Guard refusals were exercised locally (owner role, production without approval, marker mismatch, wrong confirmation, pooler, no TLS). Neon itself: **NOT VERIFIED**.
+
+## ADR-019 — Milestone 3 authentication (Better Auth in the single Worker)
+
+**Date:** 2026-11-14  
+**Status:** Accepted (verified locally in Node and workerd against Docker Postgres; NOT verified on Neon/Hyperdrive or Cloudflare)  
+**Decision:**
+1. **Better Auth 1.7.16** (all published advisories fixed; `@better-auth/core` pinned by override to the same version after a skew to 1.7.25 left the adapter unable to resolve core). One auth instance per request, on that request's pg connection (ADR-013). Email + password, `requireEmailVerification`, no auto sign-in, passwords 12–128 characters, 1-hour single-use email tokens, all sessions revoked on password reset, 7-day sessions refreshed daily, **cookie cache off** (every check reads the database, so sign-out and revocation are immediate). Database-backed rate limits keyed by `CF-Connecting-IP`: sign-in 5/min, sign-up 5/h, reset requests 3/15 min, verification resends 3/15 min, reset submits 5/15 min, default 60/min. Telemetry off.
+2. **Cookies:** `arc.session_token`, HttpOnly, SameSite=Lax, Path=/; over HTTPS `__Secure-` prefix + Secure. The session token is **stripped from JSON bodies**: Better Auth returns it for bearer clients, but this app uses only the cookie, so page scripts can never read it.
+3. **Exposure:** only the endpoints the app uses are reachable under `/api/auth/*` (everything else Better Auth ships returns 404). Our API adds `GET /api/auth-config` (public UI capabilities), `GET /api/session` (public; `user` or `null`, avoiding 401 noise) and `GET /api/me` (protected; 401 without a session). `requireSession` protects future endpoints.
+4. **Fail-closed configuration:** `APP_ENV` defaults to production. A missing or short secret, or a missing/non-https `BETTER_AUTH_URL` in production, makes every auth endpoint return 503. Sign-up requires `AUTH_SIGNUP_ENABLED=true` **and** working email; `wrangler.jsonc` ships with sign-up off and an empty URL. Local values live in the gitignored `apps/web/.dev.vars` (`npm run dev:env`, random 48-byte secret).
+5. **Email:** a `Mailer` interface. `ResendMailer` uses fetch, an idempotency key and a 10 s timeout, and its errors never contain the key. `DevMailbox` keeps messages in isolate memory, exposed at `/api/dev/mailbox` only when `APP_ENV=development`, the transport is `dev-mailbox` **and** the host is localhost. Templates escape HTML and only link to our own origin.
+6. **Security findings fixed (regression-tested):**
+   - (a) **Reset-token leak / account takeover:** with 1.7.16 a `redirectTo` of `https://evil.example` was accepted, and the genuine reset email then redirected the victim to the attacker's site with a valid token. Fix: redirect parameters must be same-site paths in bodies and email-link queries, and any auth response redirecting off-origin is refused.
+   - (b) **Open redirect** on email verification (same fix).
+   - (c) **Login CSRF:** Better Auth's origin check only covers cookie-bearing requests, so a cookieless cross-site sign-in succeeded. Fix: every non-GET API request, including `/api/auth/*`, needs `Origin` equal to the app origin and a JSON body.
+   - Duplicate sign-ups return Better Auth's normal-looking response without creating an account or sending email (anti-enumeration). Password-reset requests answer identically for unknown emails.
+7. **UI:** React pages for sign-in, sign-up (shows "not open yet" when disabled), check-inbox with resend, email-confirmed, forgot and reset password, and an account page. `RequireAuth` route guard with a safe `next` redirect. Header is session-aware. Auth state comes from TanStack Query over `/api/session`, and the whole query cache is cleared on sign-out. Shared Zod contracts validate forms with field-linked errors and focus management.
+
+**Alternatives:** Better Auth client SDK (`better-auth/react`): not needed for a same-origin cookie app and would expose bearer tokens. Relaxed limits in development: rejected, as tests instead use distinct client IPs.  
+**Remaining verification:** a deployed (preview) Worker with Neon via Hyperdrive as `ar_app`, covering Secure cookies over HTTPS, CF-Connecting-IP set by the edge (locally workerd trusts a client-supplied header), sign-in CPU time on the Paid plan, revocation consistency through Hyperdrive, and real Resend delivery.

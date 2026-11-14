@@ -10,7 +10,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json && tsc -p apps/api/tsconfig.json && tsc -p apps/web/tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p apps/api/tsconfig.json && tsc -p apps/api/tsconfig.test.json && tsc -p apps/web/tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "fixtures": "node --experimental-strip-types scripts/generate-fixtures.ts",
@@ -19,7 +19,7 @@
     "check": "npm run typecheck && npm run test",
     "fixtures:geometry": "node --experimental-strip-types scripts/generate-geometry-golden.ts",
     "p0:build": "node --experimental-strip-types scripts/build-p0.ts",
-    "check:all": "npm run check && npm run test:db && npm run usd:test",
+    "check:all": "npm run check && npm run test:db && npm run test:integration && npm run usd:test",
     "p0:serve": "node --experimental-strip-types scripts/serve-p0.ts",
     "p0:webxr:dev": "vite apps/p0-webxr-probe",
     "test:e2e": "playwright test",
@@ -28,12 +28,15 @@
     "preview": "npm run preview -w @ar-creator/web",
     "pretypecheck": "npm run -s cf-typegen -w @ar-creator/web",
     "db:env": "node --experimental-strip-types scripts/db-env.ts",
-    "db:up": "npm run -s db:env && docker compose --env-file .env -f infra/db/docker-compose.yml up -d --wait",
+    "db:up": "npm run -s db:env && npm run -s dev:env && docker compose --env-file .env -f infra/db/docker-compose.yml up -d --wait",
     "db:down": "docker compose --env-file .env -f infra/db/docker-compose.yml down",
     "db:generate": "npm run generate -w @ar-creator/db",
     "db:migrate": "npm run migrate -w @ar-creator/db",
     "db:auth-schema": "npm run auth-schema -w @ar-creator/db",
-    "test:db": "npm run test -w @ar-creator/db"
+    "test:db": "npm run test -w @ar-creator/db",
+    "db:remote": "node --experimental-strip-types scripts/db-remote.ts",
+    "dev:env": "node --experimental-strip-types scripts/dev-vars.ts",
+    "test:integration": "npm run test:integration -w @ar-creator/api"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",
@@ -50,6 +53,7 @@
   "overrides": {
     "@esbuild-kit/core-utils": {
       "esbuild": "0.25.12"
-    }
+    },
+    "@better-auth/core": "1.7.16"
   }
 }

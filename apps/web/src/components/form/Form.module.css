@@ -1,0 +1,33 @@
+.form { display: grid; gap: var(--ui-space-4); }
+.field { display: grid; gap: var(--ui-space-1); }
+.label { font-weight: 600; font-size: var(--ui-text-sm); }
+.hint { color: var(--ui-text-secondary); font-size: var(--ui-text-sm); margin: 0; }
+.input {
+  min-height: var(--ui-touch);
+  padding: 0 var(--ui-space-3);
+  font: inherit;
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+}
+.input:hover { border-color: #b9c3ce; }
+.input[aria-invalid='true'] { border-color: var(--ui-danger); }
+.error { color: var(--ui-danger); font-size: var(--ui-text-sm); margin: 0; }
+.button {
+  min-height: var(--ui-touch);
+  padding: 0 var(--ui-space-6);
+  font: inherit;
+  font-weight: 600;
+  color: var(--ui-accent-contrast);
+  background: var(--ui-accent);
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  cursor: pointer;
+}
+.button:disabled { opacity: 0.6; cursor: progress; }
+.secondary { color: var(--ui-text); background: var(--ui-surface); border: 1px solid var(--ui-border); }
+.alert { padding: var(--ui-space-3) var(--ui-space-4); border-radius: var(--ui-radius-sm); margin: 0; }
+.alertError { background: #fde2e2; color: #7d1f26; }
+.alertInfo { background: #e6effc; color: #173f86; }
+.alertSuccess { background: #d7f5df; color: #145a2a; }
