@@ -1,8 +1,8 @@
 # PROGRESS.md — Actual Implementation State
 
 **Updated:** 2026-11-14  
-**State:** P0 runtime-proof kit (incl. Android WebXR image probe) implemented and **structurally validated / desktop-tested**. **First device result: AND-IMG-01 PARTIAL** (native WebXR image tracking + DOM overlay worked on one Android/Chrome 157 device; visual/geometry checks outstanding). All other device rows NOT TESTED. **Phase 1 Milestone 1 (app skeleton) done and verified locally in workerd; not deployed.** No database/auth code yet.  
-**Current phase:** P1 Milestone 2 (database) next. P0 device rows still open (AND-IMG-01 re-run, AND-IMG-02, iOS, Scene Viewer).
+**State:** P0 runtime-proof kit (incl. Android WebXR image probe) implemented and **structurally validated / desktop-tested**. **First device result: AND-IMG-01 PARTIAL** (native WebXR image tracking + DOM overlay worked on one Android/Chrome 157 device; visual/geometry checks outstanding). All other device rows NOT TESTED. **Phase 1 Milestones 1 (app skeleton) and 2 (database) done and verified locally; not deployed; production migrations not applied.** No auth code yet.  
+**Current phase:** P1 Milestone 3 (authentication) next. P0 device rows still open (AND-IMG-01 re-run, AND-IMG-02, iOS, Scene Viewer).
 
 ## Implemented (automated evidence)
 
@@ -89,3 +89,20 @@ Not available yet: lint (ESLint/Prettier not configured), DB migrations, `apps/w
 - Not verified: anything on Cloudflare's edge (no deploy was performed: needs the owner's account); visual QA beyond Edge desktop/phone-width screenshots; no ESLint/Prettier yet.
 - ADRs: ADR-015 (owner decisions), ADR-016 (M1 conventions; ADR-014 verified locally).
 - Next smallest testable step: Milestone 2 — `packages/db` with Drizzle schema + migrations against Dockerised Postgres, Hyperdrive binding with `localConnectionString` from `.dev.vars`/env, a per-request connection helper, and `/api/health` gaining a `database` check.
+
+## Session handoff — 2026-11-14 (5) / Claude Code — Phase 1 Milestone 2 (database)
+
+- Branch: `feature/p1-m2-database` (from `feature/p1-m1-skeleton` @ `a42eb74`).
+- Built: `packages/db` (Drizzle schema = Better Auth tables + 6 app tables, migrations `0000_initial_schema` + `0001_immutability_triggers`, `connectDb` per request, error classification + redaction, `checkDatabase` with migration status), local Postgres (`infra/db/docker-compose.yml`, `npm run db:env|db:up|db:down|db:migrate|db:generate|db:auth-schema|test:db`), API DB middleware (lazy, closed via `waitUntil`), `/api/health` database check (503 when degraded), Hyperdrive binding `8de2df3d333b4a1b9b07c18fbdd49d18` in `apps/web/wrangler.jsonc` (ID only), home page database status.
+- Verified locally: see `TESTING.md` P1 M2 rows (Vitest 104, DB integration 28, USD 55, Playwright 22, connection-leak check, `npm audit` 0).
+- **Not verified / not done:** no deploy; Neon and the real Hyperdrive config were never contacted; **production migrations not applied** (awaiting approval); Hyperdrive caching-disabled is per the owner's statement, not independently checked.
+- ADR: ADR-017.
+- Next: Milestone 3 (Better Auth in `apps/api`, sign-up/in/out, protected routes, Resend verification + recovery, public sign-up gated).
+
+### Production migration procedure (run ONLY after owner approval)
+
+1. In Neon, copy the **direct** (non-pooled) connection string for the production branch, ideally for a dedicated migration-owner role.
+2. From a trusted machine, without saving it to any file: `DATABASE_URL='<neon direct url>?sslmode=require' npm run db:migrate`
+   (an explicitly set `DATABASE_URL` takes precedence over the local `.env`).
+3. Deploy, then confirm `GET /api/health` reports `checks.database.migrations: "current"`.
+4. Record the date, migration tags (`0000_initial_schema`, `0001_immutability_triggers`) and operator in `TESTING.md`.

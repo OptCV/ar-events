@@ -54,7 +54,16 @@ function SystemStatus() {
   let badge: { tone: 'ok' | 'bad' | 'pending'; label: string };
   if (health.isPending) badge = { tone: 'pending', label: 'Checking…' };
   else if (health.isError) badge = { tone: 'bad', label: 'Unavailable' };
+  else if (health.data.status === 'degraded') badge = { tone: 'bad', label: 'Degraded' };
   else badge = { tone: 'ok', label: 'Operational' };
+
+  const db = health.data?.checks.database;
+  let dbLabel = 'Checking…';
+  if (db) {
+    if (db.status === 'error') dbLabel = 'Unavailable';
+    else if (db.migrations === 'behind') dbLabel = 'Connected — migrations pending';
+    else dbLabel = 'Connected';
+  } else if (health.isError) dbLabel = 'Unknown';
 
   return (
     <section className={styles.card} aria-labelledby="status-title" data-testid="system-status">
@@ -65,6 +74,7 @@ function SystemStatus() {
           {badge.label}
         </span>
       </p>
+      <p data-testid="database-status">Database: {dbLabel}</p>
       {health.isError && <p className={styles.error}>{health.error.message}</p>}
       {health.data && (
         <dl className={styles.meta}>

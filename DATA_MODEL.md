@@ -76,3 +76,7 @@ Use immutable revision keys for published outputs and signed access for drafts. 
 `POST /api/experiences`, `PUT /api/experiences/:id/draft`, `POST /api/assets/uploads`, `POST /api/assets/:id/convert-image-to-ar`, `GET /api/assets/:id/derivatives`, `POST /api/experiences/:id/validate`, `POST /api/experiences/:id/publish`, `GET /api/experiences/:id/jobs`, `GET /api/public/experiences/:slug`.
 
 All private routes require ownership checks; public ones resolve published revision only.
+
+## Implementation status (2026-11-14)
+
+Implemented in `packages/db` (ADR-017): Better Auth `user`/`session`/`account`/`verification`/`rate_limit`, plus `experiences`, `experience_revisions`, `assets`, `asset_derivatives`, `processing_jobs`, `generated_outputs`. The schema source is `packages/db/src/schema/`; migrations are in `packages/db/migrations/`. Revision states: `draft` (only mutable state), `snapshot`, `compiling`, `partially_ready`, `published`, `failed`, `superseded`. `analytics` is not implemented yet.

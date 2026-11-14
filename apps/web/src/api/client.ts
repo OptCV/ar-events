@@ -19,7 +19,13 @@ export class ApiRequestError extends Error {
  * Same-origin JSON fetch validated against a shared contract (packages/contracts).
  * Credentials are same-origin only (ADR-014); never call cross-origin APIs with cookies.
  */
-export async function getJson<S extends z.ZodType>(path: `/api/${string}`, schema: S, init?: RequestInit): Promise<z.infer<S>> {
+export async function getJson<S extends z.ZodType>(
+  path: `/api/${string}`,
+  schema: S,
+  init?: RequestInit,
+  /** Non-2xx statuses whose body still follows `schema` (e.g. 503 from /api/health when degraded). */
+  acceptStatuses: readonly number[] = [],
+): Promise<z.infer<S>> {
   let res: Response;
   try {
     res = await fetch(path, { credentials: 'same-origin', headers: { accept: 'application/json' }, ...init });
@@ -27,7 +33,7 @@ export async function getJson<S extends z.ZodType>(path: `/api/${string}`, schem
     throw new ApiRequestError(0, 'network', 'Cannot reach the server. Check your connection and try again.');
   }
   const data: unknown = await res.json().catch(() => null);
-  if (!res.ok) {
+  if (!res.ok && !acceptStatuses.includes(res.status)) {
     const parsed = ApiError.safeParse(data);
     if (parsed.success) throw new ApiRequestError(res.status, parsed.data.error.code, parsed.data.error.message, parsed.data.error.requestId);
     throw new ApiRequestError(res.status, 'http', `Request failed (${res.status}).`);

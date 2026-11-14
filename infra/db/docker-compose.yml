@@ -1,0 +1,22 @@
+# Local development PostgreSQL (Neon production runs PostgreSQL 17).
+# Credentials come from the gitignored repo-root .env created by `npm run db:env`; nothing secret is committed.
+#   npm run db:up    /   npm run db:down
+name: ar-creator-db
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ar_creator
+      POSTGRES_DB: ar_creator
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run `npm run db:env` first}
+    ports:
+      - "127.0.0.1:${AR_DB_PORT:-54320}:5432" # loopback only
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ar_creator -d ar_creator -h 127.0.0.1"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+volumes:
+  pgdata:

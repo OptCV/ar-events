@@ -1,0 +1,31 @@
+{
+  "name": "@ar-creator/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Drizzle schema, migrations and per-request PostgreSQL access (Hyperdrive in Workers). See DATA_MODEL.md, ADR-017.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema/index.ts"
+  },
+  "scripts": {
+    "generate": "drizzle-kit generate",
+    "migrate": "drizzle-kit migrate",
+    "check": "drizzle-kit check",
+    "auth-schema": "auth generate --config auth.schema.config.ts --output src/schema/auth.ts --yes",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "@ar-creator/platform-launch": "0.0.0",
+    "@ar-creator/schema": "0.0.0",
+    "drizzle-orm": "0.45.4",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@better-auth/drizzle-adapter": "1.7.16",
+    "@types/pg": "8.23.1",
+    "auth": "1.7.16",
+    "better-auth": "1.7.16",
+    "drizzle-kit": "0.31.11"
+  }
+}

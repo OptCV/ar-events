@@ -34,7 +34,11 @@ Plan and slice order: `ROADMAP.md` "Phase 1 plan".
 - [x] **Milestone 1 / P1-1** skeleton: `apps/web` (Vite + React 19 + React Router 8 + TanStack Query + CSS Modules) and `apps/api` (Hono) as one Worker via `@cloudflare/vite-plugin`; `packages/contracts`; `/api/health`; SPA fallback; security headers; dev and production builds verified in local workerd (ADR-016).
 - [ ] First Cloudflare deploy of the skeleton (needs account; verify `run_worker_first`, `_headers`, SPA fallback on the edge).
 - [ ] ESLint/Prettier (still not configured).
-- [ ] P1-2 `packages/db`: Drizzle schema (Better Auth tables + app tables), migrations, local Postgres in Docker; Hyperdrive binding.
+- [x] **Milestone 2 / P1-2** `packages/db`: Drizzle schema (Better Auth tables + experiences, revisions, assets, derivatives, jobs, outputs), migrations 0000–0001 incl. immutability triggers, local Postgres in Docker, per-request Hyperdrive connections, `/api/health` database check (ADR-017). Verified locally.
+- [ ] Apply migrations to Neon production — **only with owner approval** (procedure in `PROGRESS.md`).
+- [ ] Edge verification of Hyperdrive: deploy, `/api/health` shows `database.status: ok`, confirm caching disabled (`wrangler hyperdrive get`), check latency.
+- [ ] Recommended: separate Neon roles (migration owner vs least-privilege DML role for Hyperdrive).
+- [ ] Rate limiting or brief caching for `/api/health` before public launch (it opens a DB connection per call).
 - [ ] P1-3 Auth in `apps/api` from the spike; `requireSession`; mutation Origin guard; sign-up/in/out UI.
 - [ ] P1-3 Edge verification on a Paid account: CPU per sign-in, Secure cookies, revocation with Hyperdrive caching disabled.
 - [ ] P1-4 Experiences + draft API with ownership checks (cross-user → 404).

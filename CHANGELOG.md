@@ -2,6 +2,21 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-14 — Phase 1 Milestone 2: database
+
+### Added
+- `packages/db`: Drizzle schema (Better Auth tables + experiences, experience revisions, assets, asset derivatives, processing jobs, generated outputs), version-controlled migrations including immutability triggers, per-request connections via Hyperdrive, error classification and credential redaction, database health check with migration status.
+- Local PostgreSQL 17 via Docker with per-developer random credentials in the gitignored `.env`; `db:*` and `test:db` scripts.
+- `/api/health` database check (HTTP 503 `degraded` on failure or pending migrations); home page shows database status.
+- Hyperdrive binding (`HYPERDRIVE`, caching disabled) in `apps/web/wrangler.jsonc`; ADR-017.
+- Tests: 28 DB integration tests, API health/failure unit tests, e2e for dev/preview/database-down, and a build-output secret scan.
+
+### Security
+- better-auth tooling pinned to 1.7.16 (fixes the 2026-11-03 advisories in ≤1.7.15); drizzle-kit's vulnerable transitive esbuild overridden.
+
+### Status
+- Verified locally only. Production migrations not applied (awaiting owner approval). Nothing deployed.
+
 ## 2026-11-14 — Phase 1 Milestone 1: application skeleton
 
 ### Added

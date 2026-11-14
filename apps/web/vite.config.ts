@@ -6,6 +6,16 @@ import { defineConfig } from 'vite';
 
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string };
 
+// Local only: make CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE (gitignored repo-root .env) visible to the
+// Cloudflare plugin so the Worker's HYPERDRIVE binding points at Docker Postgres in `vite dev`/`vite preview`.
+// Vite only exposes VITE_-prefixed variables to client code, and nothing here is passed to `define`,
+// so these values never reach the browser bundle (asserted by tests/e2e/app/database.spec.ts).
+try {
+  process.loadEnvFile(new URL('../../.env', import.meta.url));
+} catch {
+  // No .env (e.g. CI without a database): /api/health reports the database as not configured/unreachable.
+}
+
 function gitSha(): string {
   try {
     const sha = execFileSync('git', ['rev-parse', '--short=12', 'HEAD'], { encoding: 'utf8' }).trim();

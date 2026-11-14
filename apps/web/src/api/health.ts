@@ -5,7 +5,7 @@ import { getJson } from './client.ts';
 export function useHealth() {
   return useQuery({
     queryKey: ['health'],
-    queryFn: () => getJson('/api/health', HealthResponse),
+    queryFn: () => getJson('/api/health', HealthResponse, undefined, [503]),
     staleTime: 30_000,
     retry: 1,
   });

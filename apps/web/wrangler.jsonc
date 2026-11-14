@@ -13,6 +13,10 @@
     // API requests always reach the Worker, even if a static file with the same path existed.
     "run_worker_first": ["/api/*"]
   },
+  // Neon PostgreSQL (AWS US East) via Hyperdrive — config created with query caching DISABLED (ADR-017).
+  // The ID is not a secret. No connection string or localConnectionString is stored here: local dev reads
+  // CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE from the gitignored repo-root .env (npm run db:env).
+  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "8de2df3d333b4a1b9b07c18fbdd49d18" }],
   "observability": { "enabled": true },
   "upload_source_maps": true
 }
