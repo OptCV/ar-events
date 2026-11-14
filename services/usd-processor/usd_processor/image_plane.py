@@ -23,6 +23,7 @@ from typing import Literal, Optional
 
 from pxr import Gf, Sdf, Usd, UsdGeom, UsdShade, UsdUtils, Vt
 
+from .reproducible import normalize_zip_timestamps
 from .validate import validate_usdz
 
 CONVERTER_VERSION = "usd-image-plane@0.1.0"
@@ -179,6 +180,7 @@ def build_image_plane_usdz(req: ImagePlaneRequest) -> ImagePlaneResult:
         # Proper packager (never zip-and-rename): aligned, uncompressed, ARKit-flattened.
         if not UsdUtils.CreateNewARKitUsdzPackage(Sdf.AssetPath(str(layer_path)), str(req.out_usdz)):
             raise ConversionError("UsdUtils.CreateNewARKitUsdzPackage failed")
+        normalize_zip_timestamps(req.out_usdz)
 
     report = validate_usdz(str(req.out_usdz))
     with zipfile.ZipFile(req.out_usdz) as z:

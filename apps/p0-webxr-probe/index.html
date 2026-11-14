@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>P0 WebXR Image Probe</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <p><a href="../">← P0 Device Lab</a></p>
+      <h1>Android WebXR image-tracking probe</h1>
+      <p class="warn">
+        Test harness for <b>AND-IMG-01</b>. Uses the browser's native, experimental WebXR image tracking only — no
+        third-party tracker. Print <a href="../images/tracking_target_20cm.png">the tracking target</a> at exactly
+        <b>20.0 cm</b> wide. A result counts only when the report below is recorded in <code>TESTING.md</code>.
+      </p>
+
+      <section aria-labelledby="pf-h">
+        <h2 id="pf-h">Preflight</h2>
+        <ul id="preflight" class="checks" aria-live="polite"><li>Checking…</li></ul>
+        <p id="flag-help" class="muted"></p>
+      </section>
+
+      <section aria-labelledby="run-h">
+        <h2 id="run-h">Run</h2>
+        <p>Expect: the probe card (red top-left, arrow toward the top of the print) lies exactly on the print. Axis helper:
+          <b class="x">red = +X</b> → image right, <b class="y">green = +Y</b> → out of the image,
+          <b class="z">blue = +Z</b> → image bottom (ADR-005 H3).</p>
+        <button id="start" class="btn" type="button" disabled>Start AR</button>
+        <p id="result" class="result" role="status" aria-live="polite"></p>
+      </section>
+
+      <section aria-labelledby="rep-h">
+        <h2 id="rep-h">Report</h2>
+        <p class="muted">No camera images are captured. Copy this JSON into the AND-IMG-01 evidence.</p>
+        <button id="copy" class="btn secondary" type="button">Copy report</button>
+        <pre id="report" tabindex="0">{}</pre>
+      </section>
+    </main>
+
+    <!-- DOM overlay root: shown over the camera feed while the AR session runs. -->
+    <div id="overlay" class="overlay" hidden>
+      <div class="bar top">
+        <span id="status" class="pill" role="status" aria-live="polite">Starting…</span>
+        <span id="width" class="muted-on-dark"></span>
+      </div>
+      <div class="bar bottom">
+        <button id="cta" class="btn" type="button">Overlay CTA</button>
+        <button id="exit" class="btn secondary" type="button">Exit AR</button>
+      </div>
+    </div>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

@@ -89,3 +89,20 @@ Accepted decisions may be superseded by new numbered entries; never rewrite prev
 **Context:** Alpha must survive both conversions; any decode/re-encode risks premultiplication, flattening, gamma or halo bugs.  
 **Decision:** For PNG and JPEG (EXIF orientation = 1), embed the uploaded bytes unmodified in GLB and USDZ; tests assert SHA-256 equality. Alpha mode is decided once (TS `resolveAlphaMode`) and passed to the USD processor. Texture sampler uses CLAMP_TO_EDGE.  
 **Consequences:** WebP (not core glTF, not allowed in USDZ) and EXIF-rotated JPEGs must be normalized to PNG/JPEG by a lossless, alpha-preserving step before conversion — **pending**, currently rejected by `readImageInfo`. Large uploads may need a downscaled derivative for viewer texture limits — pending.
+
+## ADR-010 — Android WebXR image-tracking adapter and probe
+
+**Date:** 2026-11-14  
+**Status:** Accepted (device behavior NOT TESTED)  
+**Context:** Android image mode must use native, experimental WebXR image tracking only, isolated behind a capability adapter, with honest fallbacks. Chrome exposes it only behind the "WebXR Incubations" flag, and the deployed API shape may differ from the draft.  
+**Decision:** `packages/webxr-image` holds all runtime logic, framework-free and unit-tested: `buildSessionInit` (`local` required; `image-tracking` and `dom-overlay` *optional*, so a session that starts without tracking can be told apart from no AR at all); `resolveImageTrackingApi` (implements exactly one shape, Chrome's `trackedImages` / `getTrackedImageScores` / `getImageTrackingResults`; `marker-tracking` or a partial API → `unrecognized-api`, never guessed); `preflight` with a 4 s timeout (`isSessionSupported` hung in headless Chromium); `ImageAnchorTracker` (per-frame results → state machine scanning/tracked/emulated/lost with 15-frame hysteresis → composed pose → visibility, plus measured-width stats). Rendering stays in the app (three.js). The tracking bitmap and GLB are preloaded so `requestSession` runs synchronously inside the tap handler and keeps transient user activation. The probe (`apps/p0-webxr-probe`, vanilla TS + three.js, built by Vite into `out/p0/webxr/`) reuses `img-overlay.glb` and draws an axis helper to test H3.  
+**Alternatives:** React for the probe (deferred: the probe is a P0 harness; the public runtime in `apps/web` will consume the same package); JS image trackers (forbidden by ADR-002).  
+**Consequences:** The public Android image viewer can reuse the adapter and tracker unchanged. Desktop e2e tests can only cover the unsupported path; tracking itself is only provable on device (AND-IMG-01).
+
+## ADR-011 — Byte-reproducible USDZ packages
+
+**Date:** 2026-11-14  
+**Status:** Accepted  
+**Context:** Rebuilding the P0 kit changed every USDZ SHA-256 with identical inputs. Cause: `UsdUtils` packaging stamps ZIP entries with wall-clock time. The in-process determinism test missed it because both builds ran in the same second.  
+**Decision:** After packaging, overwrite the DOS time/date of every local and central-directory entry with 1980-01-01 00:00. These fields are fixed-width and not covered by the CRC, so alignment and checksums are unchanged (`usd_processor/reproducible.py`). A regression test builds 2.1 s apart and re-validates.  
+**Consequences:** Asset hashes in `manifest.json` / device evidence are stable across rebuilds, as content-addressed derivative keys (DATA_MODEL.md R2 layout) require.

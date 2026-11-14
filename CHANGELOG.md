@@ -2,6 +2,22 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-14 — Android WebXR image-tracking probe
+
+### Added
+- `packages/webxr-image`: native WebXR image-tracking capability adapter (Chrome `image-tracking` shape only; `marker-tracking` reported, never guessed), preflight with timeout, tracking state machine, `ImageAnchorTracker`, pose composition, user-facing error mapping.
+- `apps/p0-webxr-probe`: Vite + three.js AND-IMG-01 harness at `out/p0/webxr/`, with DOM-overlay status and CTA, axis helper for the image-frame hypothesis, and a privacy-safe JSON report.
+- Playwright (local Edge channel) e2e tests; `scripts/serve-p0.ts` static server that applies `_headers`.
+- ADR-010, ADR-011.
+
+### Fixed
+- USDZ outputs were not byte-reproducible across runs (ZIP timestamps); now normalized.
+- Device lab CSP now allows `blob:` in `img-src`/`connect-src`, which GLTFLoader needs for embedded GLB textures; added an inline empty favicon (avoids a 404 on every page).
+- Probe preflight no longer hangs if `isSessionSupported` never resolves, and no longer waits on asset preload.
+
+### Status
+- Desktop-tested only. **No AR device testing performed.**
+
 ## 2026-11-14 — P0 runtime-proof kit (first code)
 
 ### Added

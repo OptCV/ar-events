@@ -226,3 +226,19 @@ def test_validator_detects_broken_anchoring(tmp_path):
     assert UsdUtils.CreateNewARKitUsdzPackage(Sdf.AssetPath(str(work / "scene.usdc")), str(out))
     rep = validate_usdz(str(out))
     assert any("physicalWidth" in e for e in rep.errors), rep.errors
+
+
+def test_reproducible_across_time(tmp_path):
+    """Regression: ZIP entry timestamps were wall-clock, so hashes changed between runs."""
+    import time
+
+    f = next(x for x in DISPLAY if x["file"] == "alpha_steps.png")
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    req, r1 = build(tmp_path / "a", f, "floor")
+    time.sleep(2.1)  # DOS timestamps have 2 s resolution
+    _, r2 = build(tmp_path / "b", f, "floor")
+    assert r1.sha256 == r2.sha256
+    with zipfile.ZipFile(req.out_usdz) as z:
+        assert {i.date_time for i in z.infolist()} == {(1980, 1, 1, 0, 0, 0)}
+    assert validate_usdz(str(req.out_usdz)).ok  # alignment intact after patching

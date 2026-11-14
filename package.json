@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "apps/*"
   ],
   "engines": {
     "node": ">=22"
@@ -18,15 +19,21 @@
     "check": "npm run typecheck && npm run test",
     "fixtures:geometry": "node --experimental-strip-types scripts/generate-geometry-golden.ts",
     "p0:build": "node --experimental-strip-types scripts/build-p0.ts",
-    "check:all": "npm run check && npm run usd:test"
+    "check:all": "npm run check && npm run usd:test",
+    "p0:serve": "node --experimental-strip-types scripts/serve-p0.ts",
+    "p0:webxr:dev": "vite apps/p0-webxr-probe",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.1",
     "@types/node": "24.19.2",
     "@types/pngjs": "6.0.5",
+    "@types/webxr": "0.5.24",
     "gltf-validator": "2.0.0-dev.3.10",
     "jpeg-js": "0.4.4",
     "pngjs": "7.0.0",
     "typescript": "5.9.3",
+    "vite": "8.3.8",
     "vitest": "4.1.12"
   }
 }

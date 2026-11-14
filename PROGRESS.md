@@ -1,7 +1,7 @@
 # PROGRESS.md — Actual Implementation State
 
 **Updated:** 2026-11-14  
-**State:** P0 runtime-proof kit implemented and **structurally validated**. **No physical-device test has been executed.** No app/API/database code yet.  
+**State:** P0 runtime-proof kit (incl. Android WebXR image probe) implemented and **structurally validated / desktop-tested**. **No physical-device test has been executed.** No app/API/database code yet.  
 **Current phase:** P0 — automated half done; device half blocked on hosting + devices.
 
 ## Implemented (automated evidence)
@@ -15,7 +15,9 @@
 | Image-to-AR GLB generator (flat quad, OPAQUE/MASK/BLEND, original bytes embedded) | `packages/image-to-ar` | 41 tests; every fixture passes Khronos glTF-Validator with 0 errors/0 warnings |
 | Image-to-AR USDZ generator + Quick Look anchoring (image/floor/wall) + structural validator | `services/usd-processor` (Docker) | 54 pytest tests in sandbox |
 | Deterministic golden fixtures + shared geometry contract | `tests/fixtures`, `scripts/generate-*.ts` | hash-locked manifest; byte-identical regeneration |
-| P0 device kit (7 GLB/USDZ pairs + device-lab page) | `scripts/build-p0.ts` → `out/p0/` | built locally; **not deployed** |
+| P0 device kit (7 GLB/USDZ pairs + device-lab page) | `scripts/build-p0.ts` → `out/p0/` | built locally; **not deployed**; USDZ byte-reproducible across rebuilds (ADR-011) |
+| Android WebXR image runtime logic: adapter, preflight (timeout), tracker state machine, pose composition | `packages/webxr-image` | 16 tests |
+| Android WebXR image-tracking probe (AND-IMG-01 harness, DOM overlay, JSON report) | `apps/p0-webxr-probe` → `out/p0/webxr/` | Playwright on desktop Edge: unsupported path, no console/CSP errors. **Never run on an AR device** |
 
 ## Commands actually run (2026-11-14, Windows 11, Node 24.19.0, Docker 29.8.0)
 
@@ -26,14 +28,16 @@
 | `npm run usd:build` | image `ar-creator/usd-processor:dev` (453 MB) |
 | `npm run usd:test` | **54/54 passed** (sandbox: no network, read-only FS, 1 GB, 2 CPU) |
 | `npm run fixtures` ×2 | byte-identical output |
-| `P0_BASE_URL=https://p0-lab.example.workers.dev npm run p0:build` | 7 cases, 0 USD validation errors/warnings, GLB/USDZ heights match |
+| `P0_BASE_URL=https://p0-lab.example.workers.dev npm run p0:build` | 7 cases, 0 USD validation errors/warnings, GLB/USDZ heights match; probe built to `out/p0/webxr/` |
+| *(probe session)* `npm run check:all` | Vitest 5 files **86/86**; pytest **55/55** |
+| *(probe session)* `npm run test:e2e` (Playwright 1.64.1, local Edge) | **2/2 passed** |
+| *(probe session)* `p0:build` twice, 3 s apart | identical USDZ hashes |
 
-Not available yet: lint (ESLint/Prettier not configured), Playwright, build (no apps), DB migrations.
+Not available yet: lint (ESLint/Prettier not configured), DB migrations, `apps/web` build.
 
 ## Not yet implemented or verified
 
 - [ ] Any physical-device result (all TESTING.md matrix rows **NOT TESTED**).
-- [ ] Android WebXR image-tracking probe.
 - [ ] Vite/React app, Hono API, PostgreSQL/Drizzle/Hyperdrive, R2, auth, Workflows.
 - [ ] Cloudflare Containers deployment of the USD processor.
 - [ ] WebP/EXIF normalization; texture size limits.
@@ -53,4 +57,13 @@ Not available yet: lint (ESLint/Prettier not configured), Playwright, build (no 
 - Known blockers: above.
 - ADRs added: ADR-005 … ADR-009.
 - Tasks changed: P0/P1/P2/P4 items in `TASKS.md`.
-- Next smallest testable step: deploy `out/p0` (`npx wrangler@4 deploy -c infra/p0-lab/wrangler.jsonc`), rebuild with the real `P0_BASE_URL`, redeploy, and run IOS-FLR-01 / AND-FLR-01 on devices. In parallel (code): Android WebXR image-tracking probe page.
+- Next smallest testable step: deploy `out/p0` (`npx wrangler@4 deploy -c infra/p0-lab/wrangler.jsonc`), rebuild with the real `P0_BASE_URL`, redeploy, and run IOS-FLR-01 / AND-FLR-01 on devices.
+
+## Session handoff — 2026-11-14 (2) / Claude Code
+
+- Goal: Android WebXR image-tracking probe.
+- Files: `packages/webxr-image/*`, `apps/p0-webxr-probe/*`, `scripts/serve-p0.ts`, `playwright.config.ts`, `tests/e2e/p0-lab.spec.ts`, `services/usd-processor/usd_processor/reproducible.py`, `scripts/build-p0.ts` (probe link, CSP `blob:` for GLTF textures, favicon).
+- Found and fixed: USDZ hashes not reproducible (ZIP timestamps, ADR-011); `isSessionSupported` can hang (preflight timeout); preflight UI was blocked on asset preload.
+- Device evidence: none. AND-IMG-01 needs an ARCore phone with Chrome "WebXR Incubations" enabled; quick local route: `npm run p0:build && npm run p0:webxr:dev`, then `adb reverse tcp:5173 tcp:5173` and open `http://localhost:5173` on the phone.
+- ADRs: ADR-010, ADR-011.
+- Next smallest testable step: run AND-IMG-01 (flag on) and AND-IMG-02 (flag off) and paste the probe's JSON report into `TESTING.md`.

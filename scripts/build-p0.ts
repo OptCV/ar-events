@@ -14,6 +14,7 @@ import { PNG } from 'pngjs';
 import { ImageToArSettings, type ImageToArSettingsInput } from '@ar-creator/schema';
 import { analyzeAlpha, buildImagePlaneGlb, readImageInfo, resolveAlphaMode } from '@ar-creator/image-to-ar';
 import { buildQuickLookHref, buildSceneViewerIntent } from '@ar-creator/platform-launch';
+import { build as viteBuild } from 'vite';
 import { IMAGE, ROOT, SANDBOX, docker, mount } from './usd.ts';
 
 interface Case {
@@ -147,7 +148,7 @@ writeFileSync(join(OUT, 'manifest.json'), JSON.stringify({ generatedBy: 'scripts
 // Workers Static Assets headers: correct MIME types for native viewers.
 writeFileSync(
   join(OUT, '_headers'),
-  ['/usdz/*', '  Content-Type: model/vnd.usdz+zip', '/glb/*', '  Content-Type: model/gltf-binary', '  Access-Control-Allow-Origin: *', '/*', "  Content-Security-Policy: default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'", '  X-Content-Type-Options: nosniff', ''].join('\n'),
+  ['/usdz/*', '  Content-Type: model/vnd.usdz+zip', '/glb/*', '  Content-Type: model/gltf-binary', '  Access-Control-Allow-Origin: *', '/*', "  Content-Security-Policy: default-src 'self'; img-src 'self' blob: data:; connect-src 'self' blob:; script-src 'self'; style-src 'self' 'unsafe-inline'", '  X-Content-Type-Options: nosniff', ''].join('\n'),
 );
 
 // ---- device-lab page
@@ -163,7 +164,7 @@ const rows = results
       )}"><img src="images/${esc(c.fixture)}" alt="Open ${esc(c.id)} in AR Quick Look" width="120"></a>`;
       android =
         c.anchor === 'image'
-          ? '<em>WebXR image-tracking probe: next milestone (never Scene Viewer)</em>'
+          ? '<a class="btn" href="webxr/">Open WebXR image probe</a> <small>(experimental; never Scene Viewer)</small>'
           : `<a class="btn" href="${esc(
               buildSceneViewerIntent({
                 placement: c.anchor,
@@ -185,7 +186,7 @@ const rows = results
 writeFileSync(
   join(OUT, 'index.html'),
   `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AR Creator P0 Device Lab</title><style>
+<title>AR Creator P0 Device Lab</title><link rel="icon" href="data:,"><style>
 :root{--ui-bg:#f7f8fa;--ui-surface:#fff;--ui-text:#17202a;--ui-text-secondary:#596676;--ui-border:#dce2e8;--ui-accent:#215cc5;--ui-warning:#95610b}
 body{margin:0;background:var(--ui-bg);color:var(--ui-text);font:16px/1.5 system-ui,sans-serif}main{max-width:860px;margin:0 auto;padding:16px}
 section{background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:10px;padding:16px;margin:16px 0}h2{font-size:1.1rem;margin:0 0 4px}h3{font-size:.9rem;margin:0 0 8px;color:var(--ui-text-secondary)}
@@ -207,4 +208,6 @@ writeFileSync(
 });
 `,
 );
+// Android image runtime probe (AND-IMG-01) → out/p0/webxr/
+await viteBuild({ configFile: join(ROOT, 'apps', 'p0-webxr-probe', 'vite.config.ts'), logLevel: 'warn' });
 console.log(`\nwrote ${OUT}${base ? '' : '  (set P0_BASE_URL to generate launch links)'}`);

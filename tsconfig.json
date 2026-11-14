@@ -14,7 +14,7 @@
     "isolatedModules": true,
     "erasableSyntaxOnly": true,
     "skipLibCheck": true,
-    "types": ["node"]
+    "types": ["node", "webxr"]
   },
-  "include": ["packages/*/src/**/*.ts", "scripts/**/*.ts", "vitest.config.ts"]
+  "include": ["packages/*/src/**/*.ts", "tests/e2e/**/*.ts", "playwright.config.ts", "apps/*/src/**/*.ts", "apps/*/vite.config.ts", "scripts/**/*.ts", "vitest.config.ts"]
 }

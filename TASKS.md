@@ -17,7 +17,9 @@ Where a task has an automated half and a device half, they are tracked separatel
 - [ ] Prototype Android Scene Viewer floor launch via hosted GLB on device. (AND-FLR-01)
 - [ ] Prototype Android Scene Viewer wall with `enable_vertical_placement=true` + hypothesis H2. (AND-WAL-01)
 - [ ] Test Scene Viewer `link` and Quick Look banner CTA on device. (AND-LINK-01, IOS-LINK-01)
-- [ ] Android WebXR image-tracking probe page (feature detection, `image-tracking`/`marker-tracking` adapter, pose overlay) + device test. (AND-IMG-01)
+- [x] Android WebXR image-tracking probe page: adapter, preflight, tracker state machine, DOM overlay, JSON report (`packages/webxr-image`, `apps/p0-webxr-probe` → `out/p0/webxr/`; ADR-010). *(unit + desktop e2e only)*
+- [ ] Run the WebXR probe on an ARCore Android phone with Chrome "WebXR Incubations" on, and with it off. (AND-IMG-01, AND-IMG-02)
+- [x] Byte-reproducible USDZ output (ADR-011).
 - [ ] Benchmark Cloudflare Containers conversion resource requirements (local Docker baseline recorded in `TESTING.md`).
 - [ ] Run Apple `usdchecker` (macOS) on the P0 USDZ set as an extra gate (ADR-008).
 
@@ -29,7 +31,7 @@ Where a task has an automated half and a device half, they are tracked separatel
 - [ ] Decide authentication provider (open question — see `ROADMAP.md` risks) and implement ownership checks.
 - [ ] Implement R2 authorization, upload, metadata and immutable outputs.
 - [x] Implement scene schema / discriminated placement union (`packages/schema`, v1; migrations pending).
-- [-] Add migration, lint, typecheck and automated test scripts. *(typecheck + Vitest + pytest done; ESLint/Prettier and DB migrations pending)*
+- [-] Add migration, lint, typecheck and automated test scripts. *(typecheck + Vitest + pytest + Playwright (Edge channel) done; ESLint/Prettier and DB migrations pending)*
 
 ## P2: Image-to-AR
 
@@ -57,7 +59,7 @@ Where a task has an automated half and a device half, they are tracked separatel
 ## P4: Runtimes
 
 - [ ] Compile iOS image/floor/wall USDZ with validation (multi-node scenes).
-- [ ] Implement Android image WebXR viewer, capability detection and state lifecycle.
+- [-] Implement Android image WebXR viewer, capability detection and state lifecycle. *(runtime logic in `packages/webxr-image` done; public viewer UI in `apps/web` pending)*
 - [ ] Compose hosted Scene Viewer GLB from all eligible scene nodes.
 - [x] Generate separate Scene Viewer floor/wall intent params (`buildSceneViewerIntent`; device check pending).
 - [ ] Validate Quick Look CTA and Scene Viewer link mappings on device.

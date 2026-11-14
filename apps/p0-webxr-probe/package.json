@@ -1,0 +1,13 @@
+{
+  "name": "@ar-creator/p0-webxr-probe",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@ar-creator/webxr-image": "0.0.0",
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "@types/three": "0.186.0"
+  }
+}
