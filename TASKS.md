@@ -27,11 +27,18 @@ Where a task has an automated half and a device half, they are tracked separatel
 
 ## P1: Cloudflare and data
 
-- [ ] Initialize `apps/web` Vite + React + TS + CSS Modules.
-- [ ] Initialize `apps/api` Hono Worker and Cloudflare Vite plugin.
-- [ ] Configure managed PostgreSQL, Drizzle and Hyperdrive (local: Postgres in Docker).
-- [ ] Decide authentication provider (open question — see `ROADMAP.md` risks) and implement ownership checks.
-- [ ] Implement R2 authorization, upload, metadata and immutable outputs.
+Plan and slice order: `ROADMAP.md` "Phase 1 plan".
+
+- [x] Decide authentication provider: Better Auth (ADR-013), spike `spikes/auth-workers` 16/16 in local workerd.
+- [ ] Owner decisions: managed Postgres provider/region; email provider; confirm Workers Paid plan; upload path.
+- [ ] P1-1 `apps/web` (Vite + React + TS + CSS Modules) + `apps/api` (Hono) as one Worker via `@cloudflare/vite-plugin` (verify ADR-014).
+- [ ] P1-2 `packages/db`: Drizzle schema (Better Auth tables + app tables), migrations, local Postgres in Docker; Hyperdrive binding.
+- [ ] P1-3 Auth in `apps/api` from the spike; `requireSession`; mutation Origin guard; sign-up/in/out UI.
+- [ ] P1-3 Edge verification on a Paid account: CPU per sign-in, Secure cookies, revocation with Hyperdrive caching disabled.
+- [ ] P1-4 Experiences + draft API with ownership checks (cross-user → 404).
+- [ ] P1-5 R2 uploads: pending asset, streamed upload, magic bytes, size/dimension limits, SHA-256, explicit roles, signed private reads.
+- [ ] P1-6 Dashboard UI: login, experience list, create draft, upload with progress/errors.
+- [ ] Email verification + password reset (blocked on email provider).
 - [x] Implement scene schema / discriminated placement union (`packages/schema`, v1; migrations pending).
 - [-] Add migration, lint, typecheck and automated test scripts. *(typecheck + Vitest + pytest + Playwright (Edge channel) done; ESLint/Prettier and DB migrations pending)*
 

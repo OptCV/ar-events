@@ -23,6 +23,8 @@
 | 2026-11-14 | `npm run p0:build` ×2, 3 s apart | USDZ reproducibility | identical hashes |
 | 2026-11-14 | `npm run check:all` | + device-report regressions (width echo, reduced UA, client hints, frame counts) | Vitest 91/91, pytest 55/55 |
 | 2026-11-14 | `npm run test:e2e` | + probe 0.2.0 observations form and device info | 2/2 pass |
+| 2026-11-14 | `spikes/auth-workers: npm run verify` (wrangler 4.156.0 / local workerd, Postgres 17 in Docker) | Better Auth 1.7.14 + Hono + Drizzle + pg via Hyperdrive local binding: migrate, sign-up, duplicate, wrong password, sign-in cookie flags, protected route, 12 concurrent requests, hash at rest, sign-out revocation, per-IP DB rate limit, no runtime errors | 16/16 pass (local only — edge NOT VERIFIED) |
+| 2026-11-14 | `spikes/auth-workers: node bench-hash.mjs` | Better Auth default scrypt (native node:crypto, N=16384 r=16 p=1) | hash ≈ 37 ms, verify ≈ 37 ms (local CPU; exceeds the 10 ms Free-plan CPU limit) |
 
 Validators: GLB — Khronos `gltf-validator` 2.0.0-dev.3.10 (0 errors and 0 warnings required). USDZ — OpenUSD 26.8 `UsdValidation` (28 validators) + Quick Look profile checks (ADR-008). Neither is evidence of on-device behavior.
 

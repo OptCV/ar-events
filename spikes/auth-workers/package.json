@@ -1,0 +1,25 @@
+{
+  "name": "spike-auth-workers",
+  "private": true,
+  "type": "module",
+  "description": "Phase 1 spike: Better Auth + Hono + Drizzle + pg via Hyperdrive binding, run in workerd (wrangler dev). Throwaway; findings in DECISIONS.md ADR-013.",
+  "scripts": {
+    "auth:generate": "auth generate --config auth.cli.ts --output src/schema.ts --yes",
+    "verify": "node verify.mjs"
+  },
+  "dependencies": {
+    "@better-auth/drizzle-adapter": "1.7.14",
+    "better-auth": "1.7.14",
+    "drizzle-orm": "0.45.4",
+    "hono": "4.13.14",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261030.1",
+    "@types/pg": "8.23.1",
+    "auth": "1.7.14",
+    "drizzle-kit": "0.31.11",
+    "typescript": "5.9.3",
+    "wrangler": "4.156.0"
+  }
+}

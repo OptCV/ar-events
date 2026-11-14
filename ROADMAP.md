@@ -73,3 +73,25 @@ Open questions / feasibility risks (not resolved by code):
 ## Dependency order for the next phases
 
 P0 device results (axes, alpha, CTA) → P2 converter adjustments → P4 compilers. P1 infrastructure is independent of device results and can proceed in parallel once auth is decided. The Android WebXR probe gates the P5 image runtime scope.
+
+## Phase 1 plan (2026-11-14)
+
+**Gate (unchanged):** a creator can securely create a draft and upload/retrieve a checked asset.
+**Locked by ADRs:** Vite + React + TS + CSS Modules, Hono on Workers, PostgreSQL + Drizzle + Hyperdrive, R2, Better Auth (ADR-013), single same-origin Worker (ADR-014, to verify). Platform routing (ADR-002) is untouched; P1 builds no AR runtime code.
+
+| Slice | Deliverable | Verification | Depends on |
+|---|---|---|---|
+| P1-1 Skeleton | `apps/web` (React 19, React Router, TanStack Query, CSS Modules + DESIGN.md tokens) and `apps/api` (Hono) built into one Worker with `@cloudflare/vite-plugin`; `/api/health`; SPA fallback | `vite dev` serves both in workerd; prod build routes `/api/*` → Worker (Playwright) | — |
+| P1-2 Database | `packages/db`: Drizzle schema = Better Auth CLI tables + `experiences`, `experience_revisions`, `assets`, `asset_derivatives`, `processing_jobs`, `generated_outputs`; FKs to `user.id`; constrained enums; unique slugs; drizzle-kit migrations; local Postgres via Docker | migrate up on empty DB; schema tests (constraints, cascades) against Dockerised Postgres | P1-1 |
+| P1-3 Auth | Port spike config into `apps/api`; sign-up/in/out UI; `requireSession` middleware; Origin/content-type guard for mutations | spike checks re-run as integration tests; Playwright login flow; **edge test on Paid account** (CPU, Secure cookie, revocation with Hyperdrive caching disabled) | P1-2 |
+| P1-4 Experiences API | `POST/GET /api/experiences`, `GET/PATCH/DELETE /api/experiences/:id`, `PUT /:id/draft` validated by `packages/schema` | cross-user access returns 404, never 403/200 (authZ tests); draft round-trip | P1-3 |
+| P1-5 Uploads (R2) | `POST /api/assets/uploads` → pending asset + generated key `users/{uid}/assets/{id}/original`; Worker-streamed upload with size cap, magic-byte + header checks (reuse `readImageInfo`), SHA-256; explicit role (`tracking-image` / `display-image` / `model`); private read via short-lived signed URL | oversize, spoofed MIME, decompression-bomb dimensions rejected; checksum stored; other users cannot read | P1-4 |
+| P1-6 Dashboard | Login, experience list, create draft, upload asset with progress and errors (DESIGN.md states) | Playwright happy path + accessibility checks | P1-5 |
+
+**Open decisions needed from the product owner:**
+1. Managed PostgreSQL provider and region (Neon, Supabase, AWS RDS, GCP Cloud SQL, …). Hyperdrive works with any of them; data residency drives the choice.
+2. Email provider for verification and password reset (e.g. Cloudflare Email Service, Resend, Postmark). Blocks the public-launch auth gate, not P1 development.
+3. Confirm the Workers **Paid** plan (required by ADR-013).
+4. Upload path: Worker-streamed (simple, bounded by request body limits) vs. presigned R2 S3 URLs (large files; needs an R2 API token secret). Recommendation: Worker-streamed for images now, presigned for large GLB/USDZ later.
+
+**Phase 1 risks:** Hyperdrive caching of auth reads (ADR-013 §5); request-body size limits for large model uploads; Better Auth minor-version churn (pin exact, review changelogs); `@cloudflare/vite-plugin` + monorepo layout (validated in P1-1 before anything else).

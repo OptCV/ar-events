@@ -2,6 +2,13 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-14 — Phase 1 planning and authentication decision
+
+### Added
+- `spikes/auth-workers`: Better Auth + Hono + Drizzle + pg/Hyperdrive verified in local workerd (16/16 checks) plus a password-hash CPU benchmark.
+- ADR-013 (Better Auth; per-request client and auth instance; Workers Paid plan required; Hyperdrive caching disabled for auth reads) and ADR-014 (single same-origin Worker, proposed).
+- Phase 1 slice plan, open owner decisions and risks in `ROADMAP.md`; P1 tasks expanded.
+
 ## 2026-11-14 — First device result (AND-IMG-01) and probe 0.2.0
 
 ### Verified on device (PARTIAL)

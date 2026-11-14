@@ -1,0 +1,17 @@
+// Spike only — never deployed by an agent. Local runs use workerd via `wrangler dev`.
+{
+  "name": "spike-auth-workers",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-28",
+  // Explicit even though dates >= 2026-08-04 enable Node.js compat by default (Better Auth needs node:crypto, AsyncLocalStorage; pg needs node APIs).
+  "compatibility_flags": ["nodejs_compat"],
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "00000000000000000000000000000000",
+      // Local only; overridden by CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE (set by verify.mjs).
+      "localConnectionString": "postgres://spike:spike@127.0.0.1:54329/spike"
+    }
+  ],
+  "vars": { "BETTER_AUTH_URL": "http://127.0.0.1:8799" }
+}

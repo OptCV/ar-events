@@ -75,3 +75,7 @@ Not available yet: lint (ESLint/Prettier not configured), DB migrations, `apps/w
 - Fixed (probe 0.2.0, ADR-012): UA width echo flagged; device identity via UA Client Hints; tester-observation fields; raw frame counts; duration and end reason.
 - Commands: `npm run check:all` → Vitest 91/91, pytest 55/55; `npm run test:e2e` → 2/2; `p0:build` → `img-overlay.glb` SHA unchanged (`2b1167ae…`), so the device result applies to the current asset.
 - Next device step: re-run AND-IMG-01 with probe 0.2.0, filling in every observation; run AND-IMG-02 (flag off).
+- Committed Phase 0 as `ddf4aa9` on `webxr-feature` (not pushed).
+- Phase 1 (uncommitted): Better Auth evaluated and accepted (ADR-013) after a local-workerd spike (`spikes/auth-workers`, 16/16 checks); single same-origin Worker proposed (ADR-014); Phase 1 slice plan in `ROADMAP.md`; P1 tasks expanded.
+- Phase 1 blockers (owner decisions): Postgres provider/region, email provider, Workers Paid plan, upload path.
+- Next smallest testable step (P1-1): scaffold `apps/web` + `apps/api` as one Worker with `@cloudflare/vite-plugin` and prove `/api/health` + SPA fallback in `vite dev` and in a production build.
