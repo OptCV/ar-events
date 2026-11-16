@@ -4,6 +4,11 @@
   "private": true,
   "type": "module",
   "description": "Zod request/response contracts shared by apps/api (Worker) and apps/web (SPA).",
-  "exports": { ".": "./src/index.ts" },
-  "dependencies": { "zod": "4.6.7" }
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@ar-creator/schema": "0.0.0",
+    "zod": "4.6.7"
+  }
 }

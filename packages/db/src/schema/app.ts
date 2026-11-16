@@ -76,6 +76,8 @@ export const experiences = pgTable(
     /** Denormalised from the draft revision for dashboard filtering; updated in the same transaction (M4). */
     placementMode: placementModeEnum('placement_mode').notNull(),
     visibility: experienceVisibilityEnum('visibility').notNull().default('draft'),
+    /** Optimistic concurrency for draft saves (ADR-021): bumped on every save; stale writers get 409. */
+    draftVersion: integer('draft_version').notNull().default(1),
     draftRevisionId: uuid('draft_revision_id'),
     publishedRevisionId: uuid('published_revision_id'),
     ...timestamps,
@@ -84,6 +86,7 @@ export const experiences = pgTable(
     index('experiences_owner_updated_idx').on(t.ownerId, t.updatedAt),
     check('experiences_name_not_blank', sql`length(btrim(${t.name})) > 0`),
     check('experiences_slug_format', sql`${t.slug} ~ '^[a-z0-9](?:[a-z0-9-]{1,62}[a-z0-9])$'`),
+    check('experiences_draft_version_positive', sql`${t.draftVersion} > 0`),
     // Pointers must reference revisions of THIS experience (composite FK; NULL skips the check).
     foreignKey({
       name: 'experiences_draft_revision_fk',

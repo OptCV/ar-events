@@ -245,3 +245,22 @@ Accepted decisions may be superseded by new numbered entries; never rewrite prev
 5. **Incident:** the development `neondb_owner` connection string was pasted into chat. The password was reset on the development branch. Production's `neondb_owner` may share it (branch copy); rotate it after production Hyperdrive moves to `ar_app` (needs approval).
 
 **Verification:** NEON-DEV-01 PASS; REMOTE-AUTH-01 PASS 9/9 (`TESTING.md`). Edge finding: Cloudflare rejects client-supplied `CF-Connecting-IP` with 403 error 1000, so the rate-limit key cannot be spoofed.
+
+## ADR-021 — Experience management API, drafts and placement changes (Milestone 4)
+
+**Date:** 2026-11-15  
+**Status:** Accepted (verified locally; not yet migrated to Neon or deployed to `ar-creator-dev`)  
+**Decision:**
+1. **Routes** (`apps/api/src/experiences/routes.ts`), all behind `requireSession`, 256 KB body limit, CSRF guard (Origin; JSON for POST/PUT/PATCH; Origin-only for DELETE):
+   - `GET /api/experiences`, `POST /api/experiences`;
+   - `GET/PATCH/DELETE /api/experiences/:id`;
+   - `PUT /api/experiences/:id/draft` (scene configuration API);
+   - `POST /api/experiences/:id/validate` (publish readiness).
+2. **Ownership in SQL:** every query filters `owner_id = session user`. Another user's experience, a deleted one and a malformed ID all return **404** (never 403), so existence is not leaked.
+3. **Draft vs publishable scene:** `DraftExperienceScene` (`packages/schema`) shares every integrity rule with `ExperienceScene` (one function), but image placement may lack its tracking target until uploads exist (Milestone 5). `publishReadiness()` reports blocking errors and warnings. Publishing (strict schema) is a later milestone.
+4. **Optimistic concurrency:** migration `0002_draft_version` adds `experiences.draft_version`. Saves must send the version they loaded. The update is conditional (`WHERE draft_version = $v`), so concurrent writers get exactly one success and the rest **409 `stale_draft`** with the current version. The UI shows "changed in another tab" and offers "Load the latest version". Edits typed during an in-flight save are queued, never lost. Autosave runs after an 800 ms pause.
+5. **Placement changes are reviewed, never silent:** `planPlacementChange()` keeps every node and action, lists what is removed (tracking image / printed width) and explains orientation effects. The UI shows it in a confirmation dialog, and the API rejects a mode change without `confirmPlacementChange: true` (**409 `placement_change_unconfirmed`**). The denormalised `experiences.placement_mode` is updated in the same transaction as the draft.
+6. **Create** inserts the experience and draft revision 1 (default scene for the chosen mode) in one transaction. The slug is derived from the name plus a random suffix, with retry on collision. `public` visibility is refused until publishing exists.
+7. **UI:** `/dashboard` (list, search, empty/loading/error states), `/experiences/new` (details + accessible placement radio group with per-platform runtimes and the Android image "Experimental" badge), `/experiences/:id` (placement, image printed width, scene summary, readiness panel, details, delete with confirmation), all behind `RequireAuth`. The default destination after sign-in is now `/dashboard`.
+
+**Consequences:** the Neon development branch needs migration 0002 (owner approval) and `ar-creator-dev` a redeploy before Milestone 4 can be verified remotely. Asset ownership checks for scene references arrive with assets (Milestone 5).

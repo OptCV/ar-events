@@ -8,6 +8,7 @@ import type { Auth } from './auth/auth.ts';
 import type { AuthConfig } from './auth/config.ts';
 import { AuthUnavailableError, authContext, isAllowedAuthRoute, redirectsOffOrigin, requireSession, sameOriginMutations, unsafeRedirectIn } from './auth/middleware.ts';
 import { DevMailbox, type Mailer } from './email/mailer.ts';
+import { experienceRoutes } from './experiences/routes.ts';
 
 export interface BuildInfo {
   version: string;
@@ -144,6 +145,9 @@ export function createApp(info: BuildInfo, deps: AppDeps = {}) {
   });
 
   app.get('/me', requireSession, (c) => c.json(MeResponse.parse({ user: c.get('user') })));
+
+  // Experience management (Milestone 4, ADR-021): session required, ownership enforced in SQL.
+  app.route('/experiences', experienceRoutes());
 
   /** Public session probe for the UI: 200 with the user or null (no 401 noise for signed-out visitors). */
   app.get('/session', async (c) => {

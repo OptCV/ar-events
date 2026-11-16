@@ -18,7 +18,7 @@ export function SignUpPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (user) return <Navigate to="/account" replace />;
+  if (user) return <Navigate to="/dashboard" replace />;
   if (config.isPending) {
     return (
       <AuthCard title="Create your account">

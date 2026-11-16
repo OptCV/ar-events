@@ -97,7 +97,7 @@ P0 device results (axes, alpha, CTA) → P2 converter adjustments → P4 compile
 | M1 Application skeleton | P1-1 | **Done locally** (ADR-016); edge deploy not yet verified |
 | M2 Database | P1-2 (+ Hyperdrive binding, connection management, no-cache config for consistency-sensitive reads) | **Done locally** (ADR-017); production migrations await owner approval; edge not verified |
 | M3 Authentication | P1-3 (+ Resend email verification and password recovery; public sign-up gated until complete) | **Done**: local (ADR-019) + Neon development (NEON-DEV-01) + edge on isolated dev Worker (REMOTE-AUTH-01 9/9); email flows pending Resend |
-| M4 Experience management | P1-4 + dashboard layout + image/floor/wall placement selector + scene configuration API | — |
+| M4 Experience management | P1-4 + dashboard layout + image/floor/wall placement selector + scene configuration API | **Done locally** (ADR-021); Neon migration 0002 + dev redeploy pending approval |
 | M5 Asset storage | P1-5 (+ previews and metadata; storage logic separate from UI; presigned/multipart-ready interface) | — |
 
 **Phase 1 risks:** Hyperdrive caching of auth reads (ADR-013 §5); request-body size limits for large model uploads; Better Auth minor-version churn (pin exact, review changelogs); `@cloudflare/vite-plugin` + monorepo layout (validated locally in M1; edge deploy pending). Client bundle is 133 KB gzip for a skeleton, mostly React + Zod 4; watch it as features land (consider `zod/mini` on the client).

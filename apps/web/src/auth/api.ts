@@ -68,7 +68,7 @@ export const authApi = {
 };
 
 /** Post-login destination: same-site path only (never "//host" or absolute URLs). */
-export function safeNext(next: string | null, fallback = '/account'): string {
+export function safeNext(next: string | null, fallback = '/dashboard'): string {
   if (!next || !next.startsWith('/') || next.startsWith('//') || next.startsWith('/\\')) return fallback;
   return next;
 }

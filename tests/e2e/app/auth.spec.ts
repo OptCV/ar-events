@@ -52,7 +52,8 @@ test('sign-up → email verification → sign-in → session persists → sign-o
   await page.getByRole('link', { name: 'Continue to sign in' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Your email is confirmed' })).toBeVisible();
   await signIn(page, email);
-  await expect(page).toHaveURL(/\/account$/);
+  await expect(page).toHaveURL(/\/dashboard$/); // default destination after sign-in
+  await page.goto('/account');
   await expect(page.getByTestId('account-email')).toHaveText(email);
 
   // Cookie flags as seen by the browser (http locally → no Secure; https in production adds Secure + __Secure-).
@@ -139,7 +140,7 @@ test('forgot password → email link → new password → old password rejected,
   await signIn(page, email, PASSWORD);
   await expect(page.getByRole('alert')).toHaveText('That email and password combination is not correct.');
   await signIn(page, email, newPassword);
-  await expect(page).toHaveURL(/\/account$/);
+  await expect(page).toHaveURL(/\/dashboard$/);
 });
 
 test('an invalid reset link shows a helpful error instead of the form', async ({ page }) => {

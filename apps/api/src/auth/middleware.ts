@@ -94,7 +94,10 @@ export const sameOriginMutations: MiddlewareHandler<AppEnv> = async (c, next) =>
   const expected = cfg.baseURL ?? new URL(c.req.url).origin;
   const origin = c.req.header('origin');
   const type = c.req.header('content-type') ?? '';
-  if (origin !== expected || !type.toLowerCase().startsWith('application/json')) {
+  // Body-carrying methods must be JSON (blocks form-encoded cross-site posts). DELETE has no body: Origin suffices
+  // (HTML forms cannot send DELETE and cross-origin fetch DELETE requires a CORS preflight we never grant).
+  const needsJson = c.req.method === 'POST' || c.req.method === 'PUT' || c.req.method === 'PATCH';
+  if (origin !== expected || (needsJson && !type.toLowerCase().startsWith('application/json'))) {
     return c.json({ error: { code: 'forbidden', message: 'Cross-origin or non-JSON request refused.', requestId: c.get('requestId') } }, 403);
   }
   return next();

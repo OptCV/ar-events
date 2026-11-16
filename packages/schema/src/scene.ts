@@ -90,15 +90,29 @@ export const Action = z.discriminatedUnion('type', [
 ]);
 export type Action = z.infer<typeof Action>;
 
-export const ExperienceScene = z
-  .object({
-    schemaVersion: z.literal(SCHEMA_VERSION),
-    placement: Placement,
-    nodes: z.array(SceneNode).max(500),
-    actions: z.array(Action).max(100),
-    primaryActionId: Id.optional(),
-  })
-  .superRefine((scene, ctx) => {
+/**
+ * Draft placement (ADR-021): identical to `Placement` except that image mode may not have its tracking target yet
+ * (uploaded later). Drafts may be incomplete; publishing requires the strict `ExperienceScene`.
+ */
+export const DraftPlacement = z.discriminatedUnion('mode', [
+  z.object({
+    mode: z.literal('image'),
+    trackingTargetAssetId: Id.nullable(),
+    physicalWidthMeters: z.number().min(TRACKING_WIDTH_METERS.min).max(TRACKING_WIDTH_METERS.max),
+  }),
+  z.object({ mode: z.literal('floor') }),
+  z.object({ mode: z.literal('wall') }),
+]);
+export type DraftPlacement = z.infer<typeof DraftPlacement>;
+
+interface SceneShape {
+  nodes: SceneNode[];
+  actions: Action[];
+  primaryActionId?: string | undefined;
+}
+
+/** Structural integrity shared by draft and publishable scenes: ids, references, cycles, primary action. */
+function checkSceneIntegrity(scene: SceneShape, ctx: z.RefinementCtx) {
     const nodeIds = new Map<string, SceneNode>();
     scene.nodes.forEach((n, i) => {
       if (nodeIds.has(n.id)) ctx.addIssue({ code: 'custom', path: ['nodes', i, 'id'], message: `duplicate node id ${n.id}` });
@@ -141,8 +155,22 @@ export const ExperienceScene = z
         ctx.addIssue({ code: 'custom', path: ['primaryActionId'], message: 'primary native action must be open-url' });
       }
     }
-  });
+}
+
+const sceneFields = {
+  schemaVersion: z.literal(SCHEMA_VERSION),
+  nodes: z.array(SceneNode).max(500),
+  actions: z.array(Action).max(100),
+  primaryActionId: Id.optional(),
+};
+
+/** Publishable scene: strict placement + integrity. */
+export const ExperienceScene = z.object({ ...sceneFields, placement: Placement }).superRefine(checkSceneIntegrity);
 export type ExperienceScene = z.infer<typeof ExperienceScene>;
+
+/** Draft scene stored by `PUT /api/experiences/:id/draft`: draft placement + the SAME integrity rules. */
+export const DraftExperienceScene = z.object({ ...sceneFields, placement: DraftPlacement }).superRefine(checkSceneIntegrity);
+export type DraftExperienceScene = z.infer<typeof DraftExperienceScene>;
 
 /** Asset roles are explicit; never inferred from MIME type (DATA_MODEL.md). */
 export const AssetRole = z.enum(['tracking-image', 'display-image', 'model', 'usdz-override', 'audio']);

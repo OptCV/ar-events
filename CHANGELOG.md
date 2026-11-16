@@ -2,6 +2,22 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-15 — Phase 1 Milestone 4: experience management (local)
+
+### Added
+- Experiences API: list, create (with draft revision 1), get, update metadata, delete, `PUT /:id/draft` (scene configuration API with optimistic concurrency), `POST /:id/validate` (publish readiness). Ownership enforced in SQL; other users' experiences return 404.
+- `DraftExperienceScene`, `planPlacementChange`, `publishReadiness`, default scenes per placement mode (`packages/schema`); experience contracts (`packages/contracts`).
+- Migration `0002_draft_version`.
+- UI: dashboard (search, empty/loading/error states), new-experience page with an accessible placement selector (per-platform runtimes, experimental badge), experience page with autosave, conflict recovery, placement-change review dialog, image printed width, readiness panel, details editing, delete confirmation. Dashboard link in the header; sign-in now lands on the dashboard.
+- ADR-021.
+
+### Changed
+- The CSRF guard requires a JSON body type only for POST/PUT/PATCH; DELETE is protected by the Origin check.
+- Phone header layout; placement-change copy mentions the tracking image only when one is set.
+
+### Status
+- Verified locally. Neon development needs migration 0002 (approval) and `ar-creator-dev` a redeploy before remote verification.
+
 ## 2026-11-15 — Neon development setup and remote authentication verification
 
 ### Added

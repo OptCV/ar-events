@@ -2,7 +2,7 @@
 
 **Updated:** 2026-11-14  
 **State:** P0 runtime-proof kit (incl. Android WebXR image probe) implemented and **structurally validated / desktop-tested**. **First device result: AND-IMG-01 PARTIAL** (native WebXR image tracking + DOM overlay worked on one Android/Chrome 157 device; visual/geometry checks outstanding). All other device rows NOT TESTED. **Phase 1 Milestones 1–3 (skeleton, database, authentication) done and verified locally; nothing deployed; no Neon migrations applied; remote auth unverified.**  
-**Current phase:** P1 Milestone 4 next (after owner Neon/Cloudflare actions for remote verification). P0 device rows still open (AND-IMG-01 re-run, AND-IMG-02, iOS, Scene Viewer).
+**Current phase:** P1 Milestone 4 done locally; remote verification of M4 pending approval; Milestone 5 next. P0 device rows still open (AND-IMG-01 re-run, AND-IMG-02, iOS, Scene Viewer).
 
 ## Implemented (automated evidence)
 
@@ -133,3 +133,12 @@ Not available yet: lint (ESLint/Prettier not configured), DB migrations, `apps/w
 - Production untouched: `ar-creator` Worker never deployed; `ar-creator-db` still `neondb_owner`; production Neon not migrated.
 - Open: Resend (email flows remotely), sign-in CPU reading, production role/migration/rotation (approval each), Milestone 4 (not started; awaiting the owner's review of the remote results).
 - To remove the dev Worker: `npx wrangler delete --name ar-creator-dev`.
+
+## Session handoff — 2026-11-15 (2) / Claude Code — Phase 1 Milestone 4 (experience management)
+
+- Branch `milestone-4` (from `milestone-3` @ `d9b2c05`).
+- Built: experiences API + scene configuration API (ADR-021), migration `0002_draft_version`, dashboard / new / experience pages with placement selector, autosave, conflict recovery, placement review, readiness.
+- Verified locally: typecheck; Vitest 134; DB 43; integration 48; USD 55; Playwright 46; npm audit 0; desktop and phone screenshots reviewed (two fixes: dialog copy, phone header).
+- **Not verified remotely:** migration 0002 is not applied to Neon development; `ar-creator-dev` still runs the Milestone 3 build. Both need owner approval.
+- Not in scope: asset uploads and the tracking-image picker (Milestone 5), visual scene editor (Phase 3), publishing.
+- Next: with approval, `db:remote migrate --env development` (0002), `deploy:dev`, add experience checks to the remote suite; then Milestone 5 (R2 asset storage).

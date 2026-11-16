@@ -25,6 +25,9 @@ export function AppLayout() {
             </NavLink>
             {!isLoading && user && (
               <>
+                <NavLink to="/dashboard" className={navClass}>
+                  Dashboard
+                </NavLink>
                 <NavLink to="/account" className={navClass}>
                   Account
                 </NavLink>

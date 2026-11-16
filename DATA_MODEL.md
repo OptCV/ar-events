@@ -80,3 +80,9 @@ All private routes require ownership checks; public ones resolve published revis
 ## Implementation status (2026-11-14)
 
 Implemented in `packages/db` (ADR-017): Better Auth `user`/`session`/`account`/`verification`/`rate_limit`, plus `experiences`, `experience_revisions`, `assets`, `asset_derivatives`, `processing_jobs`, `generated_outputs`. The schema source is `packages/db/src/schema/`; migrations are in `packages/db/migrations/`. Revision states: `draft` (only mutable state), `snapshot`, `compiling`, `partially_ready`, `published`, `failed`, `superseded`. `analytics` is not implemented yet.
+
+### Milestone 4 additions (2026-11-15)
+
+- `experiences.draft_version` (migration `0002_draft_version`): optimistic-concurrency counter for draft saves (ADR-021).
+- Draft scenes are stored as `DraftExperienceScene` (image placement may have `trackingTargetAssetId: null`); publishing will require the strict `ExperienceScene`.
+- Implemented API: `GET/POST /api/experiences`, `GET/PATCH/DELETE /api/experiences/:id`, `PUT /api/experiences/:id/draft`, `POST /api/experiences/:id/validate`. Contracts are in `packages/contracts/src/experiences.ts`.

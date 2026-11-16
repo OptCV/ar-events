@@ -46,9 +46,10 @@ Plan and slice order: `ROADMAP.md` "Phase 1 plan".
 - [x] P1-3 edge verification on the isolated `ar-creator-dev` Worker (REMOTE-AUTH-01, 9/9): Hyperdrive as `ar_app`, `__Secure-` cookies, immediate revocation, CF-Connecting-IP unspoofable, edge rate limiting, guards.
 - [ ] Read sign-in CPU time in Workers Observability for `ar-creator-dev`.
 - [ ] Production: `create-roles`/`migrate --approved`, switch `ar-creator-db` to `ar_app`, rotate production `neondb_owner` (possibly exposed). Each needs approval.
-- [ ] P1-4 Experiences + draft API with ownership checks (cross-user → 404).
+- [x] **Milestone 4 / P1-4 (local):** experiences CRUD + scene configuration API (draft PUT with optimistic concurrency, placement-change confirmation, publish readiness), ownership in SQL (cross-user → 404), migration `0002_draft_version`; dashboard, new-experience page with placement selector, experience page with autosave/conflict handling, readiness panel, delete (ADR-021).
+- [ ] Apply migration 0002 to Neon development (**approval**), redeploy `ar-creator-dev`, extend the remote suite for experiences.
 - [ ] P1-5 R2 uploads: pending asset, streamed upload, magic bytes, size/dimension limits, SHA-256, explicit roles, signed private reads.
-- [ ] P1-6 Dashboard UI: login, experience list, create draft, upload with progress/errors.
+- [-] P1-6 Dashboard UI: login, experience list, create draft done (Milestone 4); asset upload UI arrives with Milestone 5.
 - [x] Email verification + password reset flows (dev mailbox locally).
 - [ ] Resend: API key secret, verified sending domain, `EMAIL_FROM`; then real-delivery test. Public sign-up stays off until done.
 - [x] Implement scene schema / discriminated placement union (`packages/schema`, v1; migrations pending).

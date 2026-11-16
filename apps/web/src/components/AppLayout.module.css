@@ -70,3 +70,8 @@
 }
 .navButton:hover { background: var(--ui-surface-muted); color: var(--ui-text); }
 .navButton:disabled { cursor: progress; }
+.brand { white-space: nowrap; }
+@media (max-width: 520px) {
+  .headerInner { flex-wrap: wrap; row-gap: 0; padding-top: var(--ui-space-1); padding-bottom: var(--ui-space-1); }
+  .nav { width: 100%; justify-content: flex-start; margin-left: calc(-1 * var(--ui-space-3)); }
+}

@@ -1,0 +1,14 @@
+.dialog {
+  max-width: min(520px, calc(100vw - 32px));
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  padding: var(--ui-space-6);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+}
+.dialog::backdrop { background: rgba(23, 32, 42, 0.45); }
+.title { font-size: var(--ui-text-lg); margin: 0 0 var(--ui-space-3); }
+.body { color: var(--ui-text); }
+.body ul { padding-left: 1.2rem; margin: var(--ui-space-2) 0; }
+.actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--ui-space-3); margin-top: var(--ui-space-6); }
+.danger { background: var(--ui-danger); }
