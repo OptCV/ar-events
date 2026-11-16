@@ -4,8 +4,9 @@
 -- Idempotent. No secrets in this file.
 
 -- Environment marker checked by `npm run db:remote` before any migration. On the PRODUCTION branch use 'production'.
--- (Branches copy this setting from their parent; set it explicitly on every branch.)
--- ALTER DATABASE neondb SET ar.environment = 'development';
+-- Neon's neondb_owner is not a superuser, so `ALTER DATABASE … SET ar.environment` fails with 42501; use a comment,
+-- which the database owner may always set and every role may read. Set it explicitly on every branch.
+-- COMMENT ON DATABASE neondb IS 'AR Creator database. ar.environment=development';
 
 DO $$
 BEGIN

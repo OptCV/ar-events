@@ -226,3 +226,22 @@ Accepted decisions may be superseded by new numbered entries; never rewrite prev
 
 **Alternatives:** Better Auth client SDK (`better-auth/react`): not needed for a same-origin cookie app and would expose bearer tokens. Relaxed limits in development: rejected, as tests instead use distinct client IPs.  
 **Remaining verification:** a deployed (preview) Worker with Neon via Hyperdrive as `ar_app`, covering Secure cookies over HTTPS, CF-Connecting-IP set by the edge (locally workerd trusts a client-supplied header), sign-in CPU time on the Paid plan, revocation consistency through Hyperdrive, and real Resend delivery.
+
+## ADR-020 — Isolated dev Worker for remote authentication tests; Neon setup findings
+
+**Date:** 2026-11-15  
+**Status:** Accepted. Verified 2026-11-15: NEON-DEV-01 PASS; `ar-creator-dev` deployed with owner approval; REMOTE-AUTH-01 9/9  
+**Context:** Remote verification of Milestone 3 needs a real Worker on Cloudflare's edge using Hyperdrive and Neon, without any path to production.  
+**Decision:**
+1. **Separate Worker `ar-creator-dev`** (Wrangler `env.dev`), not a preview version of `ar-creator`, which would inherit production bindings. It binds only `HYPERDRIVE` → `ar-creator-db-dev` (`f7b30d81…`, Neon development branch, role `ar_app`, caching disabled), runs production-strict (`APP_ENV=production`, HTTPS origin, `__Secure-` cookies), and keeps sign-up off. It is reachable only on its `workers.dev` URL. The owner chose a public URL over Cloudflare Access.
+2. **`npm run deploy:dev -- --subdomain <s> [--dry-run]`** builds it cleanly and refuses unless: the name is right; the Hyperdrive binding is exactly the dev config; the production Hyperdrive ID appears nowhere; sign-up is off; local `.dev.vars` files are removed from the output; and no value from `apps/web/.dev.vars` or `.env` occurs anywhere in the output. The operator must type the Worker name. **Finding:** the Cloudflare Vite plugin copies `.dev.vars` (with the local `BETTER_AUTH_SECRET`) into `dist/<worker>/` for `vite preview`. This is now stripped and scanned before every deploy; the scan was proven with a planted secret.
+3. **`npm run db:remote -- remote-auth-test --env development --host <neon dev host> --base-url https://ar-creator-dev.<s>.workers.dev`** connects as `ar_app`. It seeds one temporary verified user (random in-memory password, hashed with Better Auth's `hashPassword`), runs `tests/remote` (health via Hyperdrive, static headers, sign-up closed, sign-in/cookie flags, immediate revocation, revoke-all, real-browser sign-in, CSRF/allowlist/redirect guards, and that a spoofed `CF-Connecting-IP` cannot bypass rate limiting), then always deletes the user. It refuses production and any other URL.
+4. **Neon findings (2026-11-15):**
+   - Console-created roles inherit `neon_superuser`, so roles are created with SQL via `db:remote create-roles` (hidden password prompts, attribute verification).
+   - `ALTER DATABASE … SET ar.environment` is denied to `neondb_owner` (42501), so the marker is a database comment; both forms are accepted and a conflict refuses.
+   - `pg_stat_ssl` reports `false` behind Neon's proxy, so TLS is checked client-side (encrypted and certificate verified) with `sslmode=verify-full`.
+   - The SQL Editor did not execute the `DO` block, so the grants were run as plain statements.
+   - `--host` mode builds and URL-encodes connection strings so only passwords are entered.
+5. **Incident:** the development `neondb_owner` connection string was pasted into chat. The password was reset on the development branch. Production's `neondb_owner` may share it (branch copy); rotate it after production Hyperdrive moves to `ar_app` (needs approval).
+
+**Verification:** NEON-DEV-01 PASS; REMOTE-AUTH-01 PASS 9/9 (`TESTING.md`). Edge finding: Cloudflare rejects client-supplied `CF-Connecting-IP` with 403 error 1000, so the rate-limit key cannot be spoofed.

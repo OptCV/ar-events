@@ -9,6 +9,8 @@ import { randomUUID } from 'node:crypto';
 import { expect, it } from 'vitest';
 import { Client } from 'pg';
 import { checkDatabase } from '../src/health.ts';
+import { clientTls } from '../src/tls.ts';
+import { readEnvironmentMarker } from '../src/environment.ts';
 
 export interface RuntimeRoleSuiteOptions {
   /** Connection string for the runtime role; resolved lazily so nothing is read at import time. */
@@ -53,7 +55,7 @@ async function sqlState(p: Promise<unknown>): Promise<string> {
 
 export function defineRuntimeRoleSuite(o: RuntimeRoleSuiteOptions) {
   it('targets the expected environment (ar.environment marker)', async () => {
-    const env = await withClient(o.url(), async (c) => (await c.query<{ v: string | null }>("SELECT current_setting('ar.environment', true) AS v")).rows[0]?.v);
+    const env = await withClient(o.url(), (c) => readEnvironmentMarker(c));
     expect(env).toBe(o.expectEnvironment);
   });
 
@@ -70,9 +72,9 @@ export function defineRuntimeRoleSuite(o: RuntimeRoleSuiteOptions) {
   });
 
   if (o.requireTls) {
-    it('uses TLS', async () => {
-      const ssl = await withClient(o.url(), async (c) => (await c.query<{ ssl: boolean }>('SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()')).rows[0]?.ssl);
-      expect(ssl).toBe(true);
+    it('uses TLS with a verified certificate (client side; pg_stat_ssl sees only Neon proxy→compute)', async () => {
+      const tls = await withClient(o.url(), async (c) => clientTls(c));
+      expect(tls).toMatchObject({ encrypted: true, verified: true });
     });
   }
 

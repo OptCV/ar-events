@@ -43,7 +43,8 @@ beforeAll(async () => {
   temp = await createTempDatabase();
   // Step 1 as the database owner (+ environment marker)
   await asUrl(temp.url, async (c) => {
-    await c.query(`ALTER DATABASE ${temp.name} SET ar.environment = 'development'`);
+    // Same form as on Neon (neondb_owner cannot ALTER DATABASE … SET a custom parameter: 42501).
+    await c.query(`COMMENT ON DATABASE ${temp.name} IS 'AR Creator database. ar.environment=development'`);
     await c.query(sql('01-owner-setup.sql'));
   });
   // Migrations + step 2 as ar_migrator — exactly what `db:remote migrate` does

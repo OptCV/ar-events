@@ -36,14 +36,16 @@ Plan and slice order: `ROADMAP.md` "Phase 1 plan".
 - [ ] ESLint/Prettier (still not configured).
 - [x] **Milestone 2 / P1-2** `packages/db`: Drizzle schema (Better Auth tables + experiences, revisions, assets, derivatives, jobs, outputs), migrations 0000–0001 incl. immutability triggers, local Postgres in Docker, per-request Hyperdrive connections, `/api/health` database check (ADR-017). Verified locally.
 - [x] Neon role model + guarded remote tooling (`db:remote`, `infra/db/NEON.md`, ADR-018); rehearsed locally 10/10.
-- [ ] Owner: identify which Neon branch is `ep-plain-unit-bcruyo1j`; create `ar_migrator` + `ar_app` in the Neon Console; set `ar.environment`; run `01-owner-setup.sql` (NEON.md steps 1–3).
-- [ ] `db:remote -- status --env development` (read-only), then **with owner approval** `migrate`, then `verify` (8 checks incl. TLS).
-- [ ] Switch Hyperdrive origin to `ar_app` via the dashboard (caching stays disabled).
+- [x] Neon development setup (2026-11-15): branches identified (`ep-plain-unit-bcruyo1j` = production, `ep-weathered-resonance-bce5rdkp` = development); SQL-created `ar_migrator`/`ar_app` (Console roles had `neon_superuser` and were deleted); grants; comment marker.
+- [x] Preflight, approved migration (2/2) and verify 8/8 on Neon development (NEON-DEV-01).
+- [x] `ar-creator-db-dev` Hyperdrive → `ar_app` (caching disabled). Production `ar-creator-db` still `neondb_owner` (later, with approval).
 - [ ] Apply migrations to Neon production — **only with owner approval** (`--approved`; procedure in NEON.md).
 - [ ] Edge verification of Hyperdrive: deploy, `/api/health` shows `database.status: ok`, confirm caching disabled (`wrangler hyperdrive get`), check latency.
 - [ ] Rate limiting or brief caching for `/api/health` before public launch (it opens a DB connection per call).
 - [x] **Milestone 3 / P1-3 (local):** Better Auth 1.7.16 in `apps/api` (per-request instance, allowlisted endpoints, fail-closed config, DB rate limits, token stripping, CSRF + redirect guards), `/api/auth-config`, `/api/session`, `/api/me`, `requireSession`; React sign-in/up, verify, forgot/reset, account, `RequireAuth`; dev mailbox; Resend mailer (ADR-019). Verified locally: integration 30/30, e2e 36/36.
-- [ ] P1-3 edge verification (needs owner authorization for a preview upload): Neon via Hyperdrive as `ar_app`, Secure/`__Secure-` cookies over HTTPS, CF-Connecting-IP set by the edge, sign-in CPU on Paid, revocation through Hyperdrive, Resend delivery.
+- [x] P1-3 edge verification on the isolated `ar-creator-dev` Worker (REMOTE-AUTH-01, 9/9): Hyperdrive as `ar_app`, `__Secure-` cookies, immediate revocation, CF-Connecting-IP unspoofable, edge rate limiting, guards.
+- [ ] Read sign-in CPU time in Workers Observability for `ar-creator-dev`.
+- [ ] Production: `create-roles`/`migrate --approved`, switch `ar-creator-db` to `ar_app`, rotate production `neondb_owner` (possibly exposed). Each needs approval.
 - [ ] P1-4 Experiences + draft API with ownership checks (cross-user → 404).
 - [ ] P1-5 R2 uploads: pending asset, streamed upload, magic bytes, size/dimension limits, SHA-256, explicit roles, signed private reads.
 - [ ] P1-6 Dashboard UI: login, experience list, create draft, upload with progress/errors.

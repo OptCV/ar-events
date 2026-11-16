@@ -96,7 +96,7 @@ P0 device results (axes, alpha, CTA) → P2 converter adjustments → P4 compile
 |---|---|---|
 | M1 Application skeleton | P1-1 | **Done locally** (ADR-016); edge deploy not yet verified |
 | M2 Database | P1-2 (+ Hyperdrive binding, connection management, no-cache config for consistency-sensitive reads) | **Done locally** (ADR-017); production migrations await owner approval; edge not verified |
-| M3 Authentication | P1-3 (+ Resend email verification and password recovery; public sign-up gated until complete) | **Done locally** (ADR-019); Neon/Hyperdrive/edge/Resend verification pending owner actions |
+| M3 Authentication | P1-3 (+ Resend email verification and password recovery; public sign-up gated until complete) | **Done**: local (ADR-019) + Neon development (NEON-DEV-01) + edge on isolated dev Worker (REMOTE-AUTH-01 9/9); email flows pending Resend |
 | M4 Experience management | P1-4 + dashboard layout + image/floor/wall placement selector + scene configuration API | — |
 | M5 Asset storage | P1-5 (+ previews and metadata; storage logic separate from UI; presigned/multipart-ready interface) | — |
 

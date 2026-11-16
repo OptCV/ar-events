@@ -2,6 +2,21 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-15 — Neon development setup and remote authentication verification
+
+### Added
+- `db:remote create-roles` (SQL-created restricted roles; hidden password prompts; attribute verification), `--host` mode (password-only prompts, URL encoding), `remote-auth-test` (temporary seeded user, remote Playwright suite, guaranteed cleanup).
+- Isolated Worker `ar-creator-dev` (`env.dev`, dev Hyperdrive only, production-strict, sign-up off) and `npm run deploy:dev` with binding and secret-leak guards and `--dry-run`.
+- Remote suite `tests/remote` (9 checks). ADR-020.
+
+### Fixed
+- TLS check reads the client-side socket (Neon's proxy makes `pg_stat_ssl` report false); `sslmode=verify-full` made explicit.
+- Environment marker accepts a database comment (Neon denies `ALTER DATABASE … SET` custom parameters to `neondb_owner`).
+- Deploy output no longer carries the Vite plugin's copy of `.dev.vars`.
+
+### Verified
+- Neon development: migrations applied as `ar_migrator`, runtime suite 8/8 as `ar_app`. Cloudflare edge: REMOTE-AUTH-01 9/9. Production untouched.
+
 ## 2026-11-14 — Phase 1 Milestone 3: authentication (local)
 
 ### Added

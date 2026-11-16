@@ -117,3 +117,19 @@ Not available yet: lint (ESLint/Prettier not configured), DB migrations, `apps/w
 - **Owner actions needed:** NEON.md steps 1–3; approval for `db:remote migrate --env development`; Hyperdrive origin → `ar_app` (dashboard); authorization for a preview upload (`wrangler versions upload`, not a production deploy) to run the remote checks; Resend key + verified domain.
 - **Local setup for new machines:** `npm run db:up` (creates `.env` and `apps/web/.dev.vars` with random local secrets) → `npm run db:migrate` → `npm run dev`. Emails appear at `http://localhost:5173/api/dev/mailbox`.
 - Next: Milestone 4 (dashboard, experiences, drafts, placement selector, scene configuration API). Not started.
+
+## Remote approvals log
+
+| Date | Approved by | Action | Target | Status |
+|---|---|---|---|---|
+| 2026-11-15 | product owner ("approved: migrate development") | `db:remote migrate --env development`: migrations `0000_initial_schema`, `0001_immutability_triggers` + `02-app-grants.sql` as `ar_migrator` | Neon development branch, endpoint `ep-weathered-resonance-bce5rdkp`, db `neondb` (marker `ar.environment=development`) | **done 2026-11-15**: 2/2 applied, runtime grants applied, TLSv1.3 verified, confirmation typed |
+| 2026-11-15 | product owner ("Approved") | `npm run deploy:dev -- --subdomain quiet-dawn-af59`: create isolated Worker `ar-creator-dev` (dev Hyperdrive only, sign-up off) | Cloudflare account `a91b768f…`, `https://ar-creator-dev.quiet-dawn-af59.workers.dev` | approved |
+
+## Session handoff — 2026-11-15 / Claude Code — Neon development + remote authentication verification
+
+- Branch `milestone-3` (Milestone 3 commit `2bdf4e9` preserved).
+- Neon development branch fully set up (NEON-DEV-01 PASS): restricted roles created with SQL, owner grants, comment marker, approved migrations 2/2, runtime suite 8/8; `ar-creator-db-dev` Hyperdrive → `ar_app`, caching disabled.
+- Isolated Worker `ar-creator-dev` deployed with approval (`https://ar-creator-dev.quiet-dawn-af59.workers.dev`); `BETTER_AUTH_SECRET` set by the owner via a pipe (never displayed); REMOTE-AUTH-01 **9/9**.
+- Production untouched: `ar-creator` Worker never deployed; `ar-creator-db` still `neondb_owner`; production Neon not migrated.
+- Open: Resend (email flows remotely), sign-in CPU reading, production role/migration/rotation (approval each), Milestone 4 (not started; awaiting the owner's review of the remote results).
+- To remove the dev Worker: `npx wrangler delete --name ar-creator-dev`.

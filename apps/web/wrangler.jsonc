@@ -29,5 +29,25 @@
     "AUTH_SIGNUP_ENABLED": "false"
   },
   "observability": { "enabled": true },
-  "upload_source_maps": true
+  "upload_source_maps": true,
+
+  // Isolated remote-test Worker (ADR-020). A SEPARATE Worker (`ar-creator-dev`), not a version of `ar-creator`,
+  // so it can never inherit production bindings. Bound ONLY to the development Hyperdrive config
+  // (Neon development branch, role ar_app, caching disabled). Production-strict auth settings; sign-up off.
+  // Secret (set by the owner, hidden prompt): npx wrangler secret put BETTER_AUTH_SECRET --name ar-creator-dev
+  // Build + deploy only via: npm run deploy:dev  (refuses while the subdomain placeholder is present)
+  "env": {
+    "dev": {
+      "name": "ar-creator-dev",
+      "workers_dev": true,
+      "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "f7b30d814f184296bb44518058778789" }],
+      "vars": {
+        "APP_ENV": "production",
+        "BETTER_AUTH_URL": "https://ar-creator-dev.__WORKERS_SUBDOMAIN__.workers.dev",
+        "EMAIL_TRANSPORT": "resend",
+        "EMAIL_FROM": "",
+        "AUTH_SIGNUP_ENABLED": "false"
+      }
+    }
+  }
 }

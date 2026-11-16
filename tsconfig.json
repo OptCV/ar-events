@@ -16,5 +16,5 @@
     "skipLibCheck": true,
     "types": ["node", "webxr"]
   },
-  "include": ["packages/*/src/**/*.ts", "packages/db/test/**/*.ts", "packages/db/test-remote/**/*.ts", "packages/db/*.ts", "tests/e2e/**/*.ts", "playwright.config.ts", "apps/p0-webxr-probe/src/**/*.ts", "apps/p0-webxr-probe/vite.config.ts", "scripts/**/*.ts", "vitest.config.ts"]
+  "include": ["packages/*/src/**/*.ts", "tests/remote/**/*.ts", "playwright.remote.config.ts", "packages/db/test/**/*.ts", "packages/db/test-remote/**/*.ts", "packages/db/*.ts", "tests/e2e/**/*.ts", "playwright.config.ts", "apps/p0-webxr-probe/src/**/*.ts", "apps/p0-webxr-probe/vite.config.ts", "scripts/**/*.ts", "vitest.config.ts"]
 }

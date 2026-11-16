@@ -7,7 +7,7 @@
 - **Structurally validated:** file parses/validates, but native viewer not tested.
 - **Device verified:** target device + OS + browser/viewer version recorded with visible result.
 
-**Current baseline (2026-11-14):** schema, launch URLs, capability registry and flat Image-to-AR GLB/USDZ conversion are **Implemented + structurally validated**. Remote **Neon/Hyperdrive/Cloudflare authentication is NOT VERIFIED** (no remote test has run). Device rows are **NOT TESTED** except AND-IMG-01, which is **PARTIAL** (runtime path verified on one Android/Chrome 157 device; visual/geometry checks outstanding).
+**Current baseline (2026-11-14):** schema, launch URLs, capability registry and flat Image-to-AR GLB/USDZ conversion are **Implemented + structurally validated**. **Neon development database: VERIFIED 2026-11-15** (migrations applied as `ar_migrator`, runtime-role suite 8/8 as `ar_app`; see "Remote results"). **Cloudflare authentication: VERIFIED 2026-11-15 on the isolated dev Worker** (REMOTE-AUTH-01, 9/9; email flows pending Resend). Device rows are **NOT TESTED** except AND-IMG-01, which is **PARTIAL** (runtime path verified on one Android/Chrome 157 device; visual/geometry checks outstanding).
 
 ## Automated evidence log
 
@@ -121,6 +121,44 @@ Local alternative to hosting: `npm run p0:build && npm run p0:webxr:dev`, `adb r
 | AND-ALPHA-01 | TBD | Scene Viewer | transparent GLB | see-through pixels | NOT TESTED | — |
 | AND-LINK-01 | TBD | Scene Viewer | `link` parameter | native CTA | NOT TESTED | — |
 | IOS-LINK-01 | TBD | Safari + Quick Look | `callToAction` banner | banner tap posts message; page opens link | NOT TESTED | — |
+
+## Remote results
+
+### NEON-DEV-01 — Neon development branch — 2026-11-15 — PASS
+
+Target: endpoint `ep-weathered-resonance-bce5rdkp` (development, child of production), database `neondb`, AWS us-east-1, marker `ar.environment=development` (database comment). Commands were run by the owner in PowerShell; secrets were entered at hidden prompts only.
+
+| Step | Command / action | Result |
+|---|---|---|
+| Roles | `db:remote create-roles --env development` (after deleting Console-created roles that had `neon_superuser`) | `ar_migrator`, `ar_app`: superuser/createdb/createrole/bypassrls all false, no memberships |
+| Owner grants | SQL Editor (plain GRANT statements) + check query | migrator can create schema/tables; app cannot create tables |
+| Marker | `COMMENT ON DATABASE` (ALTER DATABASE SET → 42501 on Neon) | comment verified |
+| Preflight | `db:remote status --env development --host …` as `ar_migrator` | TLSv1.3 verified, 0/2 applied |
+| Migrate (approved) | `db:remote migrate --env development --host …` | 2/2 applied + runtime grants |
+| Verify | `db:remote verify --env development --host …` as `ar_app` | **8/8 pass**: marker, non-superuser without DDL, TLS verified (client side), migrations current, DDL denied, session create/lookup/expire/revoke (rolled back), triggers fire (rolled back), no residue |
+
+Findings fixed during setup (tooling, not schema): `pg_stat_ssl` reports `false` behind Neon's proxy, so TLS is now checked client-side; the marker moved to a database comment; `--host` mode builds and URL-encodes the connection string so only the password is entered.
+
+### REMOTE-AUTH-01 — Cloudflare edge, isolated dev Worker — 2026-11-15 — PASS (9/9)
+
+Target: Worker `ar-creator-dev` (`https://ar-creator-dev.quiet-dawn-af59.workers.dev`, version `c72c7702-7b21-4230-8b2a-bbce613461a1`, build `2bdf4e9c583e-dirty`) → Hyperdrive `ar-creator-db-dev`/`f7b30d81…` (caching disabled, role `ar_app`) → Neon development. Run by the owner: `npm run db:remote -- remote-auth-test --env development --host … --base-url …`; temporary verified user seeded as `ar_app` and removed afterwards.
+
+| Check | Result |
+|---|---|
+| Fail-closed before the secret was set | `/api/auth/*` and `/api/session` → 503; health/auth-config 200 |
+| REMOTE-HEALTH | workerd; database ok through Hyperdrive (~108–575 ms request), migrations current |
+| REMOTE-STATIC | SPA over HTTPS with CSP / frame-ancestors headers |
+| REMOTE-SIGNUP-CLOSED | `signupEnabled: false`; sign-up 403 |
+| REMOTE-SIGNIN | wrong password 401; correct password → `__Secure-arc.session_token` with Secure, HttpOnly, SameSite=Lax; token not in body; `/api/me` + `/api/session` OK; **sign-out revocation immediate through Hyperdrive** (cookie replay 401) |
+| REMOTE-REVOKE-ALL | other device's session 401 after revoke-sessions |
+| REMOTE-BROWSER | real Edge browser: protected redirect → sign-in → `/account`; cookie secure/httpOnly/Lax and invisible to `document.cookie`; sign-out |
+| REMOTE-GUARDS | cross-origin sign-in 403; non-allowlisted endpoint 404; foreign `redirectTo` 400; unauthenticated `/api/me` 401 |
+| REMOTE-CF-IP | a client-supplied `CF-Connecting-IP` is rejected **by Cloudflare's edge** (403 `error code: 1000`, `Server: cloudflare`, not JSON) before the Worker runs, so the rate-limit key cannot be spoofed |
+| REMOTE-RATE-LIMIT | wrong passwords from the real IP → 429 at the edge; the correct password is also refused while limited, with Retry-After |
+
+First run: 7/8. The CF-IP assertion expected 429; diagnosis showed Cloudflare blocks the spoofed header outright (a stronger property), so the test was corrected and the rate-limit check split out. Second run: 9/9.
+
+**Not yet verified remotely:** email verification and password reset (need Resend: API key, verified domain, `EMAIL_FROM`); sign-in CPU time (read it in the dashboard: Workers & Pages → `ar-creator-dev` → Observability / Metrics → CPU time); production (`ar-creator` Worker, production Neon) is untouched.
 
 ## Device results
 
