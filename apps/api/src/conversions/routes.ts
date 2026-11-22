@@ -16,7 +16,6 @@ import {
   CreateImageObjectInput,
   ImageObjectListResponse,
   MAX_ACTIVE_CONVERSIONS,
-  USD_CONVERTER_VERSION,
   formatBytes,
   type DerivativeOutput,
   type ImageObjectSummary,
@@ -28,13 +27,14 @@ import { logError } from '../db.ts';
 import { UUID, err, parseJson } from '../http.ts';
 import { assetSigningKey, signAssetUrl, verifyAssetUrl } from '../assets/signing.ts';
 import { derivativeBytes } from '../assets/usage.ts';
-import { GLB_CONVERTER_VERSION, MIME_GLB, MIME_USDZ, failJob, imageObjectJobKey, settingsHash, type ImageObjectJobInput } from './pipeline.ts';
+import { GLB_CONVERTER_VERSION, MIME_GLB, MIME_USDZ, USDZ_CONVERTER_VERSION, failJob, imageObjectJobKey, settingsHash, type ImageObjectJobInput } from './pipeline.ts';
 
 const { assets, assetDerivatives, processingJobs } = schema;
 type JobRow = typeof processingJobs.$inferSelect;
 type DerivativeRow = typeof assetDerivatives.$inferSelect;
 
-const CONVERTIBLE_TYPES = ['image/png', 'image/jpeg'];
+// WebP sources are prepared as PNG/JPEG textures before conversion (ADR-025).
+const CONVERTIBLE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 
 const signingSecret = (c: Context<AppEnv>) => {
   const s = c.get('authConfig').secret;
@@ -74,7 +74,7 @@ async function summarize(c: Context<AppEnv>, db: Database, job: JobRow, filename
     );
   const glb = outs.find((d) => d.outputType === 'image_object_glb' && d.converterVersion === input.glbConverterVersion);
   const usdz = outs.find((d) => d.outputType === 'image_object_usdz' && d.converterVersion === input.usdConverterVersion);
-  const diag = (job.diagnostics ?? {}) as { alphaMode?: string; widthMeters?: number; heightMeters?: number; alpha?: unknown; error?: { code: string; message: string } };
+  const diag = (job.diagnostics ?? {}) as { alphaMode?: string; widthMeters?: number; heightMeters?: number; alpha?: unknown; texture?: unknown; error?: { code: string; message: string } };
   const glbDiag = (glb?.diagnostics ?? {}) as typeof diag;
   const known = { ...glbDiag, ...diag };
   return ConversionSummary.parse({
@@ -86,6 +86,7 @@ async function summarize(c: Context<AppEnv>, db: Database, job: JobRow, filename
     widthMeters: known.widthMeters ?? null,
     heightMeters: known.heightMeters ?? null,
     alpha: known.alpha ?? null,
+    texture: known.texture ?? null,
     outputs: {
       // Outputs are only offered once both exist: a half-finished pair is never presented as a result.
       glb: await outputOf(c, glb, 'glb', filename),
@@ -120,14 +121,14 @@ export function conversionRoutes() {
     if (a.role !== 'display-image') {
       return err(c, 409, 'conflict', 'Only display images can become AR objects. Upload the picture again as a display image.', { reason: 'not_convertible' });
     }
-    if (!a.mimeType || !CONVERTIBLE_TYPES.includes(a.mimeType)) return err(c, 409, 'conflict', 'Only PNG and JPEG images can be converted.', { reason: 'not_convertible' });
+    if (!a.mimeType || !CONVERTIBLE_TYPES.includes(a.mimeType)) return err(c, 409, 'conflict', 'Only PNG, JPEG and WebP images can be converted.', { reason: 'not_convertible' });
     const p = await parseJson(c, CreateImageObjectInput);
     if (!p.ok) return p.res;
     const settings = p.data.settings;
     const ownerId = c.get('user').id;
     const hash = await settingsHash(settings);
-    const key = imageObjectJobKey(a.id, hash);
-    const input: ImageObjectJobInput = { kind: 'image-object', settings, settingsHash: hash, glbConverterVersion: GLB_CONVERTER_VERSION, usdConverterVersion: USD_CONVERTER_VERSION };
+    const key = await imageObjectJobKey(a.id, hash);
+    const input: ImageObjectJobInput = { kind: 'image-object', settings, settingsHash: hash, glbConverterVersion: GLB_CONVERTER_VERSION, usdConverterVersion: USDZ_CONVERTER_VERSION };
     const { db } = await c.get('db')();
 
     const outcome = await db.transaction(async (tx) => {
@@ -252,7 +253,7 @@ export function conversionRoutes() {
       .innerJoin(assets, eq(assets.id, assetDerivatives.sourceAssetId))
       .where(and(eq(assetDerivatives.id, id), eq(assetDerivatives.status, 'ready'), eq(assets.state, 'validated')))
       .limit(1);
-    if (!d?.sha256 || !d.r2Key || d.outputType === 'thumbnail') return notFound();
+    if (!d?.sha256 || !d.r2Key || (d.outputType !== 'image_object_glb' && d.outputType !== 'image_object_usdz')) return notFound(); // textures and thumbnails are internal
     const v = await verifyAssetUrl(await assetSigningKey(secret), { id: d.id, sha256: d.sha256 }, { v: c.req.query('v'), exp: c.req.query('exp'), sig: c.req.query('sig') }, Date.now(), 'derivative');
     if (!v.ok) return err(c, 403, 'forbidden', v.reason === 'expired' ? 'This link has expired.' : 'This link is not valid.');
     const obj = await c.get('assetStore')().get(d.r2Key);

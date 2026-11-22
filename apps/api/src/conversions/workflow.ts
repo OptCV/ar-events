@@ -14,7 +14,7 @@ import { NonRetryableError } from 'cloudflare:workflows';
 import { CONVERSION_ERRORS, type ConversionErrorCode } from '@ar-creator/contracts';
 import { r2Store } from '../assets/store.ts';
 import { hyperdriveConnector } from '../db.ts';
-import { asFailure, buildGlbStep, buildUsdzStep, failJob, finishJob, startJob, type JobContext, type GlbStepResult, type PipelineDeps, type UsdzStepResult } from './pipeline.ts';
+import { asFailure, buildGlbStep, buildUsdzStep, failJob, finishJob, prepareTextureStep, startJob, type GlbStepResult, type JobContext, type PipelineDeps, type TextureRef, type UsdzStepResult } from './pipeline.ts';
 import type { ImageToArParams } from './runner.ts';
 import { converterPool, httpUsdConverter, type UsdConverter } from './usd.ts';
 
@@ -76,11 +76,11 @@ export class ImageToArWorkflow extends WorkflowEntrypoint<Env, ImageToArParams> 
     const quick = { retries: { limit: 3, delay: '2 seconds', backoff: 'exponential' }, timeout: '1 minute' } as const;
     try {
       const ctx = (await step.do('start', quick, () => this.guarded((d) => startJob(d, jobId)) as never)) as JobContext;
-      const glb = (await step.do('glb', { ...quick, timeout: '5 minutes' }, () => this.guarded((d) => buildGlbStep(d, ctx)) as never)) as GlbStepResult;
-      // Cold-starting a container can take a while; retry generously before giving up.
-      const usdz = (await step.do('usdz', { retries: { limit: 4, delay: '10 seconds', backoff: 'exponential' }, timeout: '10 minutes' }, () =>
-        this.guarded((d) => buildUsdzStep(d, ctx, glb)) as never,
-      )) as UsdzStepResult;
+      // Container steps: cold-starting a container can take a while; retry generously before giving up.
+      const container = { retries: { limit: 4, delay: '10 seconds', backoff: 'exponential' }, timeout: '10 minutes' } as const;
+      const tex = (await step.do('texture', container, () => this.guarded((d) => prepareTextureStep(d, ctx)) as never)) as TextureRef;
+      const glb = (await step.do('glb', { ...quick, timeout: '5 minutes' }, () => this.guarded((d) => buildGlbStep(d, ctx, tex)) as never)) as GlbStepResult;
+      const usdz = (await step.do('usdz', container, () => this.guarded((d) => buildUsdzStep(d, ctx, tex, glb)) as never)) as UsdzStepResult;
       await step.do('finish', quick, () => this.guarded((d) => finishJob(d, ctx, glb, usdz)) as never);
     } catch (e) {
       const f = decode(e);

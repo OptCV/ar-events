@@ -56,6 +56,17 @@ function main() {
       '--memory', '1g', '--cpus', '2', '--pids-limit', '128', '-p', `127.0.0.1:${SERVE_PORT}:8080`, RUNTIME_IMAGE,
     ]);
     process.exit(r.status ?? 1);
+  } else if (cmd === 'fixtures-webp') {
+    // WebP fixtures for ADR-025, generated with the pinned Pillow/libwebp in the sandbox (no network).
+    const out = join(ROOT, 'tests', 'fixtures', 'normalize');
+    const r = docker([
+      'run', ...SANDBOX, '-w', '/app',
+      ...mount(join(SVC, 'tools'), '/app/tools'),
+      ...mount(join(ROOT, 'tests', 'fixtures'), '/fixtures'),
+      ...mount(out, '/out', false),
+      IMAGE, 'python', 'tools/make_webp_fixtures.py', '/out',
+    ]);
+    process.exit(r.status ?? 1);
   } else if (cmd === 'stop') {
     process.exit(docker(['rm', '-f', SERVE_NAME]).status ?? 1);
   } else {

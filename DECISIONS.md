@@ -341,3 +341,23 @@ Accepted decisions may be superseded by new numbered entries; never rewrite prev
 5. **Soft-edge highlight.** Partly transparent pixels (0 < alpha < 255) are painted magenta over the 2D preview with the share reported. The image is drawn at ≤ 1024 px with **nearest-neighbour** sampling, so a hard cutout never shows false soft edges; the signed image is same-origin, so the canvas is readable under the existing CSP.
 
 **Consequences:** Publishing/compilation (Phase 5) will read image objects through the GLB id and its USDZ partner. Transform editing, multiple instances of the same object per scene (the picker hides already-placed objects) and per-device rendering checks remain open.
+
+## ADR-025 — Texture preparation: WebP, EXIF rotation and a 2048 px texture budget (Phase 2 Milestone 8)
+
+**Date:** 2026-11-22
+**Status:** Accepted (verified locally; not yet on the dev Worker). Resolves the pending part of ADR-009.
+**Context:** ADR-009 embeds the uploaded bytes unmodified, which works only for upright PNG/JPEG within viewer texture budgets. WebP is neither core glTF nor allowed in USDZ; EXIF-rotated JPEGs would display sideways; very large images waste memory on phones.
+**Decision:**
+1. **Original bytes whenever possible.** A new first pipeline step decides what both files embed. PNG/JPEG that is upright (EXIF orientation 1) and at most **2048 px** on its longest edge is embedded unchanged, exactly as before (tests assert byte equality for every committed fixture).
+2. **Otherwise one prepared texture, made once and shared.** The converter container (same image, new `POST /v1/texture?max_edge=2048`, Pillow 13.0.0) prepares it and the Worker stores it as an `image_object_texture` derivative (migration 0005), keyed by source × texture policy, so the GLB (Worker) and USDZ (Container) embed **byte-identical** bytes (asserted in tests) and different settings reuse it.
+   - WebP → PNG when it has transparency or came from a lossless/opaque PNG-like source; opaque **lossy** sources (JPEG, lossy WebP) → JPEG quality 92, 4:4:4 chroma. Lossless WebP → PNG is pixel-exact.
+   - EXIF orientation ≠ 1 → pixels rotated upright, orientation tag dropped.
+   - Longest edge > 2048 → Lanczos downscale **in premultiplied alpha** (no dark fringes from transparent black pixels; Pillow already does this for RGBA, the explicit step keeps it independent of that), aspect ratio kept; the physical width does not change.
+   - Fully opaque alpha channels are dropped; metadata is not copied; animated images and anything over 64 MP are refused; output is deterministic.
+   - The Worker re-reads the prepared texture's header and refuses it if type, size or budget disagree with what the converter reported.
+3. **Provenance.** The texture policy (`texture@0.1.0/max2048`) is part of the GLB and USDZ converter versions and of the job key (folded into a digest), so outputs made under different texture rules are never reused for each other. Jobs created by older code are refused by `startJob` instead of being finished with mislabelled outputs.
+4. **Uploads.** Display images accept **still WebP** (header-only checks: VP8/VP8L/VP8X dimensions and alpha flag, RIFF size must equal the file size, animation refused). Tracking images stay PNG/JPEG (Quick Look reference images and the WebXR tracker load them directly).
+5. **UI.** The page says when an image will be scaled down or converted, and the result explains what was done ("converted to PNG", "turned upright…", "scaled down from … to … px for phones").
+
+**Why 2048:** a conservative common budget for mobile AR viewers; it is an engineering choice, **not yet confirmed on devices** — revisit with the device matrix.
+**Consequences:** Pillow's decoders are new attack surface inside the network-less, credential-free container (SECURITY.md). Colour profiles are not converted (prepared textures drop ICC data; originals keep theirs) — pending. Tracking-image WebP remains unsupported.

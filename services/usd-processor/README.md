@@ -46,3 +46,10 @@ The Worker sends the source and stores the result; this process has no storage, 
 Locally (Windows cannot run Cloudflare Containers): `npm run usd:serve` builds the runtime image and runs it on
 `127.0.0.1:8790` with a read-only root FS and 1 GiB / 2 CPU / 128 pids limits; `vite dev` reaches it through
 `USD_CONVERTER_URL` (development only). Image stages: `base` → `test` (pytest; `npm run usd:build|usd:test`) → `runtime`.
+
+## Texture preparation (ADR-025)
+
+`POST /v1/texture?max_edge=2048` (body: PNG/JPEG/WebP) returns the frame `u32be(len) + JSON + texture`, where the
+texture is PNG (anything with transparency, or lossless sources) or JPEG q92 4:4:4 (opaque lossy sources), rotated
+upright from EXIF and downscaled in premultiplied alpha. Pillow is pinned (13.0.0). WebP test fixtures:
+`node --experimental-strip-types scripts/usd.ts fixtures-webp` (writes `tests/fixtures/normalize/` + SHA256SUMS).

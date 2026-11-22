@@ -46,7 +46,7 @@ export const revisionStateEnum = pgEnum('revision_state', [
 ]);
 export const assetRoleEnum = pgEnum('asset_role', tuple(AssetRole.options));
 export const assetStateEnum = pgEnum('asset_state', ['pending_upload', 'uploaded', 'validated', 'rejected', 'deleted']);
-export const derivativeTypeEnum = pgEnum('derivative_type', ['image_object_glb', 'image_object_usdz', 'thumbnail']);
+export const derivativeTypeEnum = pgEnum('derivative_type', ['image_object_glb', 'image_object_usdz', 'thumbnail', 'image_object_texture']);
 export const outputStateEnum = pgEnum('output_state', ['pending', 'ready', 'failed']);
 export const jobTypeEnum = pgEnum('job_type', ['validate_asset', 'convert_image_to_ar', 'compile_revision', 'publish_revision']);
 export const jobStateEnum = pgEnum('job_state', ['queued', 'running', 'succeeded', 'failed', 'cancelled']);

@@ -15,6 +15,7 @@ export function fileType(file: File): string {
   if (ext === 'glb') return MIME.glb;
   if (ext === 'png') return MIME.png;
   if (ext === 'jpg' || ext === 'jpeg') return MIME.jpeg;
+  if (ext === 'webp') return MIME.webp;
   return file.type || 'application/octet-stream';
 }
 

@@ -138,3 +138,20 @@ def test_query_parser_defaults():
         "pivot": "center",
         "orientation": "upright",
     }
+
+
+def test_texture_endpoint(server):
+    from PIL import Image
+
+    b = io.BytesIO()
+    Image.new("RGBA", (3000, 1000), (255, 255, 255, 128)).save(b, format="WEBP", lossless=True)
+    status, ctype, data = call(server, "POST", "/v1/texture?max_edge=2048", b.getvalue())
+    assert status == 200 and ctype == FRAME_TYPE
+    meta, png = unframe(data)
+    assert meta["ok"] is True and meta["mime"] == "image/png" and meta["changes"] == ["converted", "resized"]
+    assert (meta["width"], meta["height"], meta["source_width"]) == (2048, 683, 3000)
+    assert meta["sha256"] == hashlib.sha256(png).hexdigest() and png[:4] == b"\x89PNG"
+    assert call(server, "POST", "/v1/texture?max_edge=big", b.getvalue())[0] == 400
+    assert call(server, "POST", "/v1/texture?max_edge=2048&x=1", b.getvalue())[0] == 400
+    status, _, data = call(server, "POST", "/v1/texture?max_edge=2048", b"not an image")
+    assert status == 422 and json.loads(data)["code"] == "texture_failed"

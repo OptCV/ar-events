@@ -177,6 +177,31 @@ test('REMOTE-CONVERT: Workflow + Cloudflare Container turn a display PNG into a 
   await anon.dispose();
 });
 
+test('REMOTE-CONVERT-WEBP: a WebP with soft alpha is prepared as PNG by the Container (Pillow) and converted (ADR-025)', async () => {
+  test.setTimeout(360_000);
+  const disc = readFileSync('tests/fixtures/normalize/disc_soft_alpha.webp');
+  const { put } = await upload('display-image', 'disc.webp', disc, 'image/webp');
+  expect(put.status(), await put.text()).toBe(200);
+  const a = AssetSummary.parse(await put.json());
+  const t0 = Date.now();
+  const startRes = await api.post(`/api/assets/${a.id}/image-objects`, { headers: json, data: { settings: { widthMeters: 0.3, shapeMode: 'flat', alphaMode: 'auto' } } });
+  expect(startRes.status(), await startRes.text()).toBe(202);
+  let conv = ConversionSummary.parse(await startRes.json());
+  while (conv.state === 'queued' || conv.state === 'running') {
+    expect(Date.now() - t0, 'conversion did not finish in 5 minutes').toBeLessThan(300_000);
+    await new Promise((r) => setTimeout(r, 2000));
+    conv = ConversionSummary.parse(await (await api.get(`/api/conversions/${conv.id}`)).json());
+  }
+  test.info().annotations.push({ type: 'convert-webp-ms', description: String(Date.now() - t0) });
+  expect(conv.state, JSON.stringify(conv.error)).toBe('succeeded');
+  expect(conv).toMatchObject({ resolvedAlphaMode: 'BLEND', texture: { mimeType: 'image/png', width: 400, height: 400, changes: ['converted'] } });
+  const anon = await pwRequest.newContext();
+  const usdz = await anon.get(conv.outputs.usdz!.contentUrl!);
+  expect(usdz.status()).toBe(200);
+  expect(sha(await usdz.body())).toBe(conv.outputs.usdz!.sha256);
+  await anon.dispose();
+});
+
 test('REMOTE-REJECT: disguised, mismatched and tampered uploads are refused and leave nothing readable', async () => {
   const html = Buffer.from('<!doctype html><script>alert(1)</script>'.padEnd(400, ' '));
   const disguised = await upload('display-image', 'cat.png', html, 'image/png');
@@ -236,7 +261,7 @@ test('REMOTE-BROWSER-LIBRARY: real browser over HTTPS renders private previews f
   const imgs = page.locator('[data-testid="asset-card"] img');
   await expect
     .poll(() => imgs.evaluateAll((els) => (els as HTMLImageElement[]).filter((i) => i.complete && i.naturalWidth > 0).length), { timeout: 30_000 })
-    .toBe(3); // poster + noise + ring; the GLB has a text tile
+    .toBe(4); // poster + noise + ring + disc.webp; the GLB has a text tile
   await context.close();
 });
 

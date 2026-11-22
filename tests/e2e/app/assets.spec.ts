@@ -69,7 +69,7 @@ test('library: rejected files show clear errors (client checks and server signat
   const input = page.getByTestId('uploader-tracking-image').locator('input[type=file]');
 
   await input.setInputFiles({ name: 'photo.webp', mimeType: 'image/webp', buffer: Buffer.from('RIFF0000WEBP') });
-  await expect(page.getByRole('alert')).toHaveText('WebP is not supported yet. Use PNG or JPEG.');
+  await expect(page.getByRole('alert')).toHaveText('Tracking images must be PNG or JPEG.');
 
   await input.setInputFiles({ name: 'huge.png', mimeType: 'image/png', buffer: Buffer.alloc(11 * 1024 * 1024) });
   await expect(page.getByRole('alert')).toHaveText(/can be at most 10 MB/);

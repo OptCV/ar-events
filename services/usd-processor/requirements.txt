@@ -1,2 +1,4 @@
 # Pinned. usd-core provides pxr (Usd, UsdGeom, UsdShade, UsdUtils incl. ARKit packaging).
 usd-core==26.8
+# Texture preparation (WebP decode, EXIF rotation, premultiplied downscale), ADR-025.
+Pillow==13.0.0

@@ -1,0 +1,1 @@
+ALTER TYPE "public"."derivative_type" ADD VALUE 'image_object_texture';

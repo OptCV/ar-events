@@ -2,6 +2,18 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-22 — Phase 2 Milestone 8: WebP, rotated photos and a texture budget (local)
+
+### Added
+- Display images accept still WebP uploads (tracking images stay PNG/JPEG).
+- Texture preparation in the converter container (`/v1/texture`, Pillow 13.0.0): WebP → PNG/JPEG, EXIF rotation applied, images above 2048 px downscaled in premultiplied alpha. Stored once as an `image_object_texture` derivative; GLB and USDZ embed the same bytes. Migration `0005_texture_derivatives`.
+- Conversion results report what was done to the image; the page warns before converting large or WebP images.
+- WebP fixtures (`tests/fixtures/normalize`, generated reproducibly in the sandbox); remote check REMOTE-CONVERT-WEBP. ADR-025.
+
+### Changed
+- EXIF-rotated JPEGs are converted (turned upright) instead of refused.
+- GLB/USDZ provenance versions include the texture policy; conversion job keys use a version digest.
+
 ## 2026-11-22 — Dev converter pool reduced to one instance
 
 ### Changed

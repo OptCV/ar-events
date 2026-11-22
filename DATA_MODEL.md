@@ -102,4 +102,5 @@ Implemented in `packages/db` (ADR-017): Better Auth `user`/`session`/`account`/`
 " + converterVersion)}/display.{glb|usdz}`.
 - Implemented API: `POST/GET /api/assets/:id/image-objects`, `GET /api/conversions/:id`, `GET /api/derivatives/:id/content` (signed). Contracts are in `packages/contracts/src/conversions.ts`.
 - Storage usage = originals + ready derivatives.
+- Milestone 8 (ADR-025): migration `0005_texture_derivatives` adds `derivative_type` value `image_object_texture` (prepared PNG/JPEG texture, settings `{maxEdge: 2048}`, converter `texture@0.1.0`, key `…/derivatives/{hash}/texture.{png|jpg}`); internal only (never served). GLB/USDZ converter versions now include the texture policy (`image-to-ar@0.1.0+texture@0.1.0/max2048`, `usd-image-plane@0.1.0+texture@0.1.0/max2048`). `assets.mime_type` may be `image/webp` for display images.
 - Milestone 7 (ADR-024): scene `image-object` nodes store the **GLB** derivative id; the USDZ partner is found by source + settings hash. `GET /api/image-objects` lists complete pairs.

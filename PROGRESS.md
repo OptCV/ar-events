@@ -2,7 +2,7 @@
 
 **Updated:** 2026-11-22  
 **State:** P0 runtime-proof kit (incl. Android WebXR image probe) implemented and **structurally validated / desktop-tested**. **First device result: AND-IMG-01 PARTIAL** (native WebXR image tracking + DOM overlay worked on one Android/Chrome 157 device; visual/geometry checks outstanding). All other device rows NOT TESTED. **Phase 1 Milestones 1–5 done locally and verified on the isolated dev environment** (`ar-creator-dev` Worker → Hyperdrive → Neon development, R2 `ar-creator-assets-dev`): REMOTE-AUTH-01 9/9, REMOTE-CONTENT-01 8/8 (2026-11-22). Production not deployed or migrated.  
-**Current phase:** Phase 2 Milestones 6–7 **done locally** (ADR-023, ADR-024); both deployed to the dev Worker; **real Cloudflare Container conversion verified 2026-11-22 (REMOTE-CONVERT-01, 18/18)**. Milestone 6 (Image-to-AR conversion pipeline): GLB in the Worker, USDZ in a Cloudflare Container (Docker locally), driven by a Workflow. Not yet on Cloudflare: Neon migration 0004 and the first Container deploy need approval. Phase 1 is complete on dev (gate met on the edge with real R2). P0 device rows still open (AND-IMG-01 re-run, AND-IMG-02, iOS, Scene Viewer).
+**Current phase:** Phase 2 Milestone 8 (WebP, rotated photos, 2048 px texture budget; ADR-025) **done locally**, needs Neon migration 0005 + redeploy. Milestones 6–7 **done locally** (ADR-023, ADR-024); both deployed to the dev Worker; **real Cloudflare Container conversion verified 2026-11-22 (REMOTE-CONVERT-01, 18/18)**. Milestone 6 (Image-to-AR conversion pipeline): GLB in the Worker, USDZ in a Cloudflare Container (Docker locally), driven by a Workflow. Not yet on Cloudflare: Neon migration 0004 and the first Container deploy need approval. Phase 1 is complete on dev (gate met on the edge with real R2). P0 device rows still open (AND-IMG-01 re-run, AND-IMG-02, iOS, Scene Viewer).
 
 ## Implemented (automated evidence)
 
@@ -201,3 +201,12 @@ Not available yet: lint (ESLint/Prettier not configured), DB migrations, `apps/w
 ### Addendum — 2026-11-22 (8): dev container pool → 1
 
 - At the owner's request, the dev Worker now uses one converter instance (`env.dev` `max_instances: 1`, `USD_CONVERTER_POOL=1`; guard in `deploy:dev`). Production config unchanged (3). Dry run passed; **not deployed yet** (owner runs `deploy:dev`). Trade-off: dev conversions run one at a time; after 3 idle minutes the next one pays a cold start (~several seconds).
+
+## Session handoff — 2026-11-22 (9) / Claude Code — Phase 2 Milestone 8 (texture preparation)
+
+- Verified first: dev redeploy took effect (build `1c315bd`, container application `max_instances: 1`).
+- Built: still-WebP display uploads; `/v1/texture` in the converter (Pillow 13.0.0: WebP → PNG/JPEG, EXIF rotation, premultiplied downscale to 2048 px); a `texture` pipeline step that keeps original bytes when possible and otherwise stores one prepared texture used by both GLB and USDZ; migration `0005_texture_derivatives`; UI notes (ADR-025).
+- Verified locally: typecheck; Vitest 212; DB 46; integration 96; USD 81; Playwright 62; npm audit 0; deploy dry run (image 465 MB); remote spec dry run 10/10.
+- Found and fixed while testing: the conversion route still refused WebP sources; a test fixture (not the converter) had dark edge pixels; Pillow premultiplies RGBA on resize by itself (documented; the fringe test cannot tell the two apart).
+- **Needs approval/owner:** apply 0005 to Neon development **before** redeploying (otherwise health reports migrations behind), then `deploy:dev` and the remote suite.
+- Open: 2048 px budget unconfirmed on devices; colour profiles not converted; tracking-image WebP unsupported; device rendering NOT TESTED.

@@ -126,8 +126,8 @@ describe('upload, validate, store, read', () => {
       return (await errorOf(r)).issues!.map((i) => i.message).join(' ');
     };
     expect(await bad({ role: 'usdz-override' })).not.toBe('');
-    expect(await bad({ contentType: 'image/webp' })).toMatch(/WebP is not supported yet/);
-    expect(await bad({ contentType: 'image/svg+xml' })).toMatch(/PNG or JPEG/);
+    expect(await bad({ role: 'tracking-image', contentType: 'image/webp' })).toMatch(/Tracking images must be PNG or JPEG/);
+    expect(await bad({ contentType: 'image/svg+xml' })).toMatch(/PNG, JPEG or WebP/);
     expect(await bad({ role: 'model', contentType: TYPE.png })).toMatch(/\.glb/);
     expect(await bad({ sizeBytes: 0 })).toMatch(/empty/);
     expect(await bad({ sizeBytes: 16 * 1024 * 1024 })).toMatch(/at most 15 MB/);

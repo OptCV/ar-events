@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
-import { formatBytes, type AssetSummary, type ConversionSummary, type DerivativeOutput, type ImageObjectSettingsInput } from '@ar-creator/contracts';
+import { TEXTURE_MAX_EDGE, formatBytes, type AssetSummary, type ConversionSummary, type DerivativeOutput, type ImageObjectSettingsInput, type TextureInfo } from '@ar-creator/contracts';
 import { ApiRequestError } from '../api/client.ts';
 import { cx } from '../components/cx.ts';
 import { Alert } from '../components/form/Alert.tsx';
@@ -133,6 +133,8 @@ function Converter({ asset }: { asset: AssetSummary }) {
           )}
           <p className={styles.hint}>
             {img.width} × {img.height} px{img.mayHaveAlpha ? ' · can contain transparency' : ' · no transparency'}. Check the edges on light and dark backgrounds: a dark or light fringe here will also show in AR.
+            {Math.max(img.width, img.height) > TEXTURE_MAX_EDGE && ` Images larger than ${TEXTURE_MAX_EDGE} px are scaled down for phones; the real-world size does not change.`}
+            {asset.mimeType === 'image/webp' && ' WebP is converted to PNG (or JPEG for photos) because AR viewers cannot read WebP.'}
           </p>
         </div>
 
@@ -242,6 +244,17 @@ function Choice<T extends string>({ legend, name, value, onChange, options, chil
   );
 }
 
+/** Plain-language summary of what was done to the upload to make the embedded texture (ADR-025). */
+function textureNote(t: TextureInfo): string {
+  const parts: string[] = [];
+  const kind = t.mimeType === 'image/png' ? 'PNG' : 'JPEG';
+  if (t.changes.includes('converted')) parts.push(`converted to ${kind}`);
+  if (t.changes.includes('rotated')) parts.push('turned upright using the photo’s orientation tag');
+  if (t.changes.includes('resized')) parts.push(`scaled down from ${t.sourceWidth} × ${t.sourceHeight} to ${t.width} × ${t.height} px for phones`);
+  const text = parts.join(', ');
+  return `Image prepared for AR: ${text}.`;
+}
+
 function describe(c: ConversionSummary): string {
   const s = c.settings;
   const size = c.widthMeters !== null && c.heightMeters !== null ? `${fmtLen(c.widthMeters, 'cm')} × ${fmtLen(c.heightMeters, 'cm')}` : fmtLen(s.widthMeters, 'cm') + ' wide';
@@ -270,6 +283,11 @@ function Result({ conversion: c, loading, backdrop }: { conversion: ConversionSu
       {c?.state === 'succeeded' && (
         <>
           <p className={styles.summary}>{describe(c)}</p>
+          {c.texture && c.texture.changes.length > 0 && (
+            <p className={formStyles.hint} data-testid="io-texture">
+              {textureNote(c.texture)}
+            </p>
+          )}
           {c.alpha && c.alpha.transparentPixels + c.alpha.fractionalPixels > 0 && (
             <p className={formStyles.hint}>
               {Math.round(((c.alpha.transparentPixels + c.alpha.fractionalPixels) / c.alpha.pixels) * 100)}% of the pixels are transparent or partly transparent.

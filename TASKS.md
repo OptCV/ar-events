@@ -68,8 +68,10 @@ Plan and slice order: `ROADMAP.md` "Phase 1 plan".
 - [x] Dev container cost (2026-11-22): `ar-creator-dev` limited to 1 `basic` instance (`max_instances: 1`, `USD_CONVERTER_POOL=1`, enforced by `deploy:dev`); production stays at 3. Takes effect on the next `deploy:dev`.
 - [x] GLB image-plane generator with `MASK` / `BLEND` (structurally validated; device check pending).
 - [x] USDZ image-plane generator with alpha/opacity material (structurally validated; device check pending).
-- [ ] Normalize WebP and EXIF-rotated JPEG to PNG/JPEG before conversion (ADR-009).
-- [ ] Texture size limits / downscaled derivative for native viewer budgets.
+- [x] Normalize WebP and EXIF-rotated JPEG to PNG/JPEG before conversion (ADR-009 → ADR-025: prepared once in the converter container; WebP display uploads accepted).
+- [x] Texture size limits / downscaled derivative for native viewer budgets. *(2048 px longest edge, premultiplied Lanczos, stored as `image_object_texture` (ADR-025); the budget still needs device confirmation)*
+- [ ] P2 M8 remote: apply 0005 to Neon development (**approval**), redeploy, run the remote suite (REMOTE-CONVERT-WEBP).
+- [ ] Colour profiles: convert non-sRGB ICC to sRGB when preparing textures (prepared textures currently drop ICC data).
 - [ ] Batch alpha fixtures native device verification.
 - [x] Persist GLB+USDZ derivatives and conversion provenance. *(asset_derivatives unique per source × type × settings hash × converter version; job input + diagnostics (ADR-023))*
 - [ ] Optional: alpha contour/cutout geometry, behind feature gate.

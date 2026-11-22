@@ -28,6 +28,7 @@ const pad4 = (n: number) => (n + 3) & ~3;
 /** Build a self-contained, deterministic GLB image plane (IMAGE_TO_AR.md "Flat GLB generation"). */
 export function buildImagePlaneGlb(input: ImagePlaneGlbInput): ImagePlaneGlbResult {
   const info = readImageInfo(input.image);
+  if (info.mime === 'image/webp') throw new Error('WebP must be prepared as PNG/JPEG before embedding (ADR-025)');
   if (info.mime === 'image/jpeg' && input.alphaMode !== 'OPAQUE') {
     throw new Error('JPEG has no alpha channel; alphaMode must be OPAQUE');
   }

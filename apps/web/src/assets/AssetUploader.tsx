@@ -10,7 +10,7 @@ import styles from './Assets.module.css';
 
 const HINT: Record<UploadableRole, string> = {
   'tracking-image': 'The printed picture the camera recognises. PNG or JPEG, at least 256 px on the shortest side; detailed, high-contrast images track best.',
-  'display-image': 'A picture shown in the AR scene. PNG (transparency kept) or JPEG.',
+  'display-image': 'A picture shown in the AR scene. PNG or WebP (transparency kept) or JPEG.',
   model: 'A self-contained binary glTF (.glb) file. External textures or URLs are not allowed.',
 };
 

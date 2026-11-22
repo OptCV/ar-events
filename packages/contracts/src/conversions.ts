@@ -11,6 +11,27 @@ import { ImageToArSettings } from '@ar-creator/schema';
 /** Version of the Python USD converter this Worker expects (must equal `CONVERTER_VERSION` in image_plane.py). */
 export const USD_CONVERTER_VERSION = 'usd-image-plane@0.1.0';
 
+/** Version of the Python texture preparation (must equal `TEXTURE_CONVERTER_VERSION` in texture.py). */
+export const TEXTURE_CONVERTER_VERSION = 'texture@0.1.0';
+
+/**
+ * Longest texture edge embedded in image objects (ADR-025). Larger images are downscaled once, so GLB and USDZ stay
+ * within common mobile AR texture budgets. Conservative choice; to be confirmed on devices.
+ */
+export const TEXTURE_MAX_EDGE = 2048;
+
+/** What was done to the uploaded image to make the embedded texture (empty: the original bytes are embedded). */
+export const TEXTURE_CHANGES = ['converted', 'rotated', 'resized'] as const;
+export const TextureInfo = z.object({
+  mimeType: z.enum(['image/png', 'image/jpeg']),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  sourceWidth: z.number().int().positive(),
+  sourceHeight: z.number().int().positive(),
+  changes: z.array(z.enum(TEXTURE_CHANGES)),
+});
+export type TextureInfo = z.infer<typeof TextureInfo>;
+
 /** Settings accepted for a conversion. `shapeMode` is flat only; cutout/extruded modes stay hidden until built. */
 export const ImageObjectSettings = ImageToArSettings;
 export type ImageObjectSettings = z.infer<typeof ImageObjectSettings>;
@@ -62,6 +83,8 @@ export const ConversionSummary = z.object({
   alpha: z
     .object({ transparentPixels: z.number().int(), fractionalPixels: z.number().int(), pixels: z.number().int() })
     .nullable(),
+  /** The texture embedded in both files, once known. */
+  texture: TextureInfo.nullable(),
   outputs: z.object({ glb: DerivativeOutput.nullable(), usdz: DerivativeOutput.nullable() }),
   error: z.object({ code: z.enum(CONVERSION_ERRORS), message: z.string() }).nullable(),
   attempt: z.number().int(),

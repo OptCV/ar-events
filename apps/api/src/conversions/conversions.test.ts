@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { ImageObjectSettings, USD_CONVERTER_VERSION } from '@ar-creator/contracts';
+import { ImageObjectSettings, TEXTURE_CONVERTER_VERSION, USD_CONVERTER_VERSION } from '@ar-creator/contracts';
 import { assetSigningKey, signAssetUrl, verifyAssetUrl } from '../assets/signing.ts';
 import { canonicalSettings, derivativeKey, imageObjectJobKey, settingsHash } from './pipeline.ts';
 import { workflowInstanceId } from './runner.ts';
@@ -20,6 +20,8 @@ describe('converter version contract', () => {
   it('the Worker expects exactly the version the Python converter reports', () => {
     const py = readFileSync(fileURLToPath(new URL('../../../../services/usd-processor/usd_processor/image_plane.py', import.meta.url).href), 'utf8');
     expect(/CONVERTER_VERSION = "([^"]+)"/.exec(py)?.[1]).toBe(USD_CONVERTER_VERSION);
+    const tex = readFileSync(fileURLToPath(new URL('../../../../services/usd-processor/usd_processor/texture.py', import.meta.url).href), 'utf8');
+    expect(/TEXTURE_CONVERTER_VERSION = "([^"]+)"/.exec(tex)?.[1]).toBe(TEXTURE_CONVERTER_VERSION);
   });
 });
 
@@ -43,7 +45,7 @@ describe('settings hashing and keys', () => {
     await expect(derivativeKey('../x', id, h, 'v1', 'glb')).rejects.toThrow(/unsafe/);
     await expect(derivativeKey('u', 'nope', h, 'v1', 'glb')).rejects.toThrow(/unsafe/);
     await expect(derivativeKey('u', id, 'zz', 'v1', 'glb')).rejects.toThrow(/unsafe/);
-    expect(imageObjectJobKey(id, h).length).toBeLessThanOrEqual(200);
+    expect((await imageObjectJobKey(id, h)).length).toBeLessThanOrEqual(200);
     expect(workflowInstanceId(id, 2)).toBe(`${id}-a2`);
     expect(workflowInstanceId(id, 3).length).toBeLessThanOrEqual(100);
   });

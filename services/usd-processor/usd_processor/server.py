@@ -7,6 +7,7 @@ itself, so this process needs no network access, credentials or storage (the Con
 access disabled). One request at a time; every job works in a fresh temporary directory that is removed after.
 
     GET  /healthz                       -> 200 {"ok": true, "converterVersion": ..., "usd": ...}
+    POST /v1/texture?max_edge=2048        body: PNG/JPEG/WebP -> framed JSON + prepared PNG or JPEG (ADR-025)
     POST /v1/image-plane?width_m=0.5&alpha_mode=BLEND&alpha_cutoff=0.5&double_sided=0&pivot=center&orientation=upright
          body: image bytes (PNG/JPEG, Content-Length required, <= MAX_BODY)
          header X-Source-SHA256 (optional): refuse if the body does not hash to it
@@ -31,6 +32,7 @@ from urllib.parse import parse_qs, urlsplit
 from pxr import Usd
 
 from .image_plane import CONVERTER_VERSION, ConversionError, ImagePlaneRequest, build_image_plane_usdz
+from .texture import TEXTURE_CONVERTER_VERSION, TextureError, prepare_texture
 
 MAX_BODY = 32 * 1024 * 1024
 FRAME_TYPE = "application/vnd.ar-creator.conversion"
@@ -88,6 +90,17 @@ def parse_image_plane_query(query: str) -> dict:
     }
 
 
+def parse_texture_query(query: str) -> dict:
+    q = parse_qs(query, keep_blank_values=True, strict_parsing=False)
+    unknown = sorted(set(q) - {"max_edge"})
+    if unknown:
+        raise BadRequest(400, "bad_parameter", f"unknown parameter {unknown[0]}")
+    raw = _one(q, "max_edge")
+    if not raw.isdigit():
+        raise BadRequest(400, "bad_parameter", "parameter max_edge must be a whole number")
+    return {"max_edge": int(raw)}
+
+
 def convert(body: bytes, params: dict) -> tuple[dict, bytes]:
     """Run one conversion in a fresh temp dir. Returns (result json, usdz bytes); raises ConversionError."""
     with tempfile.TemporaryDirectory(prefix="req-") as tmp_s:
@@ -121,18 +134,26 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _frame(self, meta_obj: dict, payload: bytes) -> None:
+        meta = json.dumps(meta_obj).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", FRAME_TYPE)
+        self.send_header("Content-Length", str(4 + len(meta) + len(payload)))
+        self.end_headers()
+        self.wfile.write(struct.pack(">I", len(meta)) + meta + payload)
+
     def do_GET(self) -> None:  # noqa: N802
         if urlsplit(self.path).path == "/healthz":
-            self._json(200, {"ok": True, "converterVersion": CONVERTER_VERSION, "usd": ".".join(map(str, Usd.GetVersion()))})
+            self._json(200, {"ok": True, "converterVersion": CONVERTER_VERSION, "textureVersion": TEXTURE_CONVERTER_VERSION, "usd": ".".join(map(str, Usd.GetVersion()))})
         else:
             self._json(404, {"ok": False, "code": "not_found", "error": "not found"})
 
     def do_POST(self) -> None:  # noqa: N802
         url = urlsplit(self.path)
         try:
-            if url.path != "/v1/image-plane":
+            if url.path not in ("/v1/image-plane", "/v1/texture"):
                 raise BadRequest(404, "not_found", "not found")
-            params = parse_image_plane_query(url.query)
+            params = parse_image_plane_query(url.query) if url.path == "/v1/image-plane" else parse_texture_query(url.query)
             length_raw = self.headers.get("Content-Length")
             if length_raw is None or not length_raw.isdigit():
                 raise BadRequest(411, "length_required", "Content-Length is required")
@@ -147,6 +168,14 @@ class Handler(BaseHTTPRequestHandler):
             expected = self.headers.get("X-Source-SHA256")
             if expected is not None and hashlib.sha256(body).hexdigest() != expected.strip().lower():
                 raise BadRequest(422, "checksum_mismatch", "the image does not match X-Source-SHA256")
+            if url.path == "/v1/texture":
+                try:
+                    data, tex = prepare_texture(body, params["max_edge"])
+                except TextureError as e:
+                    raise BadRequest(422, "texture_failed", str(e)) from None
+                result = {"ok": True, **tex.to_dict(), "sha256": hashlib.sha256(data).hexdigest(), "sizeBytes": len(data)}
+                self._frame(result, data)
+                return
             try:
                 result, usdz = convert(body, params)
             except ConversionError as e:
@@ -154,12 +183,7 @@ class Handler(BaseHTTPRequestHandler):
             if not result["ok"]:
                 self._json(422, {"ok": False, "code": "validation_failed", "error": "the USDZ failed structural validation", "result": result})
                 return
-            meta = json.dumps(result).encode()
-            self.send_response(200)
-            self.send_header("Content-Type", FRAME_TYPE)
-            self.send_header("Content-Length", str(4 + len(meta) + len(usdz)))
-            self.end_headers()
-            self.wfile.write(struct.pack(">I", len(meta)) + meta + usdz)
+            self._frame(result, usdz)
         except BadRequest as e:
             # Unread bodies would desynchronise keep-alive; close instead.
             self.close_connection = True

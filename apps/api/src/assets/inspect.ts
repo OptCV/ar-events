@@ -4,7 +4,7 @@
  * is never trusted: the type is detected from the file signature and must match what the client declared.
  */
 import { MIME, ROLE_POLICY, type AssetMime, type FileRejection, type UploadableRole } from '@ar-creator/contracts';
-import { ImageFormatError, MAX_EDGE, MAX_PIXELS, readImageInfo } from '@ar-creator/image-to-ar';
+import { ImageFormatError, MAX_EDGE, MAX_PIXELS, isWebp, readImageInfo, webpRiffSize } from '@ar-creator/image-to-ar';
 
 export interface InspectionOk {
   ok: true;
@@ -34,6 +34,7 @@ export function sniff(head: Uint8Array): AssetMime | null {
   if (head.length >= 8 && [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every((b, i) => head[i] === b)) return MIME.png;
   if (head.length >= 3 && head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) return MIME.jpeg;
   if (head.length >= 4 && head[0] === 0x67 && head[1] === 0x6c && head[2] === 0x54 && head[3] === 0x46) return MIME.glb; // "glTF"
+  if (isWebp(head)) return MIME.webp; // RIFF....WEBP
   return null;
 }
 
@@ -41,9 +42,12 @@ export function inspectHead(role: UploadableRole, declared: string, head: Uint8A
   const policy = ROLE_POLICY[role];
   const detected = sniff(head);
   if (!detected || !(policy.types as readonly string[]).includes(detected)) {
-    return fail('signature_mismatch', role === 'model' ? 'This file is not a binary glTF (.glb) model.' : 'This file is not a PNG or JPEG image.');
+    if (detected === MIME.webp && role === 'tracking-image') return fail('signature_mismatch', 'Tracking images must be PNG or JPEG.');
+    return fail('signature_mismatch', role === 'model' ? 'This file is not a binary glTF (.glb) model.' : role === 'display-image' ? 'This file is not a PNG, JPEG or WebP image.' : 'This file is not a PNG or JPEG image.');
   }
   if (detected !== declared) return fail('type_mismatch', `The file contents (${detected}) do not match its declared type (${declared}).`);
+  // A WebP declares its full size up front: a file of any other length is truncated or padded.
+  if (detected === MIME.webp && webpRiffSize(head) !== totalSize) return fail('size_mismatch', 'The WebP file is incomplete or has extra data.');
   return detected === MIME.glb ? inspectGlb(head, totalSize) : inspectImage(role, head);
 }
 
@@ -52,6 +56,7 @@ function inspectImage(role: UploadableRole, head: Uint8Array): Inspection {
   try {
     info = readImageInfo(head);
   } catch (e) {
+    if (e instanceof ImageFormatError && /animated/.test(e.message)) return fail('corrupt', 'Animated WebP images are not supported. Upload a still image.');
     if (e instanceof ImageFormatError && /exceeds limits/.test(e.message)) {
       return fail('dimensions_out_of_range', `Images can be at most ${MAX_EDGE} × ${MAX_EDGE} pixels (${Math.round(MAX_PIXELS / 1e6)} megapixels).`);
     }

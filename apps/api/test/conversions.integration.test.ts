@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ApiError, AssetListResponse, AssetSummary, ConversionListResponse, ConversionSummary, CreateUploadResponse, ExperienceDetail, ImageObjectListResponse, type ImageObjectSettingsInput, type UploadableRole } from '@ar-creator/contracts';
 import { IDENTITY_TRANSFORM } from '@ar-creator/schema';
+import { PNG } from 'pngjs';
 import { physicalSize, readGlb } from '@ar-creator/image-to-ar';
 import { createTempDatabase, migrateDatabase } from '../../../packages/db/test/helpers.ts';
 import { fixture, makeGlb, photoJpeg, sha256Hex, trackingPng } from './files.ts';
@@ -22,13 +23,19 @@ let bob: Jar;
 
 /** Real converter, with switches to simulate an outage or hold conversions in flight. */
 const real = httpUsdConverter((r) => fetch(r), LOCAL_USD_URL);
-const control = { down: false, gate: null as Promise<void> | null, calls: 0 };
+const control = { down: false, gate: null as Promise<void> | null, calls: 0, textureCalls: 0 };
 const usd: UsdConverter = {
   async imagePlane(...args) {
     control.calls++;
     if (control.gate) await control.gate;
     if (control.down) throw new UsdConverterUnavailable('simulated outage');
     return real.imagePlane(...args);
+  },
+  async prepareTexture(...args) {
+    control.textureCalls++;
+    if (control.gate) await control.gate;
+    if (control.down) throw new UsdConverterUnavailable('simulated outage');
+    return real.prepareTexture(...args);
   },
 };
 
@@ -86,6 +93,21 @@ function zipEntries(b: Uint8Array): Map<string, Uint8Array> {
   return out;
 }
 
+/** GLB and USDZ embed byte-identical textures; `original`: those bytes are the uploaded file (ADR-009). */
+async function expectSameTexture(conv: ConversionSummary, original: boolean, sourceSha?: string) {
+  const glb = new Uint8Array(await (await anon(conv.outputs.glb!.contentUrl!)).arrayBuffer());
+  const { json, bin } = readGlb(glb);
+  const view = json.bufferViews[json.images[0].bufferView];
+  const glbTex = bin.subarray(view.byteOffset, view.byteOffset + view.byteLength);
+  expect(json.images[0].mimeType).toBe(conv.texture!.mimeType);
+  const usdz = new Uint8Array(await (await anon(conv.outputs.usdz!.contentUrl!)).arrayBuffer());
+  const tex = [...zipEntries(usdz)].filter(([n]) => n.includes('display'));
+  expect(tex).toHaveLength(1);
+  expect(await sha256Hex(tex[0]![1])).toBe(await sha256Hex(glbTex));
+  if (original) expect(await sha256Hex(glbTex)).toBe(sourceSha);
+  else if (sourceSha) expect(await sha256Hex(glbTex)).not.toBe(sourceSha);
+}
+
 beforeAll(async () => {
   const health = await fetch(`${LOCAL_USD_URL}/healthz`).catch(() => null);
   if (!health?.ok) throw new Error(`The local USD converter is not running at ${LOCAL_USD_URL}. Start it with: npm run usd:serve -- --detach`);
@@ -136,6 +158,7 @@ describe('every display fixture converts to a matching GLB + USDZ pair', () => {
       expect(conv.widthMeters).toBe(size.widthMeters);
       expect(conv.heightMeters).toBe(size.heightMeters);
       expect(conv.alpha === null).toBe(f.file.endsWith('.jpg'));
+      expect(conv.texture).toMatchObject({ changes: [], width: a.image!.width, height: a.image!.height });
 
       // GLB: cookieless signed read, exact bytes, the original image embedded unmodified (ADR-009).
       const glbOut = conv.outputs.glb!;
@@ -227,7 +250,7 @@ describe('refusals and failures', () => {
     expect(conv.outputs).toEqual({ glb: null, usdz: null });
   });
 
-  it('a rotated JPEG (EXIF orientation 6) is refused until normalisation exists (ADR-009)', async () => {
+  it('a rotated JPEG (EXIF orientation 6) is turned upright once and both files embed that texture (ADR-025)', async () => {
     const jpeg = photoJpeg();
     const tiff = new Uint8Array([0x49, 0x49, 42, 0, 8, 0, 0, 0, 1, 0, 0x12, 0x01, 3, 0, 1, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0]);
     const body = new Uint8Array([...new TextEncoder().encode('Exif\0\0'), ...tiff]);
@@ -235,8 +258,58 @@ describe('refusals and failures', () => {
     const rotated = new Uint8Array([...jpeg.subarray(0, 2), ...seg, ...jpeg.subarray(2)]);
     const a = await upload(alice, 'display-image', rotated, 'image/jpeg', 'rotated.jpg');
     const conv = await convert(alice, a.id);
-    expect(conv).toMatchObject({ state: 'failed', error: { code: 'unsupported_image' } });
-    expect(conv.error!.message).toMatch(/EXIF orientation/);
+    expect(conv.state, JSON.stringify(conv.error)).toBe('succeeded');
+    const { width: w, height: h } = a.image!;
+    // Upright: width and height swap; still a JPEG (opaque, lossy source); within budget so not resized.
+    expect(conv.texture).toEqual({ mimeType: 'image/jpeg', width: h, height: w, sourceWidth: w, sourceHeight: h, changes: ['rotated'] });
+    expect(conv).toMatchObject({ resolvedAlphaMode: 'OPAQUE', heightMeters: physicalSize(h, w, 0.5).heightMeters });
+    await expectSameTexture(conv, false);
+  });
+
+  it('WebP: lossless with transparency → PNG texture (alpha kept, Cutout/Blend as before); lossy photo → JPEG', async () => {
+    const cases = [
+      ['logo_alpha_lossless.webp', 'image/png', 'MASK'],
+      ['disc_soft_alpha.webp', 'image/png', 'BLEND'],
+      ['photo_lossy.webp', 'image/jpeg', 'OPAQUE'],
+    ] as const;
+    for (const [file, mime, alpha] of cases) {
+      const bytes = new Uint8Array(readFileSync(fileURLToPath(new URL(`../../../tests/fixtures/normalize/${file}`, import.meta.url).href)));
+      const a = await upload(alice, 'display-image', bytes, 'image/webp', file);
+      expect(a).toMatchObject({ mimeType: 'image/webp', state: 'validated' });
+      const conv = await convert(alice, a.id);
+      expect(conv.state, `${file}: ${JSON.stringify(conv.error)}`).toBe('succeeded');
+      expect(conv.texture, file).toMatchObject({ mimeType: mime, width: a.image!.width, height: a.image!.height, changes: ['converted'] });
+      expect(conv.resolvedAlphaMode, file).toBe(alpha);
+      await expectSameTexture(conv, false);
+    }
+  });
+
+  it('an image above the 2048 px budget is downscaled once (premultiplied), keeping its alpha and aspect ratio', async () => {
+    // 3000 × 1000 RGBA: opaque centre band, binary alpha → Cutout, resized to 2048 × 683.
+    const png = new PNG({ width: 3000, height: 1000 });
+    for (let y = 0; y < 1000; y++)
+      for (let x = 0; x < 3000; x++) {
+        const i = (y * 3000 + x) * 4;
+        const inside = y > 250 && y < 750;
+        png.data.set(inside ? [20, 120, 220, 255] : [0, 0, 0, 0], i);
+      }
+    const bytes = new Uint8Array(PNG.sync.write(png));
+    const a = await upload(alice, 'display-image', bytes, 'image/png', 'banner.png');
+    const conv = await convert(alice, a.id, settings({ widthMeters: 1.5 }));
+    expect(conv.state, JSON.stringify(conv.error)).toBe('succeeded');
+    expect(conv.texture).toEqual({ mimeType: 'image/png', width: 2048, height: 683, sourceWidth: 3000, sourceHeight: 1000, changes: ['resized'] });
+    expect(conv.resolvedAlphaMode).not.toBe('OPAQUE');
+    // Physical size follows the texture's aspect ratio (683/2048 vs the original 1/3: within one pixel).
+    expect(conv.widthMeters).toBe(1.5);
+    expect(Math.abs(conv.heightMeters! - 0.5)).toBeLessThan(1.5 / 2048);
+    await expectSameTexture(conv, false);
+    // The prepared texture is stored once and counts toward usage; the same source with other settings reuses it.
+    const before = control.textureCalls;
+    const again = await convert(alice, a.id, settings({ widthMeters: 2 }));
+    expect(again.texture).toEqual(conv.texture);
+    expect(control.textureCalls).toBe(before);
+    const textures = await h.sql("SELECT count(*)::int AS n FROM asset_derivatives WHERE source_asset_id = $1 AND output_type = 'image_object_texture' AND status = 'ready'", [a.id]);
+    expect(textures.rows[0]!.n).toBe(1);
   });
 
   it('a converter outage fails the attempt; starting again retries the same job (attempt 2) and succeeds', async () => {

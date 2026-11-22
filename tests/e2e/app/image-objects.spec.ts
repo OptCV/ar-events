@@ -151,3 +151,29 @@ test('image to AR (M7): soft-edge highlight, 3D preview of the result, place it 
   await expect(page.getByTestId('save-status')).toHaveText('All changes saved');
   await expect(page.getByTestId('image-objects')).toContainText('No image objects yet.');
 });
+
+test('image to AR (M8): a WebP with transparency uploads as a display image and is prepared as PNG for AR', async ({ page, request }) => {
+  test.setTimeout(90_000);
+  await verifiedSignedIn(page, request, 'p2m8');
+  await page.goto('/library');
+  await page.getByRole('group', { name: 'What is this file for?' }).getByText('Display image', { exact: true }).click();
+  const webp = { name: 'disc.webp', mimeType: 'image/webp', buffer: readFileSync('tests/fixtures/normalize/disc_soft_alpha.webp') };
+  await page.getByTestId('uploader-display-image').locator('input[type=file]').setInputFiles(webp);
+  await expect(page.getByRole('status').filter({ hasText: 'Uploaded disc.webp.' })).toBeVisible();
+  const card = page.getByTestId('asset-card').filter({ hasText: 'disc.webp' });
+  await expect(card).toContainText('400 × 400 px');
+  await expect(card.locator('img')).toHaveJSProperty('naturalWidth', 400); // browsers show WebP directly
+
+  await card.getByRole('link', { name: 'Make an AR object from disc.webp' }).click();
+  await expect(page.getByText('WebP is converted to PNG (or JPEG for photos) because AR viewers cannot read WebP.')).toBeVisible();
+  await page.getByRole('button', { name: 'Create AR object' }).click();
+  await expect(page.getByTestId('io-status')).toHaveText('Your AR object is ready.', { timeout: 30_000 });
+  await expect(page.getByTestId('io-texture')).toHaveText('Image prepared for AR: converted to PNG.');
+  await expect(page.getByTestId('io-result')).toContainText('Blend (auto)');
+  await expect(page.getByTestId('model-preview')).toHaveAttribute('data-state', 'ready', { timeout: 20_000 });
+
+  // Tracking images still refuse WebP, with a clear message.
+  await page.goto('/library');
+  await page.getByTestId('uploader-tracking-image').locator('input[type=file]').setInputFiles(webp);
+  await expect(page.getByRole('alert')).toHaveText('Tracking images must be PNG or JPEG.');
+});

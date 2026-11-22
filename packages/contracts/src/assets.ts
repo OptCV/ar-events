@@ -10,7 +10,7 @@ export const UPLOADABLE_ROLES = ['tracking-image', 'display-image', 'model'] as 
 export const UploadableRole = z.enum(UPLOADABLE_ROLES);
 export type UploadableRole = z.infer<typeof UploadableRole>;
 
-export const MIME = { png: 'image/png', jpeg: 'image/jpeg', glb: 'model/gltf-binary' } as const;
+export const MIME = { png: 'image/png', jpeg: 'image/jpeg', webp: 'image/webp', glb: 'model/gltf-binary' } as const;
 export type AssetMime = (typeof MIME)[keyof typeof MIME];
 
 export interface RolePolicy {
@@ -28,7 +28,9 @@ const MB = 1024 * 1024;
 const GB = 1024 * MB;
 export const ROLE_POLICY: Record<UploadableRole, RolePolicy> = {
   'tracking-image': { label: 'Tracking image', types: [MIME.png, MIME.jpeg], maxBytes: 10 * MB, minEdgePx: 256, accept: '.png,.jpg,.jpeg,image/png,image/jpeg' },
-  'display-image': { label: 'Display image', types: [MIME.png, MIME.jpeg], maxBytes: 15 * MB, minEdgePx: 1, accept: '.png,.jpg,.jpeg,image/png,image/jpeg' },
+  // WebP is accepted for display images only; it is prepared as PNG/JPEG before conversion (ADR-025). Tracking
+  // images stay PNG/JPEG: AR Quick Look reference images and the WebXR tracker load them directly.
+  'display-image': { label: 'Display image', types: [MIME.png, MIME.jpeg, MIME.webp], maxBytes: 15 * MB, minEdgePx: 1, accept: '.png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp' },
   model: { label: '3D model (GLB)', types: [MIME.glb], maxBytes: 25 * MB, accept: '.glb,model/gltf-binary' },
 };
 
@@ -70,8 +72,9 @@ export const CreateUploadInput = z
 export type CreateUploadInput = z.infer<typeof CreateUploadInput>;
 
 export function unsupportedTypeMessage(role: UploadableRole, type: string): string {
-  if (type === 'image/webp') return 'WebP is not supported yet. Use PNG or JPEG.';
-  return role === 'model' ? 'Upload a binary glTF file (.glb).' : 'Upload a PNG or JPEG image.';
+  if (type === 'image/webp' && role === 'tracking-image') return 'Tracking images must be PNG or JPEG.';
+  if (role === 'model') return 'Upload a binary glTF file (.glb).';
+  return role === 'display-image' ? 'Upload a PNG, JPEG or WebP image.' : 'Upload a PNG or JPEG image.';
 }
 
 export function formatBytes(n: number): string {

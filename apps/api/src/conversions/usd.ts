@@ -27,8 +27,23 @@ export interface UsdImagePlaneResult {
   openusdValidatorsRun: number;
 }
 
+export interface PreparedTexture {
+  bytes: Uint8Array;
+  sha256: string;
+  mimeType: 'image/png' | 'image/jpeg';
+  width: number;
+  height: number;
+  sourceWidth: number;
+  sourceHeight: number;
+  changes: ('converted' | 'rotated' | 'resized')[];
+  hasAlpha: boolean;
+  converterVersion: string;
+}
+
 export interface UsdConverter {
   imagePlane(image: Uint8Array, params: UsdImagePlaneParams, sourceSha256: string): Promise<UsdImagePlaneResult>;
+  /** WebP → PNG/JPEG, EXIF rotation, downscale to maxEdge (server.py /v1/texture, ADR-025). */
+  prepareTexture(image: Uint8Array, maxEdge: number, sourceSha256: string): Promise<PreparedTexture>;
 }
 
 /** The converter refused the input or its output failed validation: retrying will not help. */
@@ -75,30 +90,51 @@ export function parseFrame(body: Uint8Array): { meta: Record<string, unknown>; u
  * `origin` is only used to build the request URL (the Container ignores the host).
  */
 export function httpUsdConverter(fetcher: (req: Request) => Promise<Response>, origin = 'http://usd-converter'): UsdConverter {
+  /** POST bytes, return the parsed frame; 4xx → rejected (not retried), anything else unexpected → unavailable. */
+  async function call(path: string, image: Uint8Array, sourceSha256: string) {
+    let res: Response;
+    try {
+      res = await fetcher(
+        new Request(`${origin}${path}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/octet-stream', 'content-length': String(image.byteLength), 'x-source-sha256': sourceSha256 },
+          body: image as Uint8Array<ArrayBuffer>,
+        }),
+      );
+    } catch (e) {
+      throw new UsdConverterUnavailable(`converter unreachable: ${(e as Error).message}`);
+    }
+    const type = res.headers.get('content-type') ?? '';
+    if (res.status === 422 || res.status === 400 || res.status === 413) {
+      const j = (await res.json().catch(() => ({}))) as { code?: string; error?: string };
+      throw new UsdConversionRejected(j.code ?? 'conversion_failed', j.error ?? `converter refused the image (${res.status})`);
+    }
+    if (res.status !== 200 || !type.startsWith(FRAME_TYPE)) {
+      await res.body?.cancel();
+      throw new UsdConverterUnavailable(`converter answered ${res.status}`);
+    }
+    return parseFrame(new Uint8Array(await res.arrayBuffer()));
+  }
   return {
+    async prepareTexture(image, maxEdge, sourceSha256) {
+      const { meta, usdz: bytes } = await call(`/v1/texture?max_edge=${maxEdge}`, image, sourceSha256);
+      const mime = String(meta.mime);
+      if (meta.ok !== true || (mime !== 'image/png' && mime !== 'image/jpeg')) throw new UsdConversionRejected('texture_failed', 'the texture could not be prepared');
+      return {
+        bytes,
+        sha256: String(meta.sha256),
+        mimeType: mime,
+        width: Number(meta.width),
+        height: Number(meta.height),
+        sourceWidth: Number(meta.source_width),
+        sourceHeight: Number(meta.source_height),
+        changes: (Array.isArray(meta.changes) ? meta.changes : []).filter((c): c is 'converted' | 'rotated' | 'resized' => c === 'converted' || c === 'rotated' || c === 'resized'),
+        hasAlpha: meta.has_alpha === true,
+        converterVersion: String(meta.converter_version),
+      };
+    },
     async imagePlane(image, params, sourceSha256) {
-      let res: Response;
-      try {
-        res = await fetcher(
-          new Request(`${origin}/v1/image-plane?${imagePlaneQuery(params)}`, {
-            method: 'POST',
-            headers: { 'content-type': 'application/octet-stream', 'content-length': String(image.byteLength), 'x-source-sha256': sourceSha256 },
-            body: image,
-          }),
-        );
-      } catch (e) {
-        throw new UsdConverterUnavailable(`converter unreachable: ${(e as Error).message}`);
-      }
-      const type = res.headers.get('content-type') ?? '';
-      if (res.status === 422 || res.status === 400 || res.status === 413) {
-        const j = (await res.json().catch(() => ({}))) as { code?: string; error?: string };
-        throw new UsdConversionRejected(j.code ?? 'conversion_failed', j.error ?? `converter refused the image (${res.status})`);
-      }
-      if (res.status !== 200 || !type.startsWith(FRAME_TYPE)) {
-        await res.body?.cancel();
-        throw new UsdConverterUnavailable(`converter answered ${res.status}`);
-      }
-      const { meta, usdz } = parseFrame(new Uint8Array(await res.arrayBuffer()));
+      const { meta, usdz } = await call(`/v1/image-plane?${imagePlaneQuery(params)}`, image, sourceSha256);
       if (meta.ok !== true) throw new UsdConversionRejected('validation_failed', 'the USDZ failed structural validation');
       return {
         usdz,

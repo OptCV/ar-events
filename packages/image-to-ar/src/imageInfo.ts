@@ -1,9 +1,9 @@
 /** Header-only image inspection (no decode). Validates magic bytes rather than trusting MIME/filename. */
 export interface ImageInfo {
-  mime: 'image/png' | 'image/jpeg';
+  mime: 'image/png' | 'image/jpeg' | 'image/webp';
   width: number;
   height: number;
-  /** True when the container can carry alpha (PNG color type 4/6, or a tRNS chunk). JPEG: false. */
+  /** True when the container can carry alpha (PNG color type 4/6 or tRNS; WebP alpha flag/bit). JPEG: false. */
   mayHaveAlpha: boolean;
 }
 
@@ -17,8 +17,8 @@ export const MAX_PIXELS = 8192 * 8192;
 export const MAX_EDGE = 8192;
 
 export function readImageInfo(bytes: Uint8Array): ImageInfo {
-  const info = PNG_SIG.every((b, i) => bytes[i] === b) ? readPng(bytes) : bytes[0] === 0xff && bytes[1] === 0xd8 ? readJpeg(bytes) : null;
-  if (!info) throw new ImageFormatError('unsupported image signature (PNG and JPEG are supported; WebP pending)');
+  const info = PNG_SIG.every((b, i) => bytes[i] === b) ? readPng(bytes) : bytes[0] === 0xff && bytes[1] === 0xd8 ? readJpeg(bytes) : isWebp(bytes) ? readWebp(bytes) : null;
+  if (!info) throw new ImageFormatError('unsupported image signature (PNG, JPEG and WebP are supported)');
   if (info.width < 1 || info.height < 1) throw new ImageFormatError('image has zero dimension');
   if (info.width > MAX_EDGE || info.height > MAX_EDGE || info.width * info.height > MAX_PIXELS) {
     throw new ImageFormatError(`image ${info.width}x${info.height} exceeds limits`);
@@ -107,4 +107,37 @@ function exifOrientation(t: Uint8Array): number {
     }
   }
   return 1;
+}
+
+const ascii = (b: Uint8Array, o: number, n: number) => String.fromCharCode(...b.subarray(o, o + n));
+const u24le = (b: Uint8Array, o: number) => b[o]! | (b[o + 1]! << 8) | (b[o + 2]! << 16);
+
+/** RIFF....WEBP container (https://developers.google.com/speed/webp/docs/riff_container). */
+export function isWebp(b: Uint8Array): boolean {
+  return b.length >= 16 && ascii(b, 0, 4) === 'RIFF' && ascii(b, 8, 4) === 'WEBP';
+}
+
+/** Declared RIFF payload size + 8: must equal the file size for a complete file. */
+export function webpRiffSize(b: Uint8Array): number {
+  return ((b[4]! | (b[5]! << 8) | (b[6]! << 16) | (b[7]! << 24)) >>> 0) + 8;
+}
+
+function readWebp(b: Uint8Array): ImageInfo {
+  if (b.length < 30) throw new ImageFormatError('WebP header is truncated');
+  const chunk = ascii(b, 12, 4);
+  if (chunk === 'VP8X') {
+    const flags = b[20]!;
+    if (flags & 0x02) throw new ImageFormatError('animated WebP is not supported');
+    return { mime: 'image/webp', width: u24le(b, 24) + 1, height: u24le(b, 27) + 1, mayHaveAlpha: (flags & 0x10) !== 0 };
+  }
+  if (chunk === 'VP8L') {
+    if (b[20] !== 0x2f) throw new ImageFormatError('corrupt lossless WebP header');
+    const bits = (b[21]! | (b[22]! << 8) | (b[23]! << 16) | (b[24]! << 24)) >>> 0;
+    return { mime: 'image/webp', width: (bits & 0x3fff) + 1, height: ((bits >>> 14) & 0x3fff) + 1, mayHaveAlpha: ((bits >>> 28) & 1) === 1 };
+  }
+  if (chunk === 'VP8 ') {
+    if (b[23] !== 0x9d || b[24] !== 0x01 || b[25] !== 0x2a) throw new ImageFormatError('corrupt lossy WebP header');
+    return { mime: 'image/webp', width: (b[26]! | (b[27]! << 8)) & 0x3fff, height: (b[28]! | (b[29]! << 8)) & 0x3fff, mayHaveAlpha: false };
+  }
+  throw new ImageFormatError('unknown WebP format');
 }

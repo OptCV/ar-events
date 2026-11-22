@@ -1,4 +1,6 @@
 /** Unit tests: content inspection, the streaming pipeline, signed URLs, filename/key safety (ADR-022). */
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { alphaPng, chunked, hugePng, makeGlb, narrowPng, photoJpeg, sha256Hex, trackingPng } from '../../test/files.ts';
 import { inspectGlb, inspectHead, inspectTail, sniff } from './inspect.ts';
@@ -198,5 +200,26 @@ describe('names and keys', () => {
     expect(originalKey('abcDEF123_-', '6f1c1d39-6f37-4b4e-9d0e-1a2b3c4d5e6f')).toBe('users/abcDEF123_-/assets/6f1c1d39-6f37-4b4e-9d0e-1a2b3c4d5e6f/original');
     expect(() => originalKey('../other', '6f1c1d39-6f37-4b4e-9d0e-1a2b3c4d5e6f')).toThrow();
     expect(() => originalKey('u', '../../x')).toThrow();
+  });
+});
+
+describe('WebP uploads (ADR-025)', () => {
+  const webp = (name: string) => new Uint8Array(readFileSync(fileURLToPath(new URL(`../../../../tests/fixtures/normalize/${name}`, import.meta.url).href)));
+
+  it('display images accept still WebP with header-only metadata; tracking images refuse it', () => {
+    const logo = webp('logo_alpha_lossless.webp');
+    expect(sniff(logo)).toBe('image/webp');
+    expect(inspectHead('display-image', 'image/webp', logo, logo.length)).toMatchObject({ ok: true, mime: 'image/webp', metadata: { width: 512, height: 256, mayHaveAlpha: true } });
+    const photo = webp('photo_lossy.webp');
+    expect(inspectHead('display-image', 'image/webp', photo, photo.length)).toMatchObject({ ok: true, metadata: { mayHaveAlpha: false } });
+    expect(inspectHead('tracking-image', 'image/webp', logo, logo.length)).toMatchObject({ ok: false, code: 'signature_mismatch', message: 'Tracking images must be PNG or JPEG.' });
+  });
+
+  it('refuses animated, truncated/padded and mislabelled WebP', () => {
+    const anim = webp('animated.webp');
+    expect(inspectHead('display-image', 'image/webp', anim, anim.length)).toMatchObject({ ok: false, code: 'corrupt', message: 'Animated WebP images are not supported. Upload a still image.' });
+    const logo = webp('logo_alpha_lossless.webp');
+    expect(inspectHead('display-image', 'image/webp', logo, logo.length + 10)).toMatchObject({ ok: false, code: 'size_mismatch' });
+    expect(inspectHead('display-image', 'image/png', logo, logo.length)).toMatchObject({ ok: false, code: 'type_mismatch' });
   });
 });

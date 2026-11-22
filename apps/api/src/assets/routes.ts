@@ -47,7 +47,7 @@ export function sanitizeFilename(name: string): string {
   return clean || 'upload';
 }
 
-const EXT: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'model/gltf-binary': 'glb' };
+const EXT: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'model/gltf-binary': 'glb' };
 
 const notFound = (c: Context<AppEnv>) => err(c, 404, 'not_found', 'Asset not found.');
 
