@@ -179,3 +179,8 @@ Not available yet: lint (ESLint/Prettier not configured), DB migrations, `apps/w
 - **Partial deploy:** wrangler uploads and activates the Worker before the container step, so `ar-creator-dev` now runs version `3a8ad4a4…` (build `70b9d33`). Milestone 4/5 features keep working (health ok); conversions on dev cannot produce USDZ (expected outcome: the usdz step retries, then `converter_unavailable`; not observed).
 - Fix: `deploy:dev` now runs `wrangler containers list` before the confirmation prompt and refuses with "Nothing was uploaded" when Containers are unavailable. Verified: the refusal fires and the live version stays `3a8ad4a4…`.
 - Owner options: upgrade the account to Workers Paid, then re-run `deploy:dev` and the remote suite; or roll the dev Worker back to the Milestone 5 version `aec8691a-6a47-4406-90e4-1d76d119868a` (`npx wrangler rollback aec8691a-6a47-4406-90e4-1d76d119868a --name ar-creator-dev`, approval needed).
+
+### Addendum — 2026-11-22 (5): Workers Paid, dev redeploy, owner account
+
+- Owner upgraded the account to Workers Paid and ran `deploy:dev` successfully: `ar-creator-dev` version `f9096902-48f8-4097-80d9-cdf5dc3f1f0b` (build `afd101b`), container application `ar-creator-dev-usdconvertercontainer-dev` **ready** (0 live instances; read-only `wrangler containers list`). REMOTE-CONVERT not run yet.
+- New `npm run db:remote -- create-user --env development --email <owner email>`: one verified account in Neon development for the owner while sign-up is off. Password typed twice at a hidden prompt, hashed with Better Auth, never printed; runs as `ar_app`; development only; refuses existing emails. Refusal paths tested; the full path runs in the owner's terminal (same inserts as `remote-auth-test`).

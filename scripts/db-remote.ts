@@ -4,6 +4,8 @@
  *   npm run db:remote -- status  --env development   # read-only: target identity, marker, pending migrations
  *   npm run db:remote -- migrate --env development   # apply migrations as ar_migrator (+ runtime grants)
  *   npm run db:remote -- verify  --env development   # runtime-role checks as ar_app (all writes rolled back)
+ *   npm run db:remote -- create-user --env development --email you@example.com [--name "Your Name"]
+ *                                                      # one verified account while public sign-up is off; you type its password (hidden)
  *
  * Connection strings are read from a HIDDEN prompt (nothing echoed, nothing in shell history), or from
  * AR_REMOTE_MIGRATOR_URL / AR_REMOTE_APP_URL if you inject them with a secret manager. They are never
@@ -34,15 +36,15 @@ function fail(msg: string): never {
 function args() {
   const [cmd, ...rest] = process.argv.slice(2);
   const env = rest[rest.indexOf('--env') + 1] as Env | undefined;
-  if (!cmd || !['status', 'migrate', 'verify', 'create-roles', 'remote-auth-test'].includes(cmd)) {
-    fail('usage: db:remote -- <create-roles|status|migrate|verify|remote-auth-test> --env <development|production> [--host <hostname> [--port 5432] [--database neondb]] [--approved]');
+  if (!cmd || !['status', 'migrate', 'verify', 'create-roles', 'remote-auth-test', 'create-user'].includes(cmd)) {
+    fail('usage: db:remote -- <create-roles|status|migrate|verify|remote-auth-test|create-user> --env <development|production> [--host <hostname> [--port 5432] [--database neondb]] [--approved]');
   }
   if (rest.indexOf('--env') < 0 || (env !== 'development' && env !== 'production')) fail('--env development|production is required');
   const flag = (name: string) => (rest.includes(name) ? rest[rest.indexOf(name) + 1] : undefined);
   const host = flag('--host');
   if (host !== undefined && !/^[a-z0-9.-]+$/i.test(host)) fail('--host must be a bare hostname, e.g. ep-xxx.c-16.us-east-1.aws.neon.tech (no user, password or path).');
   CONNECT = { host, port: flag('--port') ?? '5432', database: flag('--database') ?? 'neondb' };
-  return { cmd: cmd as 'status' | 'migrate' | 'verify' | 'create-roles' | 'remote-auth-test', env, approved: rest.includes('--approved'), baseUrl: flag('--base-url') };
+  return { cmd: cmd as 'status' | 'migrate' | 'verify' | 'create-roles' | 'remote-auth-test' | 'create-user', env, approved: rest.includes('--approved'), baseUrl: flag('--base-url'), email: flag('--email'), name: flag('--name') };
 }
 
 /** Optional `--host` mode: build the URL from non-secret parts and ask only for the password (hidden). */
@@ -322,8 +324,56 @@ async function remoteAuthTest(env: Env, baseUrl: string | undefined) {
   }
 }
 
+/**
+ * Create ONE verified email/password account in the DEVELOPMENT database, for the owner to sign in to the dev Worker
+ * while public sign-up is off (no email delivery yet). The password is typed twice at a hidden prompt, hashed with
+ * Better Auth's own hashPassword, and never printed, stored elsewhere or passed on a command line. Runs as ar_app.
+ */
+async function createUser(env: Env, emailArg: string | undefined, nameArg: string | undefined) {
+  if (env !== 'development') fail('create-user only runs against the development environment (production accounts come from real sign-up).');
+  const email = (emailArg ?? '').trim().toLowerCase();
+  if (!/^[^\s@]{1,64}@[^\s@]{1,190}\.[a-z]{2,}$/i.test(email)) fail('--email you@example.com is required');
+  const name = (nameArg ?? email.split('@')[0]!).trim().slice(0, 100) || 'Owner';
+  const url = await connectionString('app');
+  const c = new Client({ connectionString: url, application_name: 'ar-creator-create-user', connectionTimeoutMillis: 15_000 });
+  c.on('error', () => undefined);
+  try {
+    await c.connect();
+    const t = await inspect(c, url);
+    report(t);
+    if (t.marker !== 'development') fail(`Refusing: ar.environment is "${t.marker ?? 'unset'}", expected "development".`);
+    if (!tlsOk(t, url)) fail('Refusing: the connection is not encrypted with a verified certificate.');
+    if (t.user !== 'ar_app') fail(`Refusing: create accounts as the runtime role ar_app (connected as ${t.user}).`);
+    const existing = await c.query('SELECT 1 FROM "user" WHERE lower(email) = $1', [email]);
+    if (existing.rowCount) fail(`An account for ${email} already exists; nothing was changed. (Use "Forgot password" once email is configured, or delete it first.)`);
+
+    const pw = await hidden(`New password for ${email} (12–128 characters, input hidden): `);
+    if (pw.length < 12 || pw.length > 128) fail('The password must be 12–128 characters; nothing was changed.');
+    if ((await hidden('Type it again: ')) !== pw) fail('The passwords did not match; nothing was changed.');
+
+    const { hashPassword } = (await import(pathToFileURL(join(DB, 'node_modules', 'better-auth', 'dist', 'crypto', 'index.mjs')).href)) as { hashPassword: (p: string) => Promise<string> };
+    const hash = await hashPassword(pw);
+    // Same id shape as Better Auth (URL-safe), which also satisfies the R2 key rules for owner ids.
+    const userId = randomBytes(24).toString('base64url');
+    await c.query('BEGIN');
+    await c.query('INSERT INTO "user" (id, name, email, email_verified) VALUES ($1, $2, $3, true)', [userId, name, email]);
+    await c.query(`INSERT INTO account (id, account_id, provider_id, user_id, password, updated_at) VALUES ($1, $2, 'credential', $2, $3, now())`, [randomBytes(24).toString('base64url'), userId, hash]);
+    await c.query('COMMIT');
+    console.log(`
+  created verified account ${email} (name "${name}") in the development database
+  sign in at the dev Worker's /sign-in with the password you just typed
+`);
+  } catch (e) {
+    await c.query('ROLLBACK').catch(() => undefined);
+    const err = e as { code?: string; message?: string };
+    fail(`Error${err.code ? ` [${err.code}]` : ''}: ${redact(String(err.message ?? e))}`);
+  } finally {
+    await c.end().catch(() => undefined);
+  }
+}
+
 async function main() {
-  const { cmd, env, approved, baseUrl } = args();
+  const { cmd, env, approved, baseUrl, email, name } = args();
   if (env === 'production' && cmd === 'migrate' && !approved) fail('Production migrations require --approved (owner sign-off recorded in PROGRESS.md).');
 
   if (cmd === 'verify') {
@@ -338,6 +388,7 @@ async function main() {
   }
 
   if (cmd === 'remote-auth-test') return remoteAuthTest(env, baseUrl);
+  if (cmd === 'create-user') return createUser(env, email, name);
 
   if (cmd === 'create-roles') {
     if (env === 'production' && !approved) fail('Creating production roles requires --approved (owner sign-off recorded in PROGRESS.md).');
