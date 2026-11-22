@@ -264,3 +264,44 @@ Accepted decisions may be superseded by new numbered entries; never rewrite prev
 7. **UI:** `/dashboard` (list, search, empty/loading/error states), `/experiences/new` (details + accessible placement radio group with per-platform runtimes and the Android image "Experimental" badge), `/experiences/:id` (placement, image printed width, scene summary, readiness panel, details, delete with confirmation), all behind `RequireAuth`. The default destination after sign-in is now `/dashboard`.
 
 **Consequences:** the Neon development branch needs migration 0002 (owner approval) and `ar-creator-dev` a redeploy before Milestone 4 can be verified remotely. Asset ownership checks for scene references arrive with assets (Milestone 5).
+
+## ADR-022 — Asset storage in R2: upload slots, streamed validation, signed private reads (Milestone 5)
+
+**Date:** 2026-11-22  
+**Status:** Accepted (verified locally, including the R2 adapter in workerd against Miniflare's R2 simulator; no Cloudflare bucket created, nothing deployed)  
+**Decision:**
+1. **Two-step upload, strategy-neutral contract.** `POST /api/assets/uploads` reserves a slot: a `pending_upload` asset row with a server-generated key `users/{userId}/assets/{assetId}/original` and a 15-minute expiry. It returns an upload target `{strategy, method, url, headers, expiresAt, maxBytes}`. Only `worker-stream` exists today (`PUT /api/assets/:id/content` through the Worker, ADR-015). `presigned-put` and `multipart` are reserved values, so switching to direct-to-R2 uploads later needs no client contract change. Storage sits behind an `ObjectStore` interface (`r2Store`, `memoryStore`); routes never touch R2 directly.
+2. **One attempt per slot.** The PUT claims the slot atomically (`upload_claimed_at`, conditional UPDATE). A concurrent second PUT, a retry after failure or an expired slot gets **409 `upload_not_pending`**, and the client starts a new upload. Failed attempts are recorded as `rejected` with a `rejection_code`. Migration `0003_asset_uploads` adds `upload_expires_at`, `upload_claimed_at`, `rejection_code` and two CHECKs (a pending upload needs an expiry; a rejection needs a code).
+3. **Validate while streaming; commit only valid files.** A TransformStream between the request body and R2 holds back the first bytes (1 MiB for images, 2 MiB for GLB) until the head is inspected, so **no byte reaches storage before the file signature is checked**. It then counts bytes (they must equal the declared size, which must equal `Content-Length`), hashes every byte (SHA-256; native `crypto.DigestStream` in workerd), and at the end checks the PNG end marker and the optional client checksum. Any failure errors the stream, so the R2 put aborts and nothing is stored; a failed overwrite never damages an existing object (both verified in workerd). When the client declares a checksum, R2 verifies it too.
+4. **What is checked.** The declared type is never trusted: the real type comes from magic bytes and must match it.
+   - `tracking-image` and `display-image` accept PNG and JPEG. WebP is refused with a clear message until ADR-009 normalisation exists.
+   - Dimensions are read from headers before any decode: ≤ 8192 px per edge and ≤ 64 MP (decompression-bomb guard).
+   - Tracking images need ≥ 256 px on the shortest side and get a warning below 480 px or beyond a 4:1 aspect ratio.
+   - `model` accepts **self-contained GLB 2.0 only**: the header length must equal the file size, the JSON chunk must parse, `asset.version` must be 2.x, and every buffer/image `uri` must be an embedded base64 `data:` URI. **External, relative, `file:` and remote references are refused.** Required glTF extensions produce a warning.
+   - JPEG trailers are not checked, because many cameras append data after the end marker.
+   - Limits: tracking 10 MB, display 15 MB, model 25 MB; 10 unfinished slots and 1 GiB stored per user (serialised per user with an advisory lock).
+   - Roles `usdz-override` and `audio` are not accepted yet.
+5. **Signed, cookieless private reads.** Native AR viewers fetch without cookies, so `GET /api/assets/:id/content?v&exp&sig` is authorised by an HMAC-SHA256 over (asset id, content SHA-256, expiry).
+   - The key is derived from `BETTER_AUTH_SECRET` with HKDF and a dedicated label (domain separation; no new secret to manage).
+   - URLs live 15 minutes (hard cap 24 h) and are bound to the content hash. Verification is constant-time (`crypto.subtle.verify`).
+   - Responses carry the stored (validated) MIME type, `nosniff`, `default-src 'none'`, `Content-Disposition: inline` with a server-generated filename, and `Cache-Control: private, max-age ≤ remaining`.
+   - The bucket has no public access, and there is no other read path.
+6. **Ownership and references.**
+   - Every session route filters by owner in SQL, so another user's asset is a 404.
+   - Draft saves now verify every referenced asset: it must be owned, validated and in the right role (tracking target → `tracking-image`, model node → `model`, image object → a ready derivative).
+   - Deleting an asset referenced by any revision of the owner's experiences returns **409 `asset_in_use`**, naming the experiences.
+   - Deletion hides the row, then removes the R2 object, then deletes the row. A storage failure therefore never leaves a visible asset without bytes, or an object with no row pointing at it.
+7. **CSRF:** the binary PUT is the single exception to the "JSON body for POST/PUT/PATCH" rule; the Origin check still applies to it.
+8. **Bindings:** `ASSETS_BUCKET` → `ar-creator-assets` (production) and `ar-creator-assets-dev` (`env.dev`; bindings are not inherited). `deploy:dev` refuses any other R2 binding. Neither bucket exists yet.
+9. **UI:**
+   - `/library` (not `/assets`, which is the immutable static-asset path): role choice, drag-and-drop or picker, client pre-checks, a browser-computed SHA-256, XHR progress and cancel, previews on a checkerboard (so transparency is visible) via signed URLs refreshed before expiry, a usage meter, filters and delete.
+   - The experience page gains a tracking-image picker: upload or choose; the printed size is computed from the width and aspect ratio; change or remove.
+
+**Consequences / pending:**
+- **Remote verification:** create both R2 buckets (owner approval), apply migrations 0002 and 0003 to Neon development, redeploy `ar-creator-dev`, then verify uploads, bucket privacy and signed reads on the edge.
+- **Not built yet:**
+  - thumbnails and derivatives;
+  - range requests (may matter for native viewers);
+  - cleanup of expired or rejected slots;
+  - presigned and multipart strategies;
+  - rendered model previews.

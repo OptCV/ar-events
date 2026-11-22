@@ -2,6 +2,26 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-22 — Phase 1 Milestone 5: asset storage in R2 (local)
+
+### Added
+- Asset API: `POST /api/assets/uploads` (upload slot + strategy-neutral upload target), `PUT /api/assets/:id/content` (Worker-streamed upload, validated before commit), `GET /api/assets` (+ usage), `GET/DELETE /api/assets/:id`, `GET /api/assets/:id/content` (HMAC-signed, cookieless private read). Ownership enforced in SQL.
+- Streaming pipeline: head inspection before any byte is stored, exact-size enforcement, SHA-256 (native `DigestStream` in workerd), PNG end-marker check, optional client checksum (also verified by R2).
+- Inspection: PNG/JPEG by signature with header-only dimensions and bomb limits; tracking-image minimum and warnings; self-contained GLB 2.0 only (external URIs refused).
+- `ObjectStore` interface with R2 and in-memory adapters; `ASSETS_BUCKET` bindings (`ar-creator-assets`, `ar-creator-assets-dev`); `deploy:dev` refuses any other bucket.
+- Migration `0003_asset_uploads`; asset contracts in `packages/contracts`.
+- Draft saves verify referenced assets (owned, validated, right role); assets in use cannot be deleted.
+- UI: asset library (`/library`) with role choice, drag-and-drop, progress, cancel, previews, usage, filters, delete; tracking-image picker with printed size on the experience page; "Library" nav link.
+- Tests: asset unit tests, integration tests, an R2 adapter test in workerd (Miniflare), browser flows. ADR-022.
+
+### Changed
+- The CSRF guard accepts a non-JSON body only for `PUT /api/assets/:id/content` (Origin still required).
+- API responses keep `Cache-Control: no-store` unless a route sets its own (signed reads: private, short-lived).
+- Shared API error helpers (`apps/api/src/http.ts`); a duplicated `/api/session` route was removed.
+
+### Status
+- Verified locally only (including local R2 simulation). No R2 bucket created; Neon development still needs migrations 0002 and 0003; `ar-creator-dev` not redeployed.
+
 ## 2026-11-15 — Phase 1 Milestone 4: experience management (local)
 
 ### Added

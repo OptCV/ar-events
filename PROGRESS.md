@@ -1,8 +1,8 @@
 # PROGRESS.md — Actual Implementation State
 
-**Updated:** 2026-11-14  
+**Updated:** 2026-11-22  
 **State:** P0 runtime-proof kit (incl. Android WebXR image probe) implemented and **structurally validated / desktop-tested**. **First device result: AND-IMG-01 PARTIAL** (native WebXR image tracking + DOM overlay worked on one Android/Chrome 157 device; visual/geometry checks outstanding). All other device rows NOT TESTED. **Phase 1 Milestones 1–3 (skeleton, database, authentication) done and verified locally; nothing deployed; no Neon migrations applied; remote auth unverified.**  
-**Current phase:** P1 Milestone 4 done locally; remote verification of M4 pending approval; Milestone 5 next. P0 device rows still open (AND-IMG-01 re-run, AND-IMG-02, iOS, Scene Viewer).
+**Current phase:** P1 Milestone 5 (asset storage) done locally. Phase 1 gate ("a creator can securely create a draft and upload/retrieve a checked asset") **met locally**, not yet on the edge. Remote verification of M4 + M5 pending approval (R2 buckets, Neon migrations 0002/0003, dev redeploy). P0 device rows still open (AND-IMG-01 re-run, AND-IMG-02, iOS, Scene Viewer).
 
 ## Implemented (automated evidence)
 
@@ -142,3 +142,12 @@ Not available yet: lint (ESLint/Prettier not configured), DB migrations, `apps/w
 - **Not verified remotely:** migration 0002 is not applied to Neon development; `ar-creator-dev` still runs the Milestone 3 build. Both need owner approval.
 - Not in scope: asset uploads and the tracking-image picker (Milestone 5), visual scene editor (Phase 3), publishing.
 - Next: with approval, `db:remote migrate --env development` (0002), `deploy:dev`, add experience checks to the remote suite; then Milestone 5 (R2 asset storage).
+
+## Session handoff — 2026-11-22 / Claude Code — Phase 1 Milestone 5 (asset storage in R2)
+
+- Branch `milestone-5` (from `milestone-4` @ `403027c`).
+- Built: asset API with upload slots, Worker-streamed upload validated before commit, signed cookieless reads, quotas, draft asset-reference checks, delete protection (ADR-022); migration `0003_asset_uploads`; `ObjectStore` (R2 + memory); R2 bindings and the `deploy:dev` bucket guard; `/library` page and the tracking-image picker.
+- Verified locally: typecheck; Vitest 155; DB 44; integration 71 (incl. 6 R2-adapter tests in workerd/Miniflare); Playwright 54; USD 55; npm audit 0; desktop and phone screenshots reviewed (3 fixes: filter label, button alignment, GB formatting).
+- **Not verified remotely:** no R2 bucket exists; Neon development lacks migrations 0002 and 0003; `ar-creator-dev` still runs the Milestone 3 build. Each needs owner approval.
+- Not built: thumbnails/derivatives, range requests, cleanup of stale upload slots, presigned/multipart strategies, model previews, WebP (ADR-009).
+- Next: with approval, create `ar-creator-assets-dev`, `db:remote migrate --env development` (0002 + 0003), `deploy:dev`, extend the remote suite (experiences + assets); then Phase 2 (Image-to-AR conversion of uploaded images).

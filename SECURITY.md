@@ -50,6 +50,6 @@ Uploads (GLB/glTF, PNG/JPG/WebP, USDZ), GLB/USD parser behavior, external URLs e
 - [ ] URL and intent encoder abuse cases tested.
 - [ ] Decompression bomb and oversized image fixtures rejected.
 - [ ] Sandbox resource budgets configured.
-- [ ] R2 private/public access separated.
+- [ ] R2 private/public access separated. *(Private side implemented: no public bucket access, owner-only routes, signed cookieless reads (ADR-022). Public published outputs not built yet; edge verification pending.)*
 - [ ] No arbitrary active content in banner/panel assets.
 - [ ] Secrets audit and dependency scanning completed.

@@ -83,6 +83,7 @@ export const requireSession: MiddlewareHandler<AppEnv> = async (c, next) => {
 };
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+const BINARY_UPLOAD_PATH = /^\/api\/assets\/[0-9a-f-]{36}\/content$/i;
 /**
  * CSRF defence for EVERY state-changing API request, including /api/auth/* (ADR-019 finding: Better Auth's own
  * origin check only applies to cookie-bearing requests, so a cookieless cross-site sign-in — login CSRF — was
@@ -96,7 +97,10 @@ export const sameOriginMutations: MiddlewareHandler<AppEnv> = async (c, next) =>
   const type = c.req.header('content-type') ?? '';
   // Body-carrying methods must be JSON (blocks form-encoded cross-site posts). DELETE has no body: Origin suffices
   // (HTML forms cannot send DELETE and cross-origin fetch DELETE requires a CORS preflight we never grant).
-  const needsJson = c.req.method === 'POST' || c.req.method === 'PUT' || c.req.method === 'PATCH';
+  // The binary upload route (ADR-022) is the single exception to the JSON rule: its body IS the file. The Origin
+  // check still applies, and a cross-site PUT is impossible without a CORS preflight we never grant.
+  const binaryUpload = c.req.method === 'PUT' && BINARY_UPLOAD_PATH.test(c.req.path);
+  const needsJson = !binaryUpload && (c.req.method === 'POST' || c.req.method === 'PUT' || c.req.method === 'PATCH');
   if (origin !== expected || (needsJson && !type.toLowerCase().startsWith('application/json'))) {
     return c.json({ error: { code: 'forbidden', message: 'Cross-origin or non-JSON request refused.', requestId: c.get('requestId') } }, 403);
   }

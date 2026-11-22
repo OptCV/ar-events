@@ -9,35 +9,19 @@ import {
   ReadinessResponse,
   SaveDraftInput,
   UpdateExperienceInput,
-  type ApiError,
   type ExperienceSummary,
 } from '@ar-creator/contracts';
 import { schema } from '@ar-creator/db';
 import { DraftExperienceScene, defaultDraftScene, publishReadiness } from '@ar-creator/schema';
-import type { z } from 'zod';
 import type { AppEnv } from '../app.ts';
 import { requireSession } from '../auth/middleware.ts';
+import { err, parseJson } from '../http.ts';
+import { assetReferenceIssues } from '../assets/references.ts';
 
 const { experiences, experienceRevisions } = schema;
 export const MAX_BODY_BYTES = 256 * 1024;
 
-type ErrorExtras = Pick<ApiError['error'], 'issues' | 'reason' | 'currentDraftVersion'>;
-function err(c: Context<AppEnv>, status: 400 | 404 | 409 | 413, code: ApiError['error']['code'], message: string, extras: ErrorExtras = {}) {
-  const body: ApiError = { error: { code, message, requestId: c.get('requestId'), ...extras } };
-  return c.json(body, status);
-}
 const notFound = (c: Context<AppEnv>) => err(c, 404, 'not_found', 'Experience not found.');
-
-async function parse<S extends z.ZodType>(c: Context<AppEnv>, s: S): Promise<{ ok: true; data: z.infer<S> } | { ok: false; res: Response }> {
-  const json: unknown = await c.req.json().catch(() => undefined);
-  if (json === undefined) return { ok: false, res: err(c, 400, 'bad_request', 'Send a JSON body.') };
-  const r = s.safeParse(json);
-  if (!r.success) {
-    const issues = r.error.issues.slice(0, 50).map((i) => ({ path: i.path.map((p) => (typeof p === 'symbol' ? String(p) : p)), message: i.message }));
-    return { ok: false, res: err(c, 400, 'bad_request', 'Some fields are invalid.', { issues }) };
-  }
-  return { ok: true, data: r.data };
-}
 
 /** URL-safe slug from the name + random suffix (DB enforces format and uniqueness). */
 export function makeSlug(name: string): string {
@@ -112,7 +96,7 @@ export function experienceRoutes() {
   });
 
   r.post('/', async (c) => {
-    const p = await parse(c, CreateExperienceInput);
+    const p = await parseJson(c, CreateExperienceInput);
     if (!p.ok) return p.res;
     const { db } = await c.get('db')();
     const ownerId = c.get('user').id;
@@ -148,7 +132,7 @@ export function experienceRoutes() {
   r.patch('/:id', async (c) => {
     const id = c.req.param('id');
     if (!ExperienceId.safeParse(id).success) return notFound(c);
-    const p = await parse(c, UpdateExperienceInput);
+    const p = await parseJson(c, UpdateExperienceInput);
     if (!p.ok) return p.res;
     const { db } = await c.get('db')();
     const set: Partial<typeof experiences.$inferInsert> = {};
@@ -169,7 +153,7 @@ export function experienceRoutes() {
     const id = c.req.param('id');
     const current = await load(c, id);
     if (!current) return notFound(c);
-    const p = await parse(c, SaveDraftInput);
+    const p = await parseJson(c, SaveDraftInput);
     if (!p.ok) return p.res;
     const { scene, draftVersion, confirmPlacementChange } = p.data;
     if (draftVersion !== current.e.draftVersion) {
@@ -179,6 +163,9 @@ export function experienceRoutes() {
       return err(c, 409, 'conflict', 'Changing the placement mode must be confirmed.', { reason: 'placement_change_unconfirmed', currentDraftVersion: current.e.draftVersion });
     }
     const { db } = await c.get('db')();
+    // Referenced assets must exist, belong to this user, be validated and have the right role (ADR-022).
+    const refIssues = await assetReferenceIssues(db, c.get('user').id, scene);
+    if (refIssues.length) return err(c, 400, 'bad_request', 'The draft references assets that cannot be used.', { issues: refIssues });
     const ok = await db.transaction(async (tx) => {
       // Conditional bump: only one concurrent writer with this draftVersion can win.
       const bumped = await tx

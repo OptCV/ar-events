@@ -5,6 +5,7 @@ import { createApp } from '../src/app.ts';
 import type { Mailer, OutboundEmail } from '../src/email/mailer.ts';
 import type { RawAuthEnv } from '../src/auth/config.ts';
 import type { DbConnector } from '../src/db.ts';
+import { memoryStore } from '../src/assets/store.ts';
 
 /** Minimal cookie jar: stores Set-Cookie name=value pairs, honours deletion (Max-Age=0 / empty value). */
 export class Jar {
@@ -31,7 +32,12 @@ export class Jar {
 export interface Harness {
   base: string;
   mails: OutboundEmail[];
-  req: (path: string, init?: { method?: string; body?: unknown; jar?: Jar; ip?: string; origin?: string | null; headers?: Record<string, string> }) => Promise<Response>;
+  /** In-memory object store standing in for R2 (the R2 adapter itself is tested in workerd). */
+  store: ReturnType<typeof memoryStore>;
+  req: (
+    path: string,
+    init?: { method?: string; body?: unknown; raw?: { bytes: Uint8Array; type: string; length?: string | null }; jar?: Jar; ip?: string; origin?: string | null; headers?: Record<string, string> },
+  ) => Promise<Response>;
   sql: (q: string, params?: unknown[]) => Promise<{ rows: Record<string, unknown>[]; rowCount: number | null }>;
 }
 
@@ -43,7 +49,8 @@ export function makeHarness(opts: { dbUrl: string; base?: string; env?: Partial<
   const base = opts.base ?? 'http://localhost';
   const mails: OutboundEmail[] = [];
   const mailer: Mailer = { transport: 'dev-mailbox', send: async (m) => void mails.push(m) };
-  const app = createApp({ version: 'test', build: 'test' }, { connectDb: opts.connect ?? (() => connectDb(opts.dbUrl)), mailer: () => mailer });
+  const store = memoryStore();
+  const app = createApp({ version: 'test', build: 'test' }, { connectDb: opts.connect ?? (() => connectDb(opts.dbUrl)), mailer: () => mailer, objectStore: () => store });
   const env: RawAuthEnv = {
     APP_ENV: 'development',
     BETTER_AUTH_SECRET: TEST_SECRET,
@@ -56,10 +63,20 @@ export function makeHarness(opts: { dbUrl: string; base?: string; env?: Partial<
     const headers: Record<string, string> = { 'cf-connecting-ip': init.ip ?? randomIp(), ...(init.headers ?? {}) };
     if (init.origin !== null) headers.origin = init.origin ?? base;
     if (init.body !== undefined) headers['content-type'] = 'application/json';
+    if (init.raw) {
+      headers['content-type'] = init.raw.type;
+      if (init.raw.length !== null) headers['content-length'] = init.raw.length ?? String(init.raw.bytes.length);
+    }
     if (init.jar && init.jar.cookies.size) headers.cookie = init.jar.header();
     const res = await app.request(
       `${base}${path}`,
-      { method: init.method ?? (init.body !== undefined ? 'POST' : 'GET'), headers, ...(init.body !== undefined ? { body: JSON.stringify(init.body) } : {}), redirect: 'manual' },
+      {
+        method: init.method ?? (init.body !== undefined ? 'POST' : 'GET'),
+        headers,
+        ...(init.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
+        ...(init.raw ? { body: init.raw.bytes } : {}),
+        redirect: 'manual',
+      },
       env as unknown as Env,
     );
     init.jar?.store(res);
@@ -75,7 +92,7 @@ export function makeHarness(opts: { dbUrl: string; base?: string; env?: Partial<
       await c.end();
     }
   };
-  return { base, mails, req, sql };
+  return { base, mails, store, req, sql };
 }
 
 export function linkIn(mail: OutboundEmail | undefined): string {

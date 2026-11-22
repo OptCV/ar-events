@@ -47,9 +47,10 @@ Plan and slice order: `ROADMAP.md` "Phase 1 plan".
 - [ ] Read sign-in CPU time in Workers Observability for `ar-creator-dev`.
 - [ ] Production: `create-roles`/`migrate --approved`, switch `ar-creator-db` to `ar_app`, rotate production `neondb_owner` (possibly exposed). Each needs approval.
 - [x] **Milestone 4 / P1-4 (local):** experiences CRUD + scene configuration API (draft PUT with optimistic concurrency, placement-change confirmation, publish readiness), ownership in SQL (cross-user → 404), migration `0002_draft_version`; dashboard, new-experience page with placement selector, experience page with autosave/conflict handling, readiness panel, delete (ADR-021).
-- [ ] Apply migration 0002 to Neon development (**approval**), redeploy `ar-creator-dev`, extend the remote suite for experiences.
-- [ ] P1-5 R2 uploads: pending asset, streamed upload, magic bytes, size/dimension limits, SHA-256, explicit roles, signed private reads.
-- [-] P1-6 Dashboard UI: login, experience list, create draft done (Milestone 4); asset upload UI arrives with Milestone 5.
+- [ ] Apply migrations 0002 + 0003 to Neon development (**approval**), create R2 bucket `ar-creator-assets-dev` (**approval**), redeploy `ar-creator-dev`, extend the remote suite for experiences and assets (upload, signed read, bucket not public).
+- [x] **Milestone 5 / P1-5 (local):** R2 asset storage: upload slots (`POST /api/assets/uploads`, single-use, expiring), Worker-streamed upload validated before commit (magic bytes vs declared type, header-only dimension/bomb limits, self-contained GLB only, exact size, SHA-256, PNG end marker), explicit roles, per-user slot cap + quota, HMAC-signed cookieless private reads, ownership in SQL, draft asset-reference checks, delete blocked while in use; `ObjectStore` interface ready for presigned/multipart; migration `0003_asset_uploads` (ADR-022). R2 adapter verified in workerd against the local simulator only.
+- [ ] Asset follow-ups: thumbnails/derivatives, HTTP range requests for signed reads, sweep expired/rejected upload slots, presigned-put and multipart strategies, rendered model previews.
+- [x] P1-6 Dashboard UI: login, experience list, create draft (Milestone 4); asset library with upload progress/errors/previews and the tracking-image picker (Milestone 5). Verified locally (Playwright).
 - [x] Email verification + password reset flows (dev mailbox locally).
 - [ ] Resend: API key secret, verified sending domain, `EMAIL_FROM`; then real-delivery test. Public sign-up stays off until done.
 - [x] Implement scene schema / discriminated placement union (`packages/schema`, v1; migrations pending).
@@ -57,7 +58,7 @@ Plan and slice order: `ROADMAP.md` "Phase 1 plan".
 
 ## P2: Image-to-AR
 
-- [-] Distinguish tracking image vs displayed image asset role. *(schema-level `AssetRole` + placement/node types done; storage/UI pending)*
+- [x] Distinguish tracking image vs displayed image asset role. *(schema `AssetRole`; explicit role on upload; separate limits and checks; draft references require the right role (ADR-022))*
 - [ ] Create checkerboard/size/alpha options UI.
 - [x] GLB image-plane generator with `MASK` / `BLEND` (structurally validated; device check pending).
 - [x] USDZ image-plane generator with alpha/opacity material (structurally validated; device check pending).

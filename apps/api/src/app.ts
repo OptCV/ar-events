@@ -9,6 +9,8 @@ import type { AuthConfig } from './auth/config.ts';
 import { AuthUnavailableError, authContext, isAllowedAuthRoute, redirectsOffOrigin, requireSession, sameOriginMutations, unsafeRedirectIn } from './auth/middleware.ts';
 import { DevMailbox, type Mailer } from './email/mailer.ts';
 import { experienceRoutes } from './experiences/routes.ts';
+import { StorageUnavailableError, assetRoutes } from './assets/routes.ts';
+import { r2Store, type ObjectStore } from './assets/store.ts';
 
 export interface BuildInfo {
   version: string;
@@ -20,11 +22,13 @@ export interface AppDeps {
   connectDb?: DbConnector;
   /** Tests inject a capturing mailer. */
   mailer?: (cfg: AuthConfig) => Mailer;
+  /** Defaults to R2 via the ASSETS_BUCKET binding; tests inject an in-memory store. */
+  objectStore?: (env: AppBindings) => ObjectStore;
 }
 
 /** Runtime bindings, generated from apps/web/wrangler.jsonc by `npm run cf-typegen -w @ar-creator/web`. */
 export type AppBindings = Env;
-export type AppEnv = { Bindings: AppBindings; Variables: { requestId: string; db: () => Promise<DbHandle>; authConfig: AuthConfig; auth: () => Promise<Auth>; user: SessionUser } };
+export type AppEnv = { Bindings: AppBindings; Variables: { requestId: string; db: () => Promise<DbHandle>; authConfig: AuthConfig; auth: () => Promise<Auth>; user: SessionUser; assetStore: () => ObjectStore } };
 
 function detectRuntime(): HealthResponse['runtime'] {
   // workerd sets this exact UA (https://developers.cloudflare.com/workers/runtime-apis/web-standards/#navigatoruseragent).
@@ -67,6 +71,13 @@ export async function stripSessionTokens(res: Response): Promise<Response> {
   return new Response(JSON.stringify(scrub(body)), { status: res.status, statusText: res.statusText, headers });
 }
 
+/** R2 via the ASSETS_BUCKET binding; fails closed (503) when the binding is missing. */
+const defaultObjectStore = (env: AppBindings): ObjectStore => {
+  const bucket = (env as Partial<{ ASSETS_BUCKET: R2Bucket }> | undefined)?.ASSETS_BUCKET;
+  if (!bucket) throw new StorageUnavailableError('ASSETS_BUCKET binding is missing');
+  return r2Store(bucket);
+};
+
 export function apiError(c: Context<AppEnv>, status: 400 | 401 | 403 | 404 | 405 | 500 | 503, code: ApiErrorCode, message: string) {
   const body: ApiError = { error: { code, message, requestId: c.get('requestId') } };
   return c.json(body, status);
@@ -83,6 +94,10 @@ export function createApp(info: BuildInfo, deps: AppDeps = {}) {
   app.use('*', dbMiddleware(deps.connectDb ?? hyperdriveConnector));
   app.use('*', authContext(deps.mailer ? { mailer: deps.mailer } : {}));
   app.use('*', sameOriginMutations);
+  app.use('*', async (c, next) => {
+    c.set('assetStore', () => (deps.objectStore ?? defaultObjectStore)(c.env));
+    await next();
+  });
   app.use(
     '*',
     secureHeaders({
@@ -94,7 +109,8 @@ export function createApp(info: BuildInfo, deps: AppDeps = {}) {
   );
   app.use('*', async (c, next) => {
     await next();
-    c.header('Cache-Control', 'no-store');
+    // Default for every API response; signed asset reads set their own private, short-lived policy.
+    if (!c.res.headers.has('Cache-Control')) c.header('Cache-Control', 'no-store');
   });
 
   app.get('/health', async (c) => {
@@ -148,16 +164,10 @@ export function createApp(info: BuildInfo, deps: AppDeps = {}) {
 
   // Experience management (Milestone 4, ADR-021): session required, ownership enforced in SQL.
   app.route('/experiences', experienceRoutes());
+  // Asset storage (Milestone 5, ADR-022): uploads, listing, deletion (session) and signed private reads.
+  app.route('/assets', assetRoutes());
 
   /** Public session probe for the UI: 200 with the user or null (no 401 noise for signed-out visitors). */
-  app.get('/session', async (c) => {
-    const auth = await c.get('auth')();
-    const r = await auth.api.getSession({ headers: c.req.raw.headers });
-    const user = r ? { id: r.user.id, email: r.user.email, name: r.user.name, emailVerified: r.user.emailVerified } : null;
-    return c.json(SessionResponse.parse({ user }));
-  });
-
-  /** Public session probe for the UI: 200 with user or null (avoids 401 noise for signed-out visitors). */
   app.get('/session', async (c) => {
     const auth = await c.get('auth')();
     const r = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -179,6 +189,10 @@ export function createApp(info: BuildInfo, deps: AppDeps = {}) {
   app.onError((err, c) => {
     // Structured, redacted log for Workers Observability; responses never leak internals.
     if (err instanceof AuthUnavailableError) return apiError(c, 503, 'unavailable', 'Sign-in is temporarily unavailable.');
+    if (err instanceof StorageUnavailableError) {
+      logError(c, 'assets.storage-unavailable', err.message);
+      return apiError(c, 503, 'unavailable', 'File storage is temporarily unavailable.');
+    }
     if (isDatabaseError(err)) {
       const e = classifyDbError(err);
       logError(c, 'db.error', `${e.kind}: ${e.detail}`);

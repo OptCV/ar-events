@@ -10,9 +10,11 @@
   "dependencies": {
     "@ar-creator/contracts": "0.0.0",
     "@ar-creator/db": "0.0.0",
+    "@ar-creator/image-to-ar": "0.0.0",
     "@ar-creator/schema": "0.0.0",
     "@better-auth/core": "1.7.16",
     "@better-auth/drizzle-adapter": "1.7.16",
+    "@noble/hashes": "2.4.0",
     "better-auth": "1.7.16",
     "drizzle-orm": "0.45.4",
     "hono": "4.13.16",
@@ -20,5 +22,9 @@
   },
   "scripts": {
     "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "miniflare": "5.20261023.1-beta"
   }
 }

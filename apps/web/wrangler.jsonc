@@ -17,6 +17,9 @@
   // The ID is not a secret. No connection string or localConnectionString is stored here: local dev reads
   // CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE from the gitignored repo-root .env (npm run db:env).
   "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "8de2df3d333b4a1b9b07c18fbdd49d18" }],
+  // Private asset storage (ADR-022). The bucket has NO public access and no custom domain: every read goes
+  // through the Worker (session or signed URL). Locally, Miniflare simulates it under .wrangler/state.
+  "r2_buckets": [{ "binding": "ASSETS_BUCKET", "bucket_name": "ar-creator-assets" }],
   // Fail-closed production defaults (ADR-019). Local values come from apps/web/.dev.vars (npm run dev:env).
   // Before enabling auth in a deployed environment set: BETTER_AUTH_URL (https origin), EMAIL_FROM (verified
   // Resend domain), and the secrets BETTER_AUTH_SECRET + RESEND_API_KEY via `wrangler secret put`.
@@ -41,6 +44,8 @@
       "name": "ar-creator-dev",
       "workers_dev": true,
       "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "f7b30d814f184296bb44518058778789" }],
+      // Separate development bucket (bindings are not inherited by environments; never the production bucket).
+      "r2_buckets": [{ "binding": "ASSETS_BUCKET", "bucket_name": "ar-creator-assets-dev" }],
       "vars": {
         "APP_ENV": "production",
         "BETTER_AUTH_URL": "https://ar-creator-dev.__WORKERS_SUBDOMAIN__.workers.dev",

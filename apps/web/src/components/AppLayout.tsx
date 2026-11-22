@@ -28,6 +28,9 @@ export function AppLayout() {
                 <NavLink to="/dashboard" className={navClass}>
                   Dashboard
                 </NavLink>
+                <NavLink to="/library" className={navClass}>
+                  Library
+                </NavLink>
                 <NavLink to="/account" className={navClass}>
                   Account
                 </NavLink>

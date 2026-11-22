@@ -149,10 +149,18 @@ export const assets = pgTable(
     /** Sanitised display name only. */
     originalFilename: varchar('original_filename', { length: 255 }),
     metadata: jsonb('metadata').notNull().default({}),
+    /** Upload slot (ADR-022): a pending asset accepts exactly one upload attempt before this time. */
+    uploadExpiresAt: timestamp('upload_expires_at', { withTimezone: true }),
+    /** Set atomically when an upload attempt starts; a claimed slot can never be reused. */
+    uploadClaimedAt: timestamp('upload_claimed_at', { withTimezone: true }),
+    /** Machine-readable reason for `rejected` (safe to show; never contains file contents). */
+    rejectionCode: varchar('rejection_code', { length: 40 }),
     ...timestamps,
   },
   (t) => [
     index('assets_owner_created_idx').on(t.ownerId, t.createdAt),
+    check('assets_pending_has_expiry', sql`${t.state} <> 'pending_upload' OR ${t.uploadExpiresAt} IS NOT NULL`),
+    check('assets_rejected_has_code', sql`${t.state} <> 'rejected' OR ${t.rejectionCode} IS NOT NULL`),
     check('assets_size_nonnegative', sql`${t.sizeBytes} IS NULL OR ${t.sizeBytes} >= 0`),
     check('assets_sha256_format', sql`${t.sha256} IS NULL OR ${SHA256(t.sha256)}`),
     check('assets_r2_key_owned_prefix', sql`${t.r2Key} LIKE 'users/%'`),

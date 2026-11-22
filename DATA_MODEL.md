@@ -86,3 +86,11 @@ Implemented in `packages/db` (ADR-017): Better Auth `user`/`session`/`account`/`
 - `experiences.draft_version` (migration `0002_draft_version`): optimistic-concurrency counter for draft saves (ADR-021).
 - Draft scenes are stored as `DraftExperienceScene` (image placement may have `trackingTargetAssetId: null`); publishing will require the strict `ExperienceScene`.
 - Implemented API: `GET/POST /api/experiences`, `GET/PATCH/DELETE /api/experiences/:id`, `PUT /api/experiences/:id/draft`, `POST /api/experiences/:id/validate`. Contracts are in `packages/contracts/src/experiences.ts`.
+
+### Milestone 5 additions (2026-11-22)
+
+- `assets.upload_expires_at`, `assets.upload_claimed_at`, `assets.rejection_code` (migration `0003_asset_uploads`), with CHECKs: `pending_upload` needs an expiry; `rejected` needs a code (ADR-022).
+- Asset lifecycle used today: `pending_upload` → `validated` (checked while streaming) or `rejected`; `deleted` is a transient state during deletion. `uploaded` is reserved for future asynchronous validation.
+- `assets.metadata`: `{ image: { width, height, mayHaveAlpha } }` or `{ model: { gltfVersion, generator?, meshes, materials, textures, animations, extensionsRequired } }`, plus `warnings[]`; `declaredSha256` while pending.
+- Implemented API: `POST /api/assets/uploads`, `PUT /api/assets/:id/content`, `GET /api/assets`, `GET/DELETE /api/assets/:id`, `GET /api/assets/:id/content` (signed). Contracts are in `packages/contracts/src/assets.ts`.
+- R2 bindings: `ASSETS_BUCKET` → `ar-creator-assets` / `ar-creator-assets-dev`; only originals are stored so far.

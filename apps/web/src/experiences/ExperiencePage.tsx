@@ -12,6 +12,7 @@ import formStyles from '../components/form/Form.module.css';
 import { SubmitButton } from '../components/form/SubmitButton.tsx';
 import { experienceKeys, useDeleteExperience, useExperience, useReadiness, useUpdateExperience } from './api.ts';
 import { PlacementSelector } from './PlacementSelector.tsx';
+import { TrackingImagePicker } from './TrackingImagePicker.tsx';
 import { useDraftEditor, type SaveStatus } from './useDraftEditor.ts';
 import styles from './Experiences.module.css';
 
@@ -136,9 +137,12 @@ function Editor({ experience, onReload }: { experience: ExperienceDetail; onRelo
                   error={widthError}
                   hint="Measure the printed image edge to edge. AR content is scaled from this value."
                 />
-                <Alert tone="info">
-                  Tracking image: {placement.trackingTargetAssetId ? 'selected' : 'not set yet'}. Image uploads arrive in the next milestone.
-                </Alert>
+                <TrackingImagePicker
+                  selectedId={placement.trackingTargetAssetId}
+                  widthMeters={placement.physicalWidthMeters}
+                  busy={editor.status === 'saving'}
+                  onSelect={(assetId) => void editor.saveNow({ ...editor.scene, placement: { ...placement, trackingTargetAssetId: assetId } })}
+                />
               </>
             )}
           </section>

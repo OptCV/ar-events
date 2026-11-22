@@ -32,6 +32,7 @@ async function pgCode(p: Promise<unknown>): Promise<string> {
 const UNIQUE = '23505';
 const FK = '23503';
 const CHECK = '23514';
+const PENDING = { uploadExpiresAt: new Date(Date.now() + 15 * 60_000) };
 
 async function makeUser(id = randomUUID()) {
   await h.db.insert(user).values({ id, name: 'Test', email: `${id}@example.com` });
@@ -96,7 +97,7 @@ describe('experiences', () => {
   it('deleting a user cascades to their experiences and assets', async () => {
     const u = await makeUser();
     const e = await makeExperience(u);
-    await h.db.insert(assets).values({ ownerId: u, role: 'model', r2Key: `users/${u}/assets/${randomUUID()}/original` });
+    await h.db.insert(assets).values({ ...PENDING, ownerId: u, role: 'model', r2Key: `users/${u}/assets/${randomUUID()}/original` });
     await h.db.delete(user).where(eq(user.id, u));
     expect(await h.db.select().from(experiences).where(eq(experiences.id, e.id))).toEqual([]);
     expect(await h.db.select().from(assets).where(eq(assets.ownerId, u))).toEqual([]);
@@ -136,15 +137,22 @@ describe('revision immutability (trigger)', () => {
 describe('assets, derivatives, outputs, jobs', () => {
   it('assets: owned R2 prefix, checksum format, uploaded requires checksum+size+mime', async () => {
     const key = () => `users/${owner}/assets/${randomUUID()}/original`;
-    expect(await pgCode(h.db.insert(assets).values({ ownerId: owner, role: 'display-image', r2Key: 'public/evil' }))).toBe(CHECK);
-    expect(await pgCode(h.db.insert(assets).values({ ownerId: owner, role: 'display-image', r2Key: key(), sha256: 'XYZ' }))).toBe(CHECK);
+    expect(await pgCode(h.db.insert(assets).values({ ...PENDING, ownerId: owner, role: 'display-image', r2Key: 'public/evil' }))).toBe(CHECK);
+    expect(await pgCode(h.db.insert(assets).values({ ...PENDING, ownerId: owner, role: 'display-image', r2Key: key(), sha256: 'XYZ' }))).toBe(CHECK);
     expect(await pgCode(h.db.insert(assets).values({ ownerId: owner, role: 'display-image', r2Key: key(), state: 'uploaded' }))).toBe(CHECK);
     await h.db.insert(assets).values({ ownerId: owner, role: 'display-image', r2Key: key(), state: 'uploaded', sha256: sha('a'), sizeBytes: 10, mimeType: 'image/png' });
-    expect(await pgCode(h.db.insert(assets).values({ ownerId: owner, role: 'not-a-role' as never, r2Key: key() }))).toBe('22P02');
+    expect(await pgCode(h.db.insert(assets).values({ ...PENDING, ownerId: owner, role: 'not-a-role' as never, r2Key: key() }))).toBe('22P02');
+  });
+
+  it('assets: a pending upload needs an expiry; a rejection needs a reason code', async () => {
+    const key = () => `users/${owner}/assets/${randomUUID()}/original`;
+    expect(await pgCode(h.db.insert(assets).values({ ownerId: owner, role: 'display-image', r2Key: key() }))).toBe(CHECK);
+    expect(await pgCode(h.db.insert(assets).values({ ownerId: owner, role: 'display-image', r2Key: key(), state: 'rejected' }))).toBe(CHECK);
+    await h.db.insert(assets).values({ ownerId: owner, role: 'display-image', r2Key: key(), state: 'rejected', rejectionCode: 'signature_mismatch' });
   });
 
   it('derivatives: provenance is unique and a ready derivative is immutable', async () => {
-    const [a] = await h.db.insert(assets).values({ ownerId: owner, role: 'display-image', r2Key: `users/${owner}/assets/${randomUUID()}/original` }).returning();
+    const [a] = await h.db.insert(assets).values({ ...PENDING, ownerId: owner, role: 'display-image', r2Key: `users/${owner}/assets/${randomUUID()}/original` }).returning();
     const base = { sourceAssetId: a!.id, outputType: 'image_object_glb' as const, settings: { widthMeters: 0.5 }, settingsHash: sha('b'), converterVersion: 'image-to-ar@0.1.0' };
     const [d] = await h.db.insert(assetDerivatives).values(base).returning();
     expect(await pgCode(h.db.insert(assetDerivatives).values(base))).toBe(UNIQUE);
@@ -164,7 +172,7 @@ describe('assets, derivatives, outputs, jobs', () => {
   });
 
   it('jobs: need a target, bounded attempts, unique idempotency keys', async () => {
-    const [a] = await h.db.insert(assets).values({ ownerId: owner, role: 'model', r2Key: `users/${owner}/assets/${randomUUID()}/original` }).returning();
+    const [a] = await h.db.insert(assets).values({ ...PENDING, ownerId: owner, role: 'model', r2Key: `users/${owner}/assets/${randomUUID()}/original` }).returning();
     const key = `job-${randomUUID()}`;
     expect(await pgCode(h.db.insert(processingJobs).values({ ownerId: owner, type: 'validate_asset', idempotencyKey: `nt-${key}` }))).toBe(CHECK);
     await h.db.insert(processingJobs).values({ ownerId: owner, type: 'validate_asset', idempotencyKey: key, assetId: a!.id });

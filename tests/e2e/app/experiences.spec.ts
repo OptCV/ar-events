@@ -2,46 +2,8 @@
  * Milestone 4 browser flows in workerd (dev and production build) against local Postgres.
  * Requires `npm run db:up && npm run db:migrate`.
  */
-import { randomBytes } from 'node:crypto';
-import { expect, test, type APIRequestContext, type Browser, type Page } from '@playwright/test';
-
-const PASSWORD = 'correct horse battery staple';
-const ip = () => `10.88.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250) + 1}`;
-
-async function verifiedSignedIn(page: Page, request: APIRequestContext): Promise<string> {
-  await page.setExtraHTTPHeaders({ 'cf-connecting-ip': ip() });
-  const email = `m4-${randomBytes(5).toString('hex')}@example.com`;
-  await page.goto('/sign-up');
-  await page.getByLabel('Name').fill('Creator');
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(PASSWORD);
-  await page.getByRole('button', { name: 'Create account' }).click();
-  await expect(page.getByRole('heading', { name: 'Check your inbox' })).toBeVisible();
-  let link = '';
-  for (let i = 0; i < 20 && !link; i++) {
-    const { messages } = (await (await request.get(`/api/dev/mailbox?to=${encodeURIComponent(email)}`)).json()) as { messages: { text: string }[] };
-    link = /https?:\/\/\S+/.exec(messages.at(-1)?.text ?? '')?.[0] ?? '';
-    if (!link) await new Promise((r) => setTimeout(r, 250));
-  }
-  await page.goto(new URL(link).pathname + new URL(link).search);
-  await page.goto('/sign-in');
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(PASSWORD);
-  await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page).toHaveURL(/\/dashboard$/);
-  return email;
-}
-
-async function createExperience(page: Page, name: string, mode: 'Image anchored' | 'Floor' | 'Wall') {
-  await page.goto('/experiences/new');
-  await page.getByLabel('Name').fill(name);
-  await page.getByText(mode, { exact: true }).click();
-  await page.getByRole('button', { name: 'Create experience' }).click();
-  await expect(page).toHaveURL(/\/experiences\/[0-9a-f-]{36}$/);
-  await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
-  await expect(page.getByTestId('save-status')).toHaveText('All changes saved');
-  return page.url();
-}
+import { expect, test, type Browser } from '@playwright/test';
+import { createExperience, verifiedSignedIn } from './helpers.ts';
 
 test('dashboard: empty state → create → listed with placement → rename → search → delete', async ({ page, request }) => {
   await verifiedSignedIn(page, request);
