@@ -44,7 +44,9 @@
     "BETTER_AUTH_URL": "",
     "EMAIL_TRANSPORT": "resend",
     "EMAIL_FROM": "",
-    "AUTH_SIGNUP_ENABLED": "false"
+    "AUTH_SIGNUP_ENABLED": "false",
+    // Converter instances requests are spread over; never above containers.max_instances (ADR-023).
+    "USD_CONVERTER_POOL": "3"
   },
   // Cloudflare Containers cannot run locally on Windows; local dev and tests reach the same converter image through
   // Docker over HTTP instead (USD_CONVERTER_URL, development only). The Container path is verified on Cloudflare.
@@ -65,14 +67,16 @@
       // Separate development bucket (bindings are not inherited by environments; never the production bucket).
       "r2_buckets": [{ "binding": "ASSETS_BUCKET", "bucket_name": "ar-creator-assets-dev" }],
       "workflows": [{ "name": "ar-creator-dev-image-to-ar", "binding": "IMAGE_TO_AR", "class_name": "ImageToArWorkflow" }],
-      "containers": [{ "class_name": "UsdConverterContainer", "image": "../../services/usd-processor/Dockerfile", "instance_type": "basic", "max_instances": 3 }],
+      "containers": [{ "class_name": "UsdConverterContainer", "image": "../../services/usd-processor/Dockerfile", "instance_type": "basic", "max_instances": 1 }],
       "durable_objects": { "bindings": [{ "name": "USD_CONVERTER", "class_name": "UsdConverterContainer" }] },
       "vars": {
         "APP_ENV": "production",
         "BETTER_AUTH_URL": "https://ar-creator-dev.__WORKERS_SUBDOMAIN__.workers.dev",
         "EMAIL_TRANSPORT": "resend",
         "EMAIL_FROM": "",
-        "AUTH_SIGNUP_ENABLED": "false"
+        "AUTH_SIGNUP_ENABLED": "false",
+        // Cost control (2026-11-22): one converter instance for dev; conversions queue behind each other.
+        "USD_CONVERTER_POOL": "1"
       }
     }
   }

@@ -114,3 +114,16 @@ export function httpUsdConverter(fetcher: (req: Request) => Promise<Response>, o
     },
   };
 }
+
+/** Upper bound for the converter pool (production `max_instances`). */
+export const MAX_CONVERTER_POOL = 3;
+
+/**
+ * Number of converter instances requests are spread over, from the `USD_CONVERTER_POOL` var (dev: 1 for cost,
+ * production: 3). Must not exceed that environment's `containers.max_instances`; clamped to 1..MAX_CONVERTER_POOL so
+ * a missing or malformed value can never widen the pool.
+ */
+export function converterPool(env: { USD_CONVERTER_POOL?: string }): number {
+  const n = Number.parseInt(env.USD_CONVERTER_POOL ?? '', 10);
+  return Number.isInteger(n) ? Math.min(MAX_CONVERTER_POOL, Math.max(1, n)) : 1;
+}

@@ -65,7 +65,7 @@ Plan and slice order: `ROADMAP.md` "Phase 1 plan".
 - [x] P2 M6 remote (2026-11-22): 0004 applied; Workers Paid; dev Worker deployed with the Container + Workflow; REMOTE-CONVERT-01 PASS.
 - [x] **P2 M7 (local):** 3D preview of the generated GLB (lazy three.js), soft-edge highlight, image objects placed in experiences (GLB id of a complete pair; source deletion blocked while placed), `GET /api/image-objects` (ADR-024).
 - [x] Remote suite against the redeployed dev Worker (2026-11-22): 18/18; REMOTE-CONVERT-01 — first real Container conversion, 8.7 s including a cold start.
-- [ ] Watch Container cost/instances: pool of 3 `basic` instances, 3 min sleep; consider 1–2 for dev.
+- [x] Dev container cost (2026-11-22): `ar-creator-dev` limited to 1 `basic` instance (`max_instances: 1`, `USD_CONVERTER_POOL=1`, enforced by `deploy:dev`); production stays at 3. Takes effect on the next `deploy:dev`.
 - [x] GLB image-plane generator with `MASK` / `BLEND` (structurally validated; device check pending).
 - [x] USDZ image-plane generator with alpha/opacity material (structurally validated; device check pending).
 - [ ] Normalize WebP and EXIF-rotated JPEG to PNG/JPEG before conversion (ADR-009).

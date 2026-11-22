@@ -2,6 +2,11 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-22 — Dev converter pool reduced to one instance
+
+### Changed
+- Converter pool size is the `USD_CONVERTER_POOL` var (clamped to 1–3; missing or invalid → 1). `env.dev`: 1 instance (`max_instances: 1`) to cut Containers cost; production unchanged at 3. `deploy:dev` refuses any other dev value.
+
 ## 2026-11-22 — Remote verification of Phase 2 conversion
 
 ### Verified

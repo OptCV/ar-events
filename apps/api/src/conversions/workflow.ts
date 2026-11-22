@@ -16,10 +16,7 @@ import { r2Store } from '../assets/store.ts';
 import { hyperdriveConnector } from '../db.ts';
 import { asFailure, buildGlbStep, buildUsdzStep, failJob, finishJob, startJob, type JobContext, type GlbStepResult, type PipelineDeps, type UsdzStepResult } from './pipeline.ts';
 import type { ImageToArParams } from './runner.ts';
-import { httpUsdConverter, type UsdConverter } from './usd.ts';
-
-/** Number of converter instances requests are spread over (must not exceed `max_instances` in wrangler.jsonc). */
-export const CONVERTER_POOL = 3;
+import { converterPool, httpUsdConverter, type UsdConverter } from './usd.ts';
 
 export class UsdConverterContainer extends Container<Env> {
   override defaultPort = 8080;
@@ -41,7 +38,7 @@ export function usdConverter(env: Env): UsdConverter {
     if (!['127.0.0.1', 'localhost'].includes(base.hostname)) throw new Error('USD_CONVERTER_URL must be a loopback address');
     return httpUsdConverter((req) => fetch(req), base.origin);
   }
-  return httpUsdConverter(async (req) => (await getRandom(env.USD_CONVERTER, CONVERTER_POOL)).fetch(req));
+  return httpUsdConverter(async (req) => (await getRandom(env.USD_CONVERTER, converterPool(env as { USD_CONVERTER_POOL?: string }))).fetch(req));
 }
 
 /** Failures cross step boundaries as plain error messages: `conversion:<code>:<message>`. */

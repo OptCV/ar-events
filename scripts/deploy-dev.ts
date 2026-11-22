@@ -22,6 +22,7 @@ const DEV_HYPERDRIVE = 'f7b30d814f184296bb44518058778789';
 const PROD_HYPERDRIVE = '8de2df3d333b4a1b9b07c18fbdd49d18';
 const DEV_BUCKET = 'ar-creator-assets-dev';
 const DEV_WORKFLOW = 'ar-creator-dev-image-to-ar';
+const DEV_MAX_INSTANCES = 1;
 const WEB = join(ROOT, 'apps', 'web');
 const DIST = join(WEB, 'dist');
 
@@ -59,7 +60,9 @@ if (JSON.stringify((cfg.r2_buckets ?? []).map((b) => ({ binding: b.binding, buck
 if (JSON.stringify((cfg.workflows ?? []).map((w) => [w.name, w.binding, w.class_name])) !== JSON.stringify([[DEV_WORKFLOW, 'IMAGE_TO_AR', 'ImageToArWorkflow']])) {
   fail('Workflow binding is not exactly the development workflow');
 }
-if ((cfg.containers ?? []).length !== 1 || cfg.containers![0]!.class_name !== 'UsdConverterContainer' || (cfg.containers![0]!.max_instances ?? 99) > 3) fail('unexpected container configuration');
+// Cost control (2026-11-22): the dev Worker runs exactly one converter instance and spreads requests over one.
+if ((cfg.containers ?? []).length !== 1 || cfg.containers![0]!.class_name !== 'UsdConverterContainer' || cfg.containers![0]!.max_instances !== DEV_MAX_INSTANCES) fail(`container configuration must be one UsdConverterContainer with max_instances ${DEV_MAX_INSTANCES}`);
+if (cfg.vars.USD_CONVERTER_POOL !== String(DEV_MAX_INSTANCES)) fail(`USD_CONVERTER_POOL must be ${DEV_MAX_INSTANCES} for the dev Worker`);
 if (cfg.vars.APP_ENV !== 'production' || cfg.vars.AUTH_SIGNUP_ENABLED !== 'false') fail('dev Worker must run production-strict with sign-up off');
 if (!cfg.vars.BETTER_AUTH_URL?.includes('__WORKERS_SUBDOMAIN__')) fail('unexpected BETTER_AUTH_URL template');
 cfg.vars.BETTER_AUTH_URL = origin;
@@ -90,7 +93,7 @@ for (const f of files) {
   const text = readFileSync(f, 'latin1');
   for (const v of secretValues) if (text.includes(v)) fail(`a local secret value was found in ${f}; refusing to deploy`);
 }
-console.log(`\n  Worker        ${cfg.name}\n  URL           ${origin}\n  Hyperdrive    ${DEV_HYPERDRIVE} (ar-creator-db-dev → Neon development, role ar_app)\n  R2 bucket     ${DEV_BUCKET}\n  Workflow      ${DEV_WORKFLOW}\n  Container     UsdConverterContainer (max 3 instances, internet disabled)\n  APP_ENV       ${cfg.vars.APP_ENV}\n  sign-up       ${cfg.vars.AUTH_SIGNUP_ENABLED}\n  files         ${files.length} checked, 0 local secrets, no .dev.vars`);
+console.log(`\n  Worker        ${cfg.name}\n  URL           ${origin}\n  Hyperdrive    ${DEV_HYPERDRIVE} (ar-creator-db-dev → Neon development, role ar_app)\n  R2 bucket     ${DEV_BUCKET}\n  Workflow      ${DEV_WORKFLOW}\n  Container     UsdConverterContainer (max ${DEV_MAX_INSTANCES} instance, internet disabled)\n  APP_ENV       ${cfg.vars.APP_ENV}\n  sign-up       ${cfg.vars.AUTH_SIGNUP_ENABLED}\n  files         ${files.length} checked, 0 local secrets, no .dev.vars`);
 
 // 4. Preflight (read-only): wrangler uploads and activates the Worker BEFORE it pushes the container image, so a
 //    missing Containers entitlement (Workers Paid) would leave a half-deployed Worker. Check access first.

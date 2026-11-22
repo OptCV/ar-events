@@ -93,3 +93,15 @@ describe('USD converter client', () => {
     ).rejects.toBeInstanceOf(UsdConversionRejected);
   });
 });
+
+describe('converter pool size (USD_CONVERTER_POOL)', () => {
+  it('uses the configured size, clamped to 1..3; missing or malformed → 1', async () => {
+    const { converterPool } = await import('./usd.ts');
+    expect(converterPool({ USD_CONVERTER_POOL: '1' })).toBe(1);
+    expect(converterPool({ USD_CONVERTER_POOL: '3' })).toBe(3);
+    expect(converterPool({ USD_CONVERTER_POOL: '10' })).toBe(3);
+    expect(converterPool({ USD_CONVERTER_POOL: '0' })).toBe(1);
+    expect(converterPool({ USD_CONVERTER_POOL: 'many' })).toBe(1);
+    expect(converterPool({})).toBe(1);
+  });
+});

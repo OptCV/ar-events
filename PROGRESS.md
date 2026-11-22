@@ -197,3 +197,7 @@ Not available yet: lint (ESLint/Prettier not configured), DB migrations, `apps/w
 
 - Owner created their development account with `create-user` (works end to end), redeployed (`ar-creator-dev` version `f0735057…`, build `f41be26`) and ran the remote suite: **18/18**, including REMOTE-CONVERT-01 (Workflow + Container, 8.7 s with a cold start). Neon development at 5/5 migrations.
 - Container application `active`, 2 live instances after the run (pool of 3, 3 min sleep).
+
+### Addendum — 2026-11-22 (8): dev container pool → 1
+
+- At the owner's request, the dev Worker now uses one converter instance (`env.dev` `max_instances: 1`, `USD_CONVERTER_POOL=1`; guard in `deploy:dev`). Production config unchanged (3). Dry run passed; **not deployed yet** (owner runs `deploy:dev`). Trade-off: dev conversions run one at a time; after 3 idle minutes the next one pays a cold start (~several seconds).
