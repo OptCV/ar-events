@@ -21,6 +21,7 @@ const WORKER = 'ar-creator-dev';
 const DEV_HYPERDRIVE = 'f7b30d814f184296bb44518058778789';
 const PROD_HYPERDRIVE = '8de2df3d333b4a1b9b07c18fbdd49d18';
 const DEV_BUCKET = 'ar-creator-assets-dev';
+const DEV_WORKFLOW = 'ar-creator-dev-image-to-ar';
 const WEB = join(ROOT, 'apps', 'web');
 const DIST = join(WEB, 'dist');
 
@@ -47,13 +48,18 @@ const workerDir = readdirSync(DIST).find((d) => d !== 'client' && existsSync(joi
 if (!workerDir) fail('no Worker output found');
 const cfgPath = join(DIST, workerDir, 'wrangler.json');
 const cfgText = readFileSync(cfgPath, 'utf8');
-const cfg = JSON.parse(cfgText) as { name: string; hyperdrive: { binding: string; id: string }[]; r2_buckets?: { binding: string; bucket_name: string }[]; vars: Record<string, string> };
+const cfg = JSON.parse(cfgText) as { name: string; hyperdrive: { binding: string; id: string }[]; r2_buckets?: { binding: string; bucket_name: string }[]; workflows?: { name: string; binding: string; class_name: string }[]; containers?: { class_name: string; max_instances?: number }[]; vars: Record<string, string> };
 if (cfg.name !== WORKER) fail(`built Worker is "${cfg.name}", expected "${WORKER}"`);
 if (cfgText.includes(PROD_HYPERDRIVE)) fail('production Hyperdrive ID found in the built config');
 if (JSON.stringify(cfg.hyperdrive) !== JSON.stringify([{ binding: 'HYPERDRIVE', id: DEV_HYPERDRIVE }])) fail('Hyperdrive binding is not exactly the development config');
 if (JSON.stringify((cfg.r2_buckets ?? []).map((b) => ({ binding: b.binding, bucket_name: b.bucket_name }))) !== JSON.stringify([{ binding: 'ASSETS_BUCKET', bucket_name: DEV_BUCKET }])) {
   fail('R2 binding is not exactly the development bucket');
 }
+// Image-to-AR (ADR-023): the dev Worker gets its own Workflow (never the production one) and a small converter pool.
+if (JSON.stringify((cfg.workflows ?? []).map((w) => [w.name, w.binding, w.class_name])) !== JSON.stringify([[DEV_WORKFLOW, 'IMAGE_TO_AR', 'ImageToArWorkflow']])) {
+  fail('Workflow binding is not exactly the development workflow');
+}
+if ((cfg.containers ?? []).length !== 1 || cfg.containers![0]!.class_name !== 'UsdConverterContainer' || (cfg.containers![0]!.max_instances ?? 99) > 3) fail('unexpected container configuration');
 if (cfg.vars.APP_ENV !== 'production' || cfg.vars.AUTH_SIGNUP_ENABLED !== 'false') fail('dev Worker must run production-strict with sign-up off');
 if (!cfg.vars.BETTER_AUTH_URL?.includes('__WORKERS_SUBDOMAIN__')) fail('unexpected BETTER_AUTH_URL template');
 cfg.vars.BETTER_AUTH_URL = origin;
@@ -84,7 +90,7 @@ for (const f of files) {
   const text = readFileSync(f, 'latin1');
   for (const v of secretValues) if (text.includes(v)) fail(`a local secret value was found in ${f}; refusing to deploy`);
 }
-console.log(`\n  Worker        ${cfg.name}\n  URL           ${origin}\n  Hyperdrive    ${DEV_HYPERDRIVE} (ar-creator-db-dev → Neon development, role ar_app)\n  R2 bucket     ${DEV_BUCKET}\n  APP_ENV       ${cfg.vars.APP_ENV}\n  sign-up       ${cfg.vars.AUTH_SIGNUP_ENABLED}\n  files         ${files.length} checked, 0 local secrets, no .dev.vars`);
+console.log(`\n  Worker        ${cfg.name}\n  URL           ${origin}\n  Hyperdrive    ${DEV_HYPERDRIVE} (ar-creator-db-dev → Neon development, role ar_app)\n  R2 bucket     ${DEV_BUCKET}\n  Workflow      ${DEV_WORKFLOW}\n  Container     UsdConverterContainer (max 3 instances, internet disabled)\n  APP_ENV       ${cfg.vars.APP_ENV}\n  sign-up       ${cfg.vars.AUTH_SIGNUP_ENABLED}\n  files         ${files.length} checked, 0 local secrets, no .dev.vars`);
 
 // 4. Deploy (or dry-run) after typed confirmation.
 if (!dryRun) {

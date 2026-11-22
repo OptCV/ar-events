@@ -29,3 +29,20 @@ usd-core 26.x no longer ships the Python `ComplianceChecker` (`usdchecker --arki
 types and shader IDs, packaged assets, meters/Y-up, anchoring consistency). Apple's preliminary schemas are *not registered*
 in OpenUSD, so applied schemas are read from authored `apiSchemas` metadata. This is **structural validation only** —
 it does not prove Quick Look detection or rendering.
+
+## HTTP converter (Cloudflare Container, ADR-023)
+
+`python -m usd_processor serve --port 8080` is the default command of the `runtime` image stage: what Wrangler builds
+for the `UsdConverterContainer` Cloudflare Container, which is started with internet access disabled.
+
+```
+GET  /healthz                                   {"ok": true, "converterVersion": "...", "usd": "0.26.8"}
+POST /v1/image-plane?width_m=0.5&alpha_mode=BLEND[&alpha_cutoff=0.5&double_sided=0|1&pivot=center|bottom-center&orientation=upright|flat]
+     body = image bytes (Content-Length required, <= 32 MiB), optional X-Source-SHA256
+     200: u32be(len(json)) + json + usdz     400/411/413: bad request     422: conversion or validation failure
+```
+
+The Worker sends the source and stores the result; this process has no storage, credentials or network.
+Locally (Windows cannot run Cloudflare Containers): `npm run usd:serve` builds the runtime image and runs it on
+`127.0.0.1:8790` with a read-only root FS and 1 GiB / 2 CPU / 128 pids limits; `vite dev` reaches it through
+`USD_CONVERTER_URL` (development only). Image stages: `base` → `test` (pytest; `npm run usd:build|usd:test`) → `runtime`.

@@ -2,7 +2,7 @@
 
 **Updated:** 2026-11-22  
 **State:** P0 runtime-proof kit (incl. Android WebXR image probe) implemented and **structurally validated / desktop-tested**. **First device result: AND-IMG-01 PARTIAL** (native WebXR image tracking + DOM overlay worked on one Android/Chrome 157 device; visual/geometry checks outstanding). All other device rows NOT TESTED. **Phase 1 Milestones 1–5 done locally and verified on the isolated dev environment** (`ar-creator-dev` Worker → Hyperdrive → Neon development, R2 `ar-creator-assets-dev`): REMOTE-AUTH-01 9/9, REMOTE-CONTENT-01 8/8 (2026-11-22). Production not deployed or migrated.  
-**Current phase:** Phase 1 complete on dev. Phase 1 gate ("a creator can securely create a draft and upload/retrieve a checked asset") **met on the edge with real R2**. Next: Phase 2 (Image-to-AR), awaiting the owner's go. P0 device rows still open (AND-IMG-01 re-run, AND-IMG-02, iOS, Scene Viewer).
+**Current phase:** Phase 2 Milestone 6 (Image-to-AR conversion pipeline) **done locally** (ADR-023): GLB in the Worker, USDZ in a Cloudflare Container (Docker locally), driven by a Workflow. Not yet on Cloudflare: Neon migration 0004 and the first Container deploy need approval. Phase 1 is complete on dev (gate met on the edge with real R2). P0 device rows still open (AND-IMG-01 re-run, AND-IMG-02, iOS, Scene Viewer).
 
 ## Implemented (automated evidence)
 
@@ -161,3 +161,13 @@ Not available yet: lint (ESLint/Prettier not configured), DB migrations, `apps/w
 - **Phase 1 gate met on the dev environment.** Production (Worker, Neon, `ar-creator-assets`) untouched.
 - Open: Resend; Workers CPU reading; production roles/migrations/rotation (approval each); asset follow-ups (range requests, slot sweep, thumbnails); ESLint/Prettier; P0 device rows.
 - Next: Phase 2 (Image-to-AR from uploaded images) when the owner says go.
+
+## Session handoff — 2026-11-22 (3) / Claude Code — Phase 2 Milestone 6 (Image-to-AR conversion pipeline)
+
+- Branch `phase-2` (from `milestone-5` @ `d071640`). Owner decision: USDZ conversion runs in Cloudflare Containers.
+- Built: Workflow + Container conversion pipeline, streaming PNG alpha scanner, HTTP converter (`serve`), multi-stage converter image, migration `0004_image_to_ar_jobs`, conversion/derivative API with signed downloads, "Make AR object" page (ADR-023).
+- Verified locally: typecheck; Vitest 207; DB 46; integration 92 (needs `npm run usd:serve`); USD 68; Playwright 58 (local Workflow engine + Docker converter); npm audit 0; `deploy:dev --dry-run` (builds the Container image; nothing uploaded); remote spec dry run against local workerd 9/9; desktop and phone screenshots reviewed.
+- **Found:** `@cloudflare/vite-plugin` refuses local Containers on Windows ("use WSL"). Local dev and tests therefore reach the same image through Docker over HTTP. **The Container class, its cold start and the `basic` sizing stay unverified until a Cloudflare deploy.**
+- **Needs approval:** apply 0004 to Neon development; redeploy `ar-creator-dev` (first Container deploy: pushes the image to Cloudflare's registry; the account must be on Workers Paid); then run REMOTE-CONVERT.
+- Device: rendering of generated GLB/USDZ in Scene Viewer and Quick Look is NOT TESTED.
+- Next: with approval, the remote steps above; then M7 (3D preview, add to an experience).

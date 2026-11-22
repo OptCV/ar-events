@@ -8,7 +8,7 @@ import { defineConfig } from '@playwright/test';
  *  app-preview  production build served by `vite preview` (Worker + Static Assets in workerd)
  *  app-dev      `vite dev` (Worker in workerd via @cloudflare/vite-plugin)
  *  app-db-down  `vite dev` whose Hyperdrive points at a closed port (failure path)
- * The app projects need local Postgres: `npm run db:up && npm run db:migrate`.
+ * The app projects need local Postgres: `npm run db:up && npm run db:migrate`, and Docker for the USD converter.
  */
 const channel = process.env.PW_CHANNEL ?? 'msedge';
 
@@ -22,6 +22,8 @@ export default defineConfig({
     { name: 'app-db-down', testDir: 'tests/e2e/db-down', use: { baseURL: 'http://localhost:5181', channel } },
   ],
   webServer: [
+    // Local USD converter (the Cloudflare Container image; Containers cannot run locally on Windows, ADR-023).
+    { command: 'node --experimental-strip-types scripts/usd.ts serve', url: 'http://127.0.0.1:8790/healthz', reuseExistingServer: true, timeout: 300_000 },
     { command: 'node --experimental-strip-types scripts/serve-p0.ts 8787', url: 'http://localhost:8787/', reuseExistingServer: true },
     {
       command: 'npx vite build && npx vite preview --port 4173 --strictPort',

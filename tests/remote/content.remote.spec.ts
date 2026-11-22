@@ -12,7 +12,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { PNG } from 'pngjs';
 import { expect, request as pwRequest, test, type APIRequestContext } from '@playwright/test';
-import { ApiError, AssetListResponse, AssetSummary, CreateUploadResponse, ExperienceDetail } from '@ar-creator/contracts';
+import { ApiError, AssetListResponse, AssetSummary, ConversionSummary, CreateUploadResponse, ExperienceDetail } from '@ar-creator/contracts';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -144,6 +144,39 @@ test('REMOTE-UPLOAD-GLB: self-contained GLB is accepted with metadata', async ()
   expect(AssetSummary.parse(await put.json())).toMatchObject({ state: 'validated', mimeType: 'model/gltf-binary', model: { gltfVersion: '2.0', meshes: 1 } });
 });
 
+test('REMOTE-CONVERT: Workflow + Cloudflare Container turn a display PNG into a matching GLB + USDZ (Phase 2, ADR-023)', async () => {
+  test.setTimeout(360_000); // includes a possible container cold start
+  const ring = readFileSync('tests/fixtures/images/ring_inner_hole.png');
+  const { put } = await upload('display-image', 'ring.png', ring, 'image/png');
+  expect(put.status(), await put.text()).toBe(200);
+  const a = AssetSummary.parse(await put.json());
+  const t0 = Date.now();
+  const startRes = await api.post(`/api/assets/${a.id}/image-objects`, { headers: json, data: { settings: { widthMeters: 0.4, shapeMode: 'flat', alphaMode: 'auto' } } });
+  expect(startRes.status(), await startRes.text()).toBe(202);
+  let conv = ConversionSummary.parse(await startRes.json());
+  while (conv.state === 'queued' || conv.state === 'running') {
+    expect(Date.now() - t0, 'conversion did not finish in 5 minutes').toBeLessThan(300_000);
+    await new Promise((r) => setTimeout(r, 2000));
+    conv = ConversionSummary.parse(await (await api.get(`/api/conversions/${conv.id}`)).json());
+  }
+  test.info().annotations.push({ type: 'convert-ms', description: String(Date.now() - t0) });
+  expect(conv.state, JSON.stringify(conv.error)).toBe('succeeded');
+  expect(conv).toMatchObject({ resolvedAlphaMode: 'MASK', widthMeters: 0.4, heightMeters: 0.4 });
+  const anon = await pwRequest.newContext();
+  for (const [out, type, magic] of [
+    [conv.outputs.glb!, 'model/gltf-binary', 'glTF'],
+    [conv.outputs.usdz!, 'model/vnd.usdz+zip', 'PK'],
+  ] as const) {
+    const r = await anon.get(out.contentUrl!);
+    expect(r.status()).toBe(200);
+    expect(r.headers()['content-type']).toBe(type);
+    const body = await r.body();
+    expect(sha(body)).toBe(out.sha256);
+    expect(body.subarray(0, magic.length).toString('latin1')).toBe(magic);
+  }
+  await anon.dispose();
+});
+
 test('REMOTE-REJECT: disguised, mismatched and tampered uploads are refused and leave nothing readable', async () => {
   const html = Buffer.from('<!doctype html><script>alert(1)</script>'.padEnd(400, ' '));
   const disguised = await upload('display-image', 'cat.png', html, 'image/png');
@@ -168,7 +201,9 @@ test('REMOTE-EXPERIENCE: drafts reference owned, validated assets; in-use assets
   const list = AssetListResponse.parse(await (await api.get('/api/assets')).json());
   const poster = list.assets.find((a) => a.filename === 'poster.png' && a.state === 'validated')!;
   const noise = list.assets.find((a) => a.filename === 'noise.png')!;
-  expect(list.usage.bytes).toBe(list.assets.filter((a) => a.state === 'validated').reduce((n, a) => n + (a.sizeBytes ?? 0), 0));
+  // Usage = originals + generated outputs (the converted ring's GLB + USDZ count too, ADR-023).
+  const originals = list.assets.filter((a) => a.state === 'validated').reduce((n, a) => n + (a.sizeBytes ?? 0), 0);
+  expect(list.usage.bytes).toBeGreaterThan(originals);
 
   const cr = await api.post('/api/experiences', { headers: json, data: { name: 'Remote poster', placementMode: 'image' } });
   expect(cr.status()).toBe(201);
@@ -201,7 +236,7 @@ test('REMOTE-BROWSER-LIBRARY: real browser over HTTPS renders private previews f
   const imgs = page.locator('[data-testid="asset-card"] img');
   await expect
     .poll(() => imgs.evaluateAll((els) => (els as HTMLImageElement[]).filter((i) => i.complete && i.naturalWidth > 0).length), { timeout: 30_000 })
-    .toBe(2); // poster + noise; the GLB has a text tile
+    .toBe(3); // poster + noise + ring; the GLB has a text tile
   await context.close();
 });
 

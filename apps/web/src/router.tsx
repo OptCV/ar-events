@@ -5,6 +5,7 @@ import { AccountPage } from './pages/AccountPage.tsx';
 import { DashboardPage } from './experiences/DashboardPage.tsx';
 import { ExperiencePage } from './experiences/ExperiencePage.tsx';
 import { LibraryPage } from './assets/LibraryPage.tsx';
+import { ImageObjectPage } from './imageObjects/ImageObjectPage.tsx';
 import { NewExperiencePage } from './experiences/NewExperiencePage.tsx';
 import { EmailVerifiedPage, VerifyEmailPage } from './pages/auth/EmailPages.tsx';
 import { ForgotPasswordPage, ResetPasswordPage } from './pages/auth/PasswordPages.tsx';
@@ -34,6 +35,7 @@ export const router = createBrowserRouter([
           { path: 'experiences/new', element: <NewExperiencePage /> },
           { path: 'experiences/:id', element: <ExperiencePage /> },
           { path: 'library', element: <LibraryPage /> },
+          { path: 'library/:assetId/ar-object', element: <ImageObjectPage /> },
           { path: 'account', element: <AccountPage /> },
         ],
       },

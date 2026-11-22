@@ -18,8 +18,9 @@ import { logError } from '../db.ts';
 import { UUID, err, parseJson } from '../http.ts';
 import { UploadRejected, createUploadPipeline } from './pipeline.ts';
 import { assetSigningKey, signAssetUrl, verifyAssetUrl } from './signing.ts';
+import { derivativeBytes } from './usage.ts';
 
-const { assets, experiences, experienceRevisions } = schema;
+const { assets, assetDerivatives, experiences, experienceRevisions, processingJobs } = schema;
 type AssetRow = typeof assets.$inferSelect;
 
 export class StorageUnavailableError extends Error {
@@ -165,7 +166,7 @@ export function assetRoutes() {
         .select({ bytes: sql<number>`coalesce(sum(${assets.sizeBytes}), 0)::bigint` })
         .from(assets)
         .where(and(eq(assets.ownerId, ownerId), or(inArray(assets.state, ['uploaded', 'validated']), live)));
-      if (Number(used?.bytes ?? 0) + sizeBytes > ASSET_LIMITS.quotaBytes) return 'quota' as const;
+      if (Number(used?.bytes ?? 0) + (await derivativeBytes(tx, ownerId)) + sizeBytes > ASSET_LIMITS.quotaBytes) return 'quota' as const;
       const [row] = await tx
         .insert(assets)
         .values({
@@ -286,7 +287,7 @@ export function assetRoutes() {
     return c.json(
       AssetListResponse.parse({
         assets: await Promise.all(rows.map((a) => summarize(c, a))),
-        usage: { bytes: Number(used?.bytes ?? 0), quotaBytes: ASSET_LIMITS.quotaBytes },
+        usage: { bytes: Number(used?.bytes ?? 0) + (await derivativeBytes(db, ownerId)), quotaBytes: ASSET_LIMITS.quotaBytes },
       }),
     );
   });
@@ -322,10 +323,21 @@ export function assetRoutes() {
       const names = users.slice(0, 3).map((u) => `“${u.name}”`).join(', ');
       return err(c, 409, 'conflict', `This asset is used by ${names}${users.length > 3 ? ' and others' : ''}. Remove it there first.`, { reason: 'asset_in_use' });
     }
-    // Hide first, then remove the object, then the row: a storage failure leaves a hidden row to retry, never a
-    // visible asset whose bytes are gone, and never an orphaned private object without a row pointing at it.
+    // A running conversion would write outputs for a source that is going away (ADR-023).
+    const [active] = await db
+      .select({ id: processingJobs.id })
+      .from(processingJobs)
+      .where(and(eq(processingJobs.assetId, id), eq(processingJobs.ownerId, ownerId), inArray(processingJobs.state, ['queued', 'running'])))
+      .limit(1);
+    if (active) return err(c, 409, 'conflict', 'This image is being converted. Wait for the conversion to finish, then delete it.', { reason: 'conversion_running' });
+    // Hide first, then remove the objects (generated outputs, then the original), then the row: a storage failure
+    // leaves a hidden row to retry, never a visible asset whose bytes are gone, and never an orphaned private
+    // object without a row pointing at it. Derivative rows cascade with the asset row.
     await db.update(assets).set({ state: 'deleted' }).where(and(eq(assets.id, id), eq(assets.ownerId, ownerId)));
-    await c.get('assetStore')().delete(a.r2Key);
+    const store = c.get('assetStore')();
+    const outputs = await db.select({ key: assetDerivatives.r2Key }).from(assetDerivatives).where(eq(assetDerivatives.sourceAssetId, id));
+    for (const o of outputs) if (o.key) await store.delete(o.key);
+    await store.delete(a.r2Key);
     await db.delete(assets).where(and(eq(assets.id, id), eq(assets.ownerId, ownerId)));
     return c.body(null, 204);
   });

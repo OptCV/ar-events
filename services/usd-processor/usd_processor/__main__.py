@@ -28,7 +28,15 @@ def main(argv: list[str] | None = None) -> int:
     ip.add_argument("--anchor", choices=["none", "image", "floor", "wall"], default="none")
     ip.add_argument("--tracking-image", type=Path)
     ip.add_argument("--tracking-width-m", type=float)
+    sv = sub.add_parser("serve", help="HTTP converter for the Cloudflare Container (server.py)")
+    sv.add_argument("--port", type=int, default=8080)
     a = p.parse_args(argv)
+
+    if a.cmd == "serve":
+        from .server import serve
+
+        serve(a.port)
+        return 0
 
     try:
         res = build_image_plane_usdz(

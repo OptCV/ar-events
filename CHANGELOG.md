@@ -2,6 +2,23 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-22 — Phase 2 Milestone 6: Image-to-AR conversion pipeline (local)
+
+### Added
+- Conversion API: `POST/GET /api/assets/:id/image-objects`, `GET /api/conversions/:id`, `GET /api/derivatives/:id/content` (signed, cookieless; `?download=1`). Contracts in `packages/contracts/src/conversions.ts`.
+- Cloudflare Workflow `ImageToArWorkflow` (one instance per attempt; steps start → glb → usdz → finish; user errors are not retried) and Container class `UsdConverterContainer` (internet disabled, `basic`, max 3). Bindings `IMAGE_TO_AR` and `USD_CONVERTER` in production and `env.dev`.
+- `python -m usd_processor serve`: HTTP converter for the Container. Dockerfile split into `base` / `test` / `runtime` stages; `npm run usd:serve` runs the runtime image locally on 127.0.0.1:8790.
+- `scanPngAlpha` (streaming alpha statistics for any PNG without a full decode) and `jpegOrientation` in `packages/image-to-ar`.
+- Migration `0004_image_to_ar_jobs` (job input and error code; derivative size and checks).
+- UI: "Make AR object" on display images → `/library/:assetId/ar-object` with preview backgrounds, settings, live status, downloads and earlier versions.
+- Tests: scanner, converter client, HTTP converter (pytest), conversion integration tests against the real converter image, browser flows with the local Workflow engine; remote check REMOTE-CONVERT (not yet run). ADR-023.
+
+### Changed
+- Generated outputs count toward the storage quota. Deleting a source removes its generated files and is refused while it is converting.
+- Signed URLs carry a kind (asset or derivative) in the signed message and the path.
+- `deploy:dev` also requires the dev Workflow name and at most 3 container instances.
+- Local dev: `dev.enable_containers` is false (Containers cannot run locally on Windows); `USD_CONVERTER_URL` in `.dev.vars` points the Workflow at the Docker converter.
+
 ## 2026-11-22 — Remote verification of Milestones 4 + 5
 
 ### Added

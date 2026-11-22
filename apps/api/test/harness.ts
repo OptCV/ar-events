@@ -6,6 +6,11 @@ import type { Mailer, OutboundEmail } from '../src/email/mailer.ts';
 import type { RawAuthEnv } from '../src/auth/config.ts';
 import type { DbConnector } from '../src/db.ts';
 import { memoryStore } from '../src/assets/store.ts';
+import { inlineRunner } from '../src/conversions/runner.ts';
+import { httpUsdConverter, type UsdConverter } from '../src/conversions/usd.ts';
+
+/** The local converter started by `npm run usd:serve` (the same image Cloudflare Containers run). */
+export const LOCAL_USD_URL = 'http://127.0.0.1:8790';
 
 /** Minimal cookie jar: stores Set-Cookie name=value pairs, honours deletion (Max-Age=0 / empty value). */
 export class Jar {
@@ -34,6 +39,8 @@ export interface Harness {
   mails: OutboundEmail[];
   /** In-memory object store standing in for R2 (the R2 adapter itself is tested in workerd). */
   store: ReturnType<typeof memoryStore>;
+  /** Conversions run in-process (same pipeline steps as the Workflow); `idle()` waits for all to settle. */
+  conversions: ReturnType<typeof inlineRunner>;
   req: (
     path: string,
     init?: { method?: string; body?: unknown; raw?: { bytes: Uint8Array; type: string; length?: string | null }; jar?: Jar; ip?: string; origin?: string | null; headers?: Record<string, string> },
@@ -45,12 +52,20 @@ const randomIp = () => `10.${[0, 0, 0].map(() => Math.floor(Math.random() * 254)
 
 export const TEST_SECRET = randomBytes(48).toString('base64url');
 
-export function makeHarness(opts: { dbUrl: string; base?: string; env?: Partial<RawAuthEnv>; connect?: DbConnector }): Harness {
+export function makeHarness(opts: { dbUrl: string; base?: string; env?: Partial<RawAuthEnv>; connect?: DbConnector; usd?: UsdConverter }): Harness {
   const base = opts.base ?? 'http://localhost';
   const mails: OutboundEmail[] = [];
   const mailer: Mailer = { transport: 'dev-mailbox', send: async (m) => void mails.push(m) };
   const store = memoryStore();
-  const app = createApp({ version: 'test', build: 'test' }, { connectDb: opts.connect ?? (() => connectDb(opts.dbUrl)), mailer: () => mailer, objectStore: () => store });
+  const usd = opts.usd ?? httpUsdConverter((r) => fetch(r), LOCAL_USD_URL);
+  const conversions = inlineRunner(async () => {
+    const h = await connectDb(opts.dbUrl);
+    return { db: h.db, store, usd, close: () => h.close() };
+  });
+  const app = createApp(
+    { version: 'test', build: 'test' },
+    { connectDb: opts.connect ?? (() => connectDb(opts.dbUrl)), mailer: () => mailer, objectStore: () => store, conversionRunner: () => conversions },
+  );
   const env: RawAuthEnv = {
     APP_ENV: 'development',
     BETTER_AUTH_SECRET: TEST_SECRET,
@@ -92,7 +107,7 @@ export function makeHarness(opts: { dbUrl: string; base?: string; env?: Partial<
       await c.end();
     }
   };
-  return { base, mails, store, req, sql };
+  return { base, mails, store, conversions, req, sql };
 }
 
 export function linkIn(mail: OutboundEmail | undefined): string {

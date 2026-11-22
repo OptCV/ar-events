@@ -100,6 +100,17 @@ P0 device results (axes, alpha, CTA) → P2 converter adjustments → P4 compile
 | M4 Experience management | P1-4 + dashboard layout + image/floor/wall placement selector + scene configuration API | **Done**: local (ADR-021) + edge on the isolated dev Worker (REMOTE-CONTENT-01, 2026-11-22) |
 | M5 Asset storage | P1-5 (+ previews and metadata; storage logic separate from UI; presigned/multipart-ready interface) | **Done**: local (ADR-022) + edge with real R2 `ar-creator-assets-dev` (REMOTE-CONTENT-01 8/8, 2026-11-22). **Phase 1 gate met on the dev environment**; production not deployed |
 
+## Phase 2 plan (2026-11-22)
+
+**Gate (unchanged):** acceptance fixtures and native visual tests pass. **Host decision (owner, 2026-11-22):** USDZ conversion runs in Cloudflare Containers (ADR-023).
+
+| Milestone | Scope | Status |
+|---|---|---|
+| M6 Conversion pipeline | Display image → GLB (Worker) + USDZ (Container) through a Workflow; streaming alpha analysis; settings (width cm/in, alpha mode + cutoff, orientation, origin, sides); derivative storage with provenance and reuse; signed downloads; "Make AR object" page with preview backgrounds, status and earlier versions | **Done locally** (ADR-023); Neon migration 0004 + dev redeploy (first Container deploy) pending approval; Container path unverified |
+| M7 Preview and reuse | 3D preview of the generated GLB in the page (three.js, lazy-loaded); alpha-edge highlighting; add the image object to an experience (image-object node referencing the derivative) | Not started |
+| M8 Normalisation and budgets | WebP and EXIF-rotated JPEG → lossless PNG/JPEG before conversion (ADR-009); texture size limits / downscaled derivative for native viewer budgets | Not started |
+| Gate | Native visual tests of the alpha fixtures through the product (IOS-ALPHA-01, AND-ALPHA-01 with generated files) | Needs devices |
+
 **Phase 1 risks:** Hyperdrive caching of auth reads (ADR-013 §5); request-body size limits for large model uploads; Better Auth minor-version churn (pin exact, review changelogs); `@cloudflare/vite-plugin` + monorepo layout (validated locally in M1; edge deploy pending). Client bundle is 133 KB gzip for a skeleton, mostly React + Zod 4; watch it as features land (consider `zod/mini` on the client).
 
 ### Milestone 3 findings (2026-11-14)

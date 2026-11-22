@@ -94,3 +94,11 @@ Implemented in `packages/db` (ADR-017): Better Auth `user`/`session`/`account`/`
 - `assets.metadata`: `{ image: { width, height, mayHaveAlpha } }` or `{ model: { gltfVersion, generator?, meshes, materials, textures, animations, extensionsRequired } }`, plus `warnings[]`; `declaredSha256` while pending.
 - Implemented API: `POST /api/assets/uploads`, `PUT /api/assets/:id/content`, `GET /api/assets`, `GET/DELETE /api/assets/:id`, `GET /api/assets/:id/content` (signed). Contracts are in `packages/contracts/src/assets.ts`.
 - R2 bindings: `ASSETS_BUCKET` → `ar-creator-assets` / `ar-creator-assets-dev`; only originals are stored so far.
+
+### Phase 2 Milestone 1 additions (2026-11-22)
+
+- Migration `0004_image_to_ar_jobs` (ADR-023): `processing_jobs.input` (immutable job input: `{kind: "image-object", settings, settingsHash, glbConverterVersion, usdConverterVersion}`), `processing_jobs.error_code` (required when `failed`; values = contracts `CONVERSION_ERRORS`), index `(owner_id, asset_id, created_at)`; `asset_derivatives.size_bytes` (required when `ready`), SHA-256 format and `users/%` key prefix checks.
+- Image-to-AR jobs: `type = convert_image_to_ar`, `idempotency_key = i2a:{assetId}:{settingsHash}:{glbVersion}+{usdVersion}`, `attempt` 1..3 (restart after failure increments it). Derivatives: `image_object_glb` (`image-to-ar@0.1.0`) and `image_object_usdz` (`usd-image-plane@0.1.0`), unique per provenance, R2 key `users/{uid}/assets/{assetId}/derivatives/{sha256(settingsHash + "
+" + converterVersion)}/display.{glb|usdz}`.
+- Implemented API: `POST/GET /api/assets/:id/image-objects`, `GET /api/conversions/:id`, `GET /api/derivatives/:id/content` (signed). Contracts are in `packages/contracts/src/conversions.ts`.
+- Storage usage = originals + ready derivatives.

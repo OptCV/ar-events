@@ -11,6 +11,8 @@ import { DevMailbox, type Mailer } from './email/mailer.ts';
 import { experienceRoutes } from './experiences/routes.ts';
 import { StorageUnavailableError, assetRoutes } from './assets/routes.ts';
 import { r2Store, type ObjectStore } from './assets/store.ts';
+import { conversionRoutes } from './conversions/routes.ts';
+import { workflowRunner, type ConversionRunner } from './conversions/runner.ts';
 
 export interface BuildInfo {
   version: string;
@@ -24,11 +26,13 @@ export interface AppDeps {
   mailer?: (cfg: AuthConfig) => Mailer;
   /** Defaults to R2 via the ASSETS_BUCKET binding; tests inject an in-memory store. */
   objectStore?: (env: AppBindings) => ObjectStore;
+  /** Defaults to the IMAGE_TO_AR Workflow binding; Node tests run conversions inline (ADR-023). */
+  conversionRunner?: (env: AppBindings) => ConversionRunner;
 }
 
 /** Runtime bindings, generated from apps/web/wrangler.jsonc by `npm run cf-typegen -w @ar-creator/web`. */
 export type AppBindings = Env;
-export type AppEnv = { Bindings: AppBindings; Variables: { requestId: string; db: () => Promise<DbHandle>; authConfig: AuthConfig; auth: () => Promise<Auth>; user: SessionUser; assetStore: () => ObjectStore } };
+export type AppEnv = { Bindings: AppBindings; Variables: { requestId: string; db: () => Promise<DbHandle>; authConfig: AuthConfig; auth: () => Promise<Auth>; user: SessionUser; assetStore: () => ObjectStore; conversions: () => ConversionRunner } };
 
 function detectRuntime(): HealthResponse['runtime'] {
   // workerd sets this exact UA (https://developers.cloudflare.com/workers/runtime-apis/web-standards/#navigatoruseragent).
@@ -71,6 +75,13 @@ export async function stripSessionTokens(res: Response): Promise<Response> {
   return new Response(JSON.stringify(scrub(body)), { status: res.status, statusText: res.statusText, headers });
 }
 
+/** The Image-to-AR Workflow; starting a conversion fails (503) when the binding is missing. */
+const defaultConversionRunner = (env: AppBindings): ConversionRunner => {
+  const wf = (env as Partial<{ IMAGE_TO_AR: AppBindings['IMAGE_TO_AR'] }> | undefined)?.IMAGE_TO_AR;
+  if (!wf) throw new Error('IMAGE_TO_AR workflow binding is missing');
+  return workflowRunner(wf);
+};
+
 /** R2 via the ASSETS_BUCKET binding; fails closed (503) when the binding is missing. */
 const defaultObjectStore = (env: AppBindings): ObjectStore => {
   const bucket = (env as Partial<{ ASSETS_BUCKET: R2Bucket }> | undefined)?.ASSETS_BUCKET;
@@ -96,6 +107,7 @@ export function createApp(info: BuildInfo, deps: AppDeps = {}) {
   app.use('*', sameOriginMutations);
   app.use('*', async (c, next) => {
     c.set('assetStore', () => (deps.objectStore ?? defaultObjectStore)(c.env));
+    c.set('conversions', () => (deps.conversionRunner ?? defaultConversionRunner)(c.env));
     await next();
   });
   app.use(
@@ -166,6 +178,7 @@ export function createApp(info: BuildInfo, deps: AppDeps = {}) {
   app.route('/experiences', experienceRoutes());
   // Asset storage (Milestone 5, ADR-022): uploads, listing, deletion (session) and signed private reads.
   app.route('/assets', assetRoutes());
+  app.route('/', conversionRoutes());
 
   /** Public session probe for the UI: 200 with the user or null (no 401 noise for signed-out visitors). */
   app.get('/session', async (c) => {

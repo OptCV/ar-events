@@ -54,3 +54,5 @@
 .choice { display: grid; gap: var(--ui-space-1); justify-items: center; width: 96px; padding: var(--ui-space-2); font: inherit; font-size: var(--ui-text-sm); background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: var(--ui-radius-sm); cursor: pointer; }
 .choice:hover { border-color: var(--ui-accent); }
 .choiceName { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cardAction { justify-self: start; display: inline-flex; align-items: center; min-height: 36px; padding: 0 var(--ui-space-3); font-weight: 600; text-decoration: none; border: 1px solid var(--ui-accent); border-radius: var(--ui-radius-sm); }
+.cardAction:hover { background: #e6effc; }

@@ -68,3 +68,43 @@ function readJpeg(b: Uint8Array): ImageInfo {
   }
   throw new ImageFormatError('JPEG has no SOF marker');
 }
+
+/**
+ * EXIF orientation of a JPEG (1–8), or 1 when absent/unreadable. ADR-009: only orientation 1 may be embedded
+ * as-is; other values need a lossless normalisation step that does not exist yet, so conversion refuses them.
+ */
+export function jpegOrientation(b: Uint8Array): number {
+  if (b[0] !== 0xff || b[1] !== 0xd8) return 1;
+  let o = 2;
+  while (o + 4 <= b.length && b[o] === 0xff) {
+    const marker = b[o + 1]!;
+    if (marker === 0xda || marker === 0xd9) break; // start of scan / end: no more metadata
+    const len = (b[o + 2]! << 8) | b[o + 3]!;
+    if (len < 2 || o + 2 + len > b.length) break;
+    if (marker === 0xe1 && len >= 16 && String.fromCharCode(...b.subarray(o + 4, o + 10)) === 'Exif\0\0') {
+      return exifOrientation(b.subarray(o + 10, o + 2 + len));
+    }
+    o += 2 + len;
+  }
+  return 1;
+}
+
+function exifOrientation(t: Uint8Array): number {
+  if (t.length < 8) return 1;
+  const le = t[0] === 0x49 && t[1] === 0x49;
+  if (!le && !(t[0] === 0x4d && t[1] === 0x4d)) return 1;
+  const u16 = (o: number) => (le ? t[o]! | (t[o + 1]! << 8) : (t[o]! << 8) | t[o + 1]!);
+  const u32le = (o: number) => (le ? (t[o]! | (t[o + 1]! << 8) | (t[o + 2]! << 16) | (t[o + 3]! << 24)) >>> 0 : ((t[o]! << 24) | (t[o + 1]! << 16) | (t[o + 2]! << 8) | t[o + 3]!) >>> 0);
+  const ifd = u32le(4);
+  if (ifd + 2 > t.length) return 1;
+  const n = u16(ifd);
+  for (let i = 0; i < n; i++) {
+    const e = ifd + 2 + i * 12;
+    if (e + 12 > t.length) return 1;
+    if (u16(e) === 0x0112) {
+      const v = u16(e + 8);
+      return v >= 1 && v <= 8 ? v : 1;
+    }
+  }
+  return 1;
+}

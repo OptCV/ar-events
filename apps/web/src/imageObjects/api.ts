@@ -1,0 +1,56 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ASSET_LIMITS, AssetSummary, ConversionListResponse, ConversionSummary, type ImageObjectSettingsInput } from '@ar-creator/contracts';
+import { getJson, sendJson } from '../api/client.ts';
+import { assetKeys } from '../assets/api.ts';
+
+export const conversionKeys = {
+  forAsset: (assetId: string) => ['conversions', 'asset', assetId] as const,
+  one: (id: string) => ['conversions', 'one', id] as const,
+};
+
+const api = {
+  asset: (id: string) => getJson(`/api/assets/${encodeURIComponent(id)}`, AssetSummary),
+  list: (assetId: string) => getJson(`/api/assets/${encodeURIComponent(assetId)}/image-objects`, ConversionListResponse),
+  get: (id: string) => getJson(`/api/conversions/${encodeURIComponent(id)}`, ConversionSummary),
+  start: (assetId: string, settings: ImageObjectSettingsInput) =>
+    sendJson('POST', `/api/assets/${encodeURIComponent(assetId)}/image-objects`, { settings }, ConversionSummary),
+};
+
+/** Signed URLs expire (ADR-022); refetch well before that so download links stay valid. */
+const REFRESH_MS = (ASSET_LIMITS.readUrlTtlSeconds * 1000) / 2;
+const active = (c: ConversionSummary | undefined) => c?.state === 'queued' || c?.state === 'running';
+
+export function useAsset(id: string) {
+  return useQuery({ queryKey: [...assetKeys.all, 'one', id], queryFn: () => api.asset(id), staleTime: REFRESH_MS, refetchInterval: REFRESH_MS });
+}
+
+export function useConversions(assetId: string) {
+  return useQuery({
+    queryKey: conversionKeys.forAsset(assetId),
+    queryFn: () => api.list(assetId),
+    staleTime: REFRESH_MS,
+    // Poll while any conversion is still working; otherwise only to keep signed links fresh.
+    refetchInterval: (q) => (q.state.data?.conversions.some(active) ? 1000 : REFRESH_MS),
+  });
+}
+
+export function useConversion(id: string | null) {
+  return useQuery({
+    queryKey: conversionKeys.one(id ?? 'none'),
+    queryFn: () => api.get(id!),
+    enabled: id !== null,
+    refetchInterval: (q) => (active(q.state.data) ? 1000 : REFRESH_MS),
+  });
+}
+
+export function useStartConversion(assetId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (settings: ImageObjectSettingsInput) => api.start(assetId, settings),
+    onSuccess: (c) => {
+      qc.setQueryData(conversionKeys.one(c.id), c);
+      void qc.invalidateQueries({ queryKey: conversionKeys.forAsset(assetId) });
+      void qc.invalidateQueries({ queryKey: assetKeys.all }); // storage usage changes
+    },
+  });
+}

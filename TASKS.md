@@ -60,13 +60,16 @@ Plan and slice order: `ROADMAP.md` "Phase 1 plan".
 ## P2: Image-to-AR
 
 - [x] Distinguish tracking image vs displayed image asset role. *(schema `AssetRole`; explicit role on upload; separate limits and checks; draft references require the right role (ADR-022))*
-- [ ] Create checkerboard/size/alpha options UI.
+- [x] Create checkerboard/size/alpha options UI. *(P2 M6: `/library/:assetId/ar-object` — transparency grid/light/dark preview, width cm/in with derived height, Auto/Cutout+threshold/Blend/Opaque, orientation, origin, sides (ADR-023))*
+- [x] **P2 M6 (local):** conversion pipeline — Workflow per attempt, GLB in the Worker, USDZ from the converter image (Cloudflare Container in deployments; Docker locally), streaming PNG alpha analysis, idempotent jobs + derivative reuse, signed downloads, quota/limits, migration `0004_image_to_ar_jobs` (ADR-023).
+- [ ] P2 M6 remote: apply 0004 to Neon development (**approval**), redeploy `ar-creator-dev` with the Container + Workflow (**approval**; needs Workers Paid), run REMOTE-CONVERT; measure container cold start.
+- [ ] P2 M7: 3D preview of the generated GLB, alpha-edge highlight, add the image object to an experience.
 - [x] GLB image-plane generator with `MASK` / `BLEND` (structurally validated; device check pending).
 - [x] USDZ image-plane generator with alpha/opacity material (structurally validated; device check pending).
 - [ ] Normalize WebP and EXIF-rotated JPEG to PNG/JPEG before conversion (ADR-009).
 - [ ] Texture size limits / downscaled derivative for native viewer budgets.
 - [ ] Batch alpha fixtures native device verification.
-- [ ] Persist GLB+USDZ derivatives and conversion provenance.
+- [x] Persist GLB+USDZ derivatives and conversion provenance. *(asset_derivatives unique per source × type × settings hash × converter version; job input + diagnostics (ADR-023))*
 - [ ] Optional: alpha contour/cutout geometry, behind feature gate.
 
 ## P3: Editor

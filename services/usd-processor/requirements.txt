@@ -1,3 +1,2 @@
-# Pinned. usd-core provides pxr (Usd, UsdGeom, UsdShade, UsdUtils incl. ARKit packaging + ComplianceChecker).
+# Pinned. usd-core provides pxr (Usd, UsdGeom, UsdShade, UsdUtils incl. ARKit packaging).
 usd-core==26.8
-pytest==8.4.2

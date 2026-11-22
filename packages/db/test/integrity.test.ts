@@ -157,8 +157,25 @@ describe('assets, derivatives, outputs, jobs', () => {
     const [d] = await h.db.insert(assetDerivatives).values(base).returning();
     expect(await pgCode(h.db.insert(assetDerivatives).values(base))).toBe(UNIQUE);
     expect(await pgCode(h.db.update(assetDerivatives).set({ status: 'ready' }).where(eq(assetDerivatives.id, d!.id)))).toBe(CHECK);
-    await h.db.update(assetDerivatives).set({ status: 'ready', r2Key: `users/${owner}/d/${d!.id}.glb`, sha256: sha('c') }).where(eq(assetDerivatives.id, d!.id));
+    // Ready also needs a size (0004); then the stored object identity (key, checksum) is frozen.
+    expect(await pgCode(h.db.update(assetDerivatives).set({ status: 'ready', r2Key: `users/${owner}/d/${d!.id}.glb`, sha256: sha('c') }).where(eq(assetDerivatives.id, d!.id)))).toBe(CHECK);
+    await h.db.update(assetDerivatives).set({ status: 'ready', r2Key: `users/${owner}/d/${d!.id}.glb`, sha256: sha('c'), sizeBytes: 10 }).where(eq(assetDerivatives.id, d!.id));
     expect(await pgCode(h.db.update(assetDerivatives).set({ sha256: sha('d') }).where(eq(assetDerivatives.id, d!.id)))).toBe(CHECK);
+  });
+
+  it('derivatives (0004): checksum format and owned key prefix', async () => {
+    const [a] = await h.db.insert(assets).values({ ...PENDING, ownerId: owner, role: 'display-image', r2Key: `users/${owner}/assets/${randomUUID()}/original` }).returning();
+    const base = { sourceAssetId: a!.id, outputType: 'image_object_usdz' as const, settings: {}, converterVersion: 'usd-image-plane@0.1.0' };
+    expect(await pgCode(h.db.insert(assetDerivatives).values({ ...base, settingsHash: sha('1'), sha256: 'NOT-HEX' }))).toBe(CHECK);
+    expect(await pgCode(h.db.insert(assetDerivatives).values({ ...base, settingsHash: sha('2'), r2Key: 'public/elsewhere.usdz' }))).toBe(CHECK);
+    await h.db.insert(assetDerivatives).values({ ...base, settingsHash: sha('3'), r2Key: `users/${owner}/assets/${a!.id}/derivatives/x/display.usdz` });
+  });
+
+  it('jobs (0004): a failed job needs an error code', async () => {
+    const [a] = await h.db.insert(assets).values({ ...PENDING, ownerId: owner, role: 'display-image', r2Key: `users/${owner}/assets/${randomUUID()}/original` }).returning();
+    const base = { ownerId: owner, type: 'convert_image_to_ar' as const, assetId: a!.id, input: { kind: 'image-object' } };
+    expect(await pgCode(h.db.insert(processingJobs).values({ ...base, idempotencyKey: `f-${randomUUID()}`, state: 'failed' }))).toBe(CHECK);
+    await h.db.insert(processingJobs).values({ ...base, idempotencyKey: `f-${randomUUID()}`, state: 'failed', errorCode: 'converter_failed' });
   });
 
   it('generated outputs: one per revision × runtime; ready outputs are immutable', async () => {

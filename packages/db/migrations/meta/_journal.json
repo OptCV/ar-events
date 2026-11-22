@@ -29,6 +29,13 @@
       "when": 1795363312169,
       "tag": "0003_asset_uploads",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795380680414,
+      "tag": "0004_image_to_ar_jobs",
+      "breakpoints": true
     }
   ]
 }

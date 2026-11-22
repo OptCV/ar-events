@@ -29,7 +29,11 @@ export function assetSigningKey(secret: string): Promise<CryptoKey> {
   return k;
 }
 
-const message = (assetId: string, sha256: string, exp: number) => new TextEncoder().encode(`asset-read/v1\n${assetId}\n${sha256}\n${exp}`);
+/** What a signature authorises. The kind is part of the signed message and of the path, so a derivative signature can never open an original (or vice versa). */
+export type SignedKind = 'asset' | 'derivative';
+const PREFIX: Record<SignedKind, string> = { asset: 'asset-read/v1', derivative: 'derivative-read/v1' };
+const PATH: Record<SignedKind, string> = { asset: '/api/assets/', derivative: '/api/derivatives/' };
+const message = (kind: SignedKind, id: string, sha256: string, exp: number) => new TextEncoder().encode(`${PREFIX[kind]}\n${id}\n${sha256}\n${exp}`);
 
 const b64url = (buf: ArrayBuffer) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 function fromB64url(s: string): Uint8Array | null {
@@ -44,16 +48,16 @@ export interface SignedUrl {
 }
 
 /** `origin` must be the app's own origin; the path is fixed so a signature can never authorise another route. */
-export async function signAssetUrl(key: CryptoKey, origin: string, a: { id: string; sha256: string }, ttlSeconds: number, now = Date.now()): Promise<SignedUrl> {
+export async function signAssetUrl(key: CryptoKey, origin: string, a: { id: string; sha256: string }, ttlSeconds: number, now = Date.now(), kind: SignedKind = 'asset'): Promise<SignedUrl> {
   const exp = Math.floor(now / 1000) + ttlSeconds;
-  const sig = b64url(await crypto.subtle.sign('HMAC', key, message(a.id, a.sha256, exp)));
+  const sig = b64url(await crypto.subtle.sign('HMAC', key, message(kind, a.id, a.sha256, exp)));
   const qs = new URLSearchParams({ v: a.sha256.slice(0, 16), exp: String(exp), sig });
-  return { url: `${origin}/api/assets/${a.id}/content?${qs}`, expiresAt: new Date(exp * 1000) };
+  return { url: `${origin}${PATH[kind]}${a.id}/content?${qs}`, expiresAt: new Date(exp * 1000) };
 }
 
 export type VerifyResult = { ok: true; expiresInSeconds: number } | { ok: false; reason: 'malformed' | 'expired' | 'bad_signature' };
 
-export async function verifyAssetUrl(key: CryptoKey, a: { id: string; sha256: string }, q: { v?: string | undefined; exp?: string | undefined; sig?: string | undefined }, now = Date.now()): Promise<VerifyResult> {
+export async function verifyAssetUrl(key: CryptoKey, a: { id: string; sha256: string }, q: { v?: string | undefined; exp?: string | undefined; sig?: string | undefined }, now = Date.now(), kind: SignedKind = 'asset'): Promise<VerifyResult> {
   if (!q.v || !q.exp || !q.sig || !/^\d{1,12}$/.test(q.exp)) return { ok: false, reason: 'malformed' };
   const sig = fromB64url(q.sig);
   if (!sig) return { ok: false, reason: 'malformed' };
@@ -62,6 +66,6 @@ export async function verifyAssetUrl(key: CryptoKey, a: { id: string; sha256: st
   if (remaining <= 0) return { ok: false, reason: 'expired' };
   if (remaining > MAX_TTL_SECONDS) return { ok: false, reason: 'malformed' };
   if (q.v !== a.sha256.slice(0, 16)) return { ok: false, reason: 'bad_signature' };
-  const valid = await crypto.subtle.verify('HMAC', key, sig, message(a.id, a.sha256, exp));
+  const valid = await crypto.subtle.verify('HMAC', key, sig, message(kind, a.id, a.sha256, exp));
   return valid ? { ok: true, expiresInSeconds: remaining } : { ok: false, reason: 'bad_signature' };
 }

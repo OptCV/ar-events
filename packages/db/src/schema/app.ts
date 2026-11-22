@@ -186,6 +186,8 @@ export const assetDerivatives = pgTable(
     converterVersion: varchar('converter_version', { length: 64 }).notNull(),
     r2Key: text('r2_key').unique('asset_derivatives_r2_key_unique'),
     sha256: char('sha256', { length: 64 }),
+    /** Output size in bytes (ready outputs). Phase 2 (ADR-023). */
+    sizeBytes: bigint('size_bytes', { mode: 'number' }),
     diagnostics: jsonb('diagnostics'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -193,6 +195,9 @@ export const assetDerivatives = pgTable(
     unique('asset_derivatives_provenance_unique').on(t.sourceAssetId, t.outputType, t.settingsHash, t.converterVersion),
     check('asset_derivatives_settings_hash_format', SHA256(t.settingsHash)),
     check('asset_derivatives_ready_complete', sql`${t.status} <> 'ready' OR (${t.r2Key} IS NOT NULL AND ${t.sha256} IS NOT NULL)`),
+    check('asset_derivatives_ready_has_size', sql`${t.status} <> 'ready' OR ${t.sizeBytes} IS NOT NULL`),
+    check('asset_derivatives_sha256_format', sql`${t.sha256} IS NULL OR ${SHA256(t.sha256)}`),
+    check('asset_derivatives_r2_key_owned_prefix', sql`${t.r2Key} IS NULL OR ${t.r2Key} LIKE 'users/%'`),
   ],
 );
 
@@ -212,6 +217,10 @@ export const processingJobs = pgTable(
     assetId: uuid('asset_id').references(() => assets.id, { onDelete: 'cascade' }),
     attempt: integer('attempt').notNull().default(0),
     maxAttempts: integer('max_attempts').notNull().default(3),
+    /** What to do (e.g. Image-to-AR settings + their hash). Immutable once queued. Phase 2 (ADR-023). */
+    input: jsonb('input'),
+    /** Machine-readable failure reason (contracts CONVERSION_ERRORS); set only when state = failed. */
+    errorCode: varchar('error_code', { length: 40 }),
     diagnostics: jsonb('diagnostics'),
     startedAt: timestamp('started_at', { withTimezone: true }),
     finishedAt: timestamp('finished_at', { withTimezone: true }),
@@ -220,6 +229,8 @@ export const processingJobs = pgTable(
   (t) => [
     index('processing_jobs_state_created_idx').on(t.state, t.createdAt),
     check('processing_jobs_has_target', sql`num_nonnulls(${t.revisionId}, ${t.assetId}) >= 1`),
+    check('processing_jobs_failed_has_code', sql`${t.state} <> 'failed' OR ${t.errorCode} IS NOT NULL`),
+    index('processing_jobs_owner_asset_idx').on(t.ownerId, t.assetId, t.createdAt),
     check('processing_jobs_attempts_bounded', sql`${t.attempt} >= 0 AND ${t.maxAttempts} BETWEEN 1 AND 10 AND ${t.attempt} <= ${t.maxAttempts}`),
   ],
 );

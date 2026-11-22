@@ -4,6 +4,7 @@
  *   BETTER_AUTH_SECRET   random per developer (48 bytes, base64url); preserved if already present
  *   APP_ENV=development  enables origin inference and the localhost-only dev mailbox
  *   EMAIL_TRANSPORT=dev-mailbox, AUTH_SIGNUP_ENABLED=true  (local only; Resend is not needed)
+ *   USD_CONVERTER_URL=http://127.0.0.1:8790  local converter (npm run usd:serve); honoured only when APP_ENV=development
  * Never put production secrets here. Production secrets: `wrangler secret put BETTER_AUTH_SECRET` etc.
  */
 import { randomBytes } from 'node:crypto';
@@ -25,6 +26,8 @@ const defaults: [string, string][] = [
   ['EMAIL_TRANSPORT', 'dev-mailbox'],
   ['EMAIL_FROM', 'AR Creator <dev@localhost.invalid>'],
   ['AUTH_SIGNUP_ENABLED', 'true'],
+  // Local USD converter (npm run usd:serve): Cloudflare Containers cannot run locally on Windows (ADR-023).
+  ['USD_CONVERTER_URL', 'http://127.0.0.1:8790'],
 ];
 let added = 0;
 for (const [k, v] of defaults) {

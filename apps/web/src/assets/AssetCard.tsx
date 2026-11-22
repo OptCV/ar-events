@@ -1,3 +1,4 @@
+import { Link } from 'react-router';
 import { ROLE_POLICY, formatBytes, type AssetSummary, type UploadableRole } from '@ar-creator/contracts';
 import { cx } from '../components/cx.ts';
 import styles from './Assets.module.css';
@@ -48,6 +49,11 @@ export function AssetCard({ asset, onDelete, error }: { asset: AssetSummary; onD
           <span className={styles.cardError} role="alert">
             {error}
           </span>
+        )}
+        {asset.role === 'display-image' && asset.state === 'validated' && (
+          <Link className={styles.cardAction} to={`/library/${asset.id}/ar-object`} aria-label={`Make an AR object from ${asset.filename ?? 'this image'}`}>
+            Make AR object
+          </Link>
         )}
         <button type="button" className={styles.deleteButton} onClick={onDelete} aria-label={`Delete ${asset.filename ?? 'asset'}`}>
           Delete

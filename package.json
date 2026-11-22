@@ -16,6 +16,7 @@
     "fixtures": "node --experimental-strip-types scripts/generate-fixtures.ts",
     "usd:build": "node --experimental-strip-types scripts/usd.ts build",
     "usd:test": "node --experimental-strip-types scripts/usd.ts test",
+    "usd:serve": "node --experimental-strip-types scripts/usd.ts serve",
     "check": "npm run typecheck && npm run test",
     "fixtures:geometry": "node --experimental-strip-types scripts/generate-geometry-golden.ts",
     "p0:build": "node --experimental-strip-types scripts/build-p0.ts",

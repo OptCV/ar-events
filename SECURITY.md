@@ -51,5 +51,6 @@ Uploads (GLB/glTF, PNG/JPG/WebP, USDZ), GLB/USD parser behavior, external URLs e
 - [ ] Decompression bomb and oversized image fixtures rejected.
 - [ ] Sandbox resource budgets configured.
 - [ ] R2 private/public access separated. *(Private side implemented: no public bucket access, owner-only routes, signed cookieless reads (ADR-022). Public published outputs not built yet; edge verification pending.)*
+- [x] Conversion container isolation (ADR-023, implemented; Cloudflare side unverified): the USD converter runs with internet access disabled, receives the source in the request body from the Worker and returns the result; it holds no credentials or storage access and never sees user filenames. Locally the same image runs read-only with memory/CPU/pids limits, bound to 127.0.0.1. `USD_CONVERTER_URL` is honoured only with `APP_ENV=development` and a loopback host. Derivative signatures carry a kind so they cannot open originals. Per-user cap of 3 active conversions; outputs count toward the quota.
 - [ ] No arbitrary active content in banner/panel assets.
 - [ ] Secrets audit and dependency scanning completed.
