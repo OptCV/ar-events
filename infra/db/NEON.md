@@ -8,9 +8,11 @@ No step below puts a password or connection string in Git, a file, a command lin
 | Hyperdrive config | ID | Neon endpoint | Branch | Caching | Origin role |
 |---|---|---|---|---|---|
 | `ar-creator-db` | `8de2df3d333b4a1b9b07c18fbdd49d18` | `ep-plain-unit-bcruyo1j` | **production** (parent) | disabled ✔ | `neondb_owner` ⚠ |
-| `ar-creator-db-dev` | `f7b30d814f184296bb44518058778789` | `ep-weathered-resonance-bce5rdkp` | **development** (child of production) | disabled ✔ | `neondb_owner` ⚠ (→ `ar_app`, step 8) |
+| `ar-creator-db-dev` | `f7b30d814f184296bb44518058778789` | `ep-dark-butterfly-bctzb64e` (since 2026-11-22; was `ep-weathered-resonance-bce5rdkp`) | **development** | disabled ✔ | `ar_app` ✔ |
 
 Both use direct (non-pooler) endpoints in AWS us-east-1, database `neondb`.
+
+**2026-11-22:** the owner moved Neon development to the endpoint `ep-dark-butterfly-bctzb64e` and applied migrations 0002 + 0003 there. Checked the same day: `wrangler hyperdrive get` (read-only) shows `ar-creator-db-dev` → that host as `ar_app` with caching disabled; `db:remote` reports marker `ar.environment=development`, TLSv1.3 with a verified certificate, and 4/4 migrations applied. Use `--host ep-dark-butterfly-bctzb64e.c-16.us-east-1.aws.neon.tech` from now on; older steps below mention the previous endpoint.
 
 **2026-11-15 incident:** the development branch's `neondb_owner` connection string was pasted into a chat session. The owner reset that role's password on the development branch the same day. Neon copies roles to child branches; whether passwords are copied is not documented. Treat production's `neondb_owner` password as possibly exposed: rotate it after production Hyperdrive moves to `ar_app` (production change, needs approval).
 

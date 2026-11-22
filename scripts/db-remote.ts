@@ -303,7 +303,7 @@ async function remoteAuthTest(env: Env, baseUrl: string | undefined) {
     ]);
     await c.query('COMMIT');
     seeded = true;
-    console.log(`\n  seeded temporary verified user ${email} (password random, never displayed)\n  running remote suite against ${base.origin}\n`);
+    console.log(`\n  seeded temporary verified user ${email} (password random, never displayed)\n  running remote suite (auth + content) against ${base.origin}\n`);
 
     const r = spawnSync(process.execPath, [join(ROOT, 'node_modules', '@playwright', 'test', 'cli.js'), 'test', '--config', 'playwright.remote.config.ts'], {
       cwd: ROOT,

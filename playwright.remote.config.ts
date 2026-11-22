@@ -1,7 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
 /**
- * Remote authentication suite against the ISOLATED dev Worker (ADR-020). Run ONLY via
+ * Remote suite (auth, then experiences + R2 assets) against the ISOLATED dev Worker (ADR-020). Run ONLY via
  *   npm run db:remote -- remote-auth-test --env development --host <neon dev host> --base-url https://ar-creator-dev.<sub>.workers.dev
  * which seeds a temporary verified user and supplies REMOTE_* through the child-process environment.
  * Serial, single worker: the suite deliberately stays within the 5/min sign-in limit before testing it.

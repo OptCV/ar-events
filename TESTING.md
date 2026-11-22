@@ -7,7 +7,7 @@
 - **Structurally validated:** file parses/validates, but native viewer not tested.
 - **Device verified:** target device + OS + browser/viewer version recorded with visible result.
 
-**Current baseline (2026-11-14):** schema, launch URLs, capability registry and flat Image-to-AR GLB/USDZ conversion are **Implemented + structurally validated**. **Neon development database: VERIFIED 2026-11-15** (migrations applied as `ar_migrator`, runtime-role suite 8/8 as `ar_app`; see "Remote results"). **Cloudflare authentication: VERIFIED 2026-11-15 on the isolated dev Worker** (REMOTE-AUTH-01, 9/9; email flows pending Resend). Device rows are **NOT TESTED** except AND-IMG-01, which is **PARTIAL** (runtime path verified on one Android/Chrome 157 device; visual/geometry checks outstanding).
+**Current baseline (2026-11-14):** schema, launch URLs, capability registry and flat Image-to-AR GLB/USDZ conversion are **Implemented + structurally validated**. **Neon development database: VERIFIED 2026-11-15** (migrations applied as `ar_migrator`, runtime-role suite 8/8 as `ar_app`; see "Remote results"). **Cloudflare authentication: VERIFIED 2026-11-15 on the isolated dev Worker** (REMOTE-AUTH-01, 9/9; email flows pending Resend). **Experiences + R2 asset storage: VERIFIED 2026-11-22 on the isolated dev Worker** (REMOTE-CONTENT-01, 8/8, with the auth suite re-run 9/9). Device rows are **NOT TESTED** except AND-IMG-01, which is **PARTIAL** (runtime path verified on one Android/Chrome 157 device; visual/geometry checks outstanding).
 
 ## Automated evidence log
 
@@ -168,6 +168,26 @@ Target: Worker `ar-creator-dev` (`https://ar-creator-dev.quiet-dawn-af59.workers
 First run: 7/8. The CF-IP assertion expected 429; diagnosis showed Cloudflare blocks the spoofed header outright (a stronger property), so the test was corrected and the rate-limit check split out. Second run: 9/9.
 
 **Not yet verified remotely:** email verification and password reset (need Resend: API key, verified domain, `EMAIL_FROM`); sign-in CPU time (read it in the dashboard: Workers & Pages → `ar-creator-dev` → Observability / Metrics → CPU time); production (`ar-creator` Worker, production Neon) is untouched.
+
+### REMOTE-CONTENT-01 — Cloudflare edge, isolated dev Worker + R2 — 2026-11-22 — PASS (8/8; full remote run 17/17 in 1.3 min)
+
+Target: Worker `ar-creator-dev` (version `aec8691a-6a47-4406-90e4-1d76d119868a`, build `a162f66e7ea2`) → Hyperdrive `ar-creator-db-dev` (caching disabled, `ar_app`) → Neon development endpoint `ep-dark-butterfly-bctzb64e` (marker `development`, TLSv1.3 verified, migrations 4/4), and → R2 bucket `ar-creator-assets-dev`. Owner set-up (bucket, migrations 0002 + 0003, redeploy) on 2026-11-22. Run by the owner in PowerShell: `npm run db:remote -- remote-auth-test --env development --host ep-dark-butterfly-bctzb64e.c-16.us-east-1.aws.neon.tech --base-url https://ar-creator-dev.quiet-dawn-af59.workers.dev`; temporary user seeded as `ar_app` and removed afterwards (1 user). The spec was first dry-run against the local workerd build (8/8) to check the test code itself.
+
+| Check | Result |
+|---|---|
+| REMOTE-AUTH-01 re-run (auth.remote.spec.ts) | 9/9 on the M5 build |
+| REMOTE-CONTENT-SIGNIN | one session after the auth suite's rate limit window (~1 min wait); empty library, 0 of 1 GB used |
+| REMOTE-UPLOAD | tracking PNG reserved → streamed through the Worker → **real R2**; validated with SHA-256 and 1200 × 800; cookieless signed read returns identical bytes with `image/png`, `private, max-age`, `nosniff`; tampered, missing and stale signatures 403; unknown id 404; slot reuse 409 `upload_not_pending` |
+| REMOTE-UPLOAD-LARGE | 10.3 MiB incompressible PNG (display image) uploaded, hashed and stored, read back identical; ~2 s for the test, no Workers CPU or size limit hit |
+| REMOTE-UPLOAD-GLB | self-contained GLB accepted, glTF 2.0, 1 mesh |
+| REMOTE-REJECT | HTML disguised as PNG → 422 `signature_mismatch`, row `rejected`, no read URL; wrong client checksum → 422 `checksum_mismatch`; cross-origin binary PUT → 403 |
+| REMOTE-EXPERIENCE | image-anchored experience created; display image as tracking target → 400; tracking image saved; stale `draftVersion` → 409; deleting an in-use asset → 409 `asset_in_use` |
+| REMOTE-BROWSER-LIBRARY | real Edge browser over HTTPS: `/library` shows the asset; both image previews load from signed URLs under the production CSP |
+| REMOTE-CLEANUP | experience and every uploaded asset deleted (204); the earlier signed URL → 404; list empty, usage 0 |
+
+Bucket privacy (read-only `wrangler r2 bucket dev-url get` / `domain list`, 2026-11-22): `ar-creator-assets-dev` and `ar-creator-assets` both have r2.dev public access **disabled** and **no custom domains**; objects are reachable only through the Worker binding.
+
+**Not captured:** the per-test annotations (upload time, the edge's answer to a `Range` request) are not printed by the list reporter; range requests are unimplemented either way (TASKS follow-up). Cleanup is checked through the API (row gone, URL 404); the bucket itself was not listed. **Not covered remotely:** cross-user isolation (covered by local integration tests), the external-reference GLB rejection (unit + integration), upload-slot expiry. The production Worker, production Neon and `ar-creator-assets` are untouched.
 
 ## Device results
 

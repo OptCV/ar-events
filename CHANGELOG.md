@@ -2,6 +2,14 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-22 — Remote verification of Milestones 4 + 5
+
+### Added
+- Remote suite `tests/remote/content.remote.spec.ts` (experiences, R2 uploads, signed reads, rejections, browser library, cleanup); runs with the auth suite via `db:remote -- remote-auth-test`.
+
+### Verified
+- REMOTE-CONTENT-01 8/8 on `ar-creator-dev` with real R2 (`ar-creator-assets-dev`) and Neon development (migrations 4/4); auth suite re-run 9/9. Both R2 buckets confirmed private. Neon development endpoint is now `ep-dark-butterfly-bctzb64e` (NEON.md).
+
 ## 2026-11-22 — Phase 1 Milestone 5: asset storage in R2 (local)
 
 ### Added

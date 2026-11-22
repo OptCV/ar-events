@@ -1,8 +1,8 @@
 # PROGRESS.md — Actual Implementation State
 
 **Updated:** 2026-11-22  
-**State:** P0 runtime-proof kit (incl. Android WebXR image probe) implemented and **structurally validated / desktop-tested**. **First device result: AND-IMG-01 PARTIAL** (native WebXR image tracking + DOM overlay worked on one Android/Chrome 157 device; visual/geometry checks outstanding). All other device rows NOT TESTED. **Phase 1 Milestones 1–3 (skeleton, database, authentication) done and verified locally; nothing deployed; no Neon migrations applied; remote auth unverified.**  
-**Current phase:** P1 Milestone 5 (asset storage) done locally. Phase 1 gate ("a creator can securely create a draft and upload/retrieve a checked asset") **met locally**, not yet on the edge. Remote verification of M4 + M5 pending approval (R2 buckets, Neon migrations 0002/0003, dev redeploy). P0 device rows still open (AND-IMG-01 re-run, AND-IMG-02, iOS, Scene Viewer).
+**State:** P0 runtime-proof kit (incl. Android WebXR image probe) implemented and **structurally validated / desktop-tested**. **First device result: AND-IMG-01 PARTIAL** (native WebXR image tracking + DOM overlay worked on one Android/Chrome 157 device; visual/geometry checks outstanding). All other device rows NOT TESTED. **Phase 1 Milestones 1–5 done locally and verified on the isolated dev environment** (`ar-creator-dev` Worker → Hyperdrive → Neon development, R2 `ar-creator-assets-dev`): REMOTE-AUTH-01 9/9, REMOTE-CONTENT-01 8/8 (2026-11-22). Production not deployed or migrated.  
+**Current phase:** Phase 1 complete on dev. Phase 1 gate ("a creator can securely create a draft and upload/retrieve a checked asset") **met on the edge with real R2**. Next: Phase 2 (Image-to-AR), awaiting the owner's go. P0 device rows still open (AND-IMG-01 re-run, AND-IMG-02, iOS, Scene Viewer).
 
 ## Implemented (automated evidence)
 
@@ -124,6 +124,7 @@ Not available yet: lint (ESLint/Prettier not configured), DB migrations, `apps/w
 |---|---|---|---|---|
 | 2026-11-15 | product owner ("approved: migrate development") | `db:remote migrate --env development`: migrations `0000_initial_schema`, `0001_immutability_triggers` + `02-app-grants.sql` as `ar_migrator` | Neon development branch, endpoint `ep-weathered-resonance-bce5rdkp`, db `neondb` (marker `ar.environment=development`) | **done 2026-11-15**: 2/2 applied, runtime grants applied, TLSv1.3 verified, confirmation typed |
 | 2026-11-15 | product owner ("Approved") | `npm run deploy:dev -- --subdomain quiet-dawn-af59`: create isolated Worker `ar-creator-dev` (dev Hyperdrive only, sign-up off) | Cloudflare account `a91b768f…`, `https://ar-creator-dev.quiet-dawn-af59.workers.dev` | approved |
+| 2026-11-22 | product owner (performed by the owner) | Created R2 buckets `ar-creator-assets-dev` and `ar-creator-assets`; applied migrations `0002_draft_version` + `0003_asset_uploads` to Neon development; redeployed `ar-creator-dev` (version `aec8691a…`, build `a162f66`) | Neon development endpoint `ep-dark-butterfly-bctzb64e`; Cloudflare account `a91b768f…` | **done 2026-11-22**: verified by health (migrations current), `db:remote` (4/4), REMOTE-CONTENT-01 |
 
 ## Session handoff — 2026-11-15 / Claude Code — Neon development + remote authentication verification
 
@@ -151,3 +152,12 @@ Not available yet: lint (ESLint/Prettier not configured), DB migrations, `apps/w
 - **Not verified remotely:** no R2 bucket exists; Neon development lacks migrations 0002 and 0003; `ar-creator-dev` still runs the Milestone 3 build. Each needs owner approval.
 - Not built: thumbnails/derivatives, range requests, cleanup of stale upload slots, presigned/multipart strategies, model previews, WebP (ADR-009).
 - Next: with approval, create `ar-creator-assets-dev`, `db:remote migrate --env development` (0002 + 0003), `deploy:dev`, extend the remote suite (experiences + assets); then Phase 2 (Image-to-AR conversion of uploaded images).
+
+## Session handoff — 2026-11-22 (2) / Claude Code — remote verification of Milestones 4 + 5
+
+- The owner created both R2 buckets, applied 0002 + 0003 to Neon development (new endpoint `ep-dark-butterfly-bctzb64e`) and redeployed `ar-creator-dev`.
+- Checked read-only: health (build `a162f66`, migrations current); unauthenticated asset routes 401/404; both buckets private (no r2.dev URL, no custom domain); dev Hyperdrive → new endpoint as `ar_app`, caching disabled.
+- Added `tests/remote/content.remote.spec.ts` (runs after the auth spec and waits out its rate limit; deletes everything it uploads). Dry run on the local workerd build 8/8; **owner's remote run 17/17** (REMOTE-AUTH-01 9/9 + REMOTE-CONTENT-01 8/8).
+- **Phase 1 gate met on the dev environment.** Production (Worker, Neon, `ar-creator-assets`) untouched.
+- Open: Resend; Workers CPU reading; production roles/migrations/rotation (approval each); asset follow-ups (range requests, slot sweep, thumbnails); ESLint/Prettier; P0 device rows.
+- Next: Phase 2 (Image-to-AR from uploaded images) when the owner says go.
