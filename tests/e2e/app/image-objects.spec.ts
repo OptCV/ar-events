@@ -5,7 +5,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
-import { verifiedSignedIn } from './helpers.ts';
+import { createExperience, verifiedSignedIn } from './helpers.ts';
 
 const FIX = 'tests/fixtures/images/';
 const file = (name: string) => ({ name, mimeType: name.endsWith('.jpg') ? 'image/jpeg' : 'image/png', buffer: readFileSync(`${FIX}${name}`) });
@@ -95,4 +95,59 @@ test('image to AR: refusals are explained (opaque with transparency, tracking im
   await expect(page.getByRole('status').filter({ hasText: 'Uploaded tracking_target_20cm.png.' })).toBeVisible();
   const card = page.getByTestId('asset-card').filter({ hasText: 'tracking_target_20cm.png' });
   await expect(card.getByRole('link', { name: /Make an AR object/ })).toHaveCount(0);
+});
+
+test('image to AR (M7): soft-edge highlight, 3D preview of the result, place it in an experience', async ({ page, request }) => {
+  test.setTimeout(120_000);
+  await verifiedSignedIn(page, request, 'p2m7');
+
+  // Hard cutout: no partly transparent pixels.
+  await uploadDisplay(page, 'ring_inner_hole.png');
+  await page.getByRole('link', { name: 'Make an AR object from ring_inner_hole.png' }).click();
+  await page.getByLabel('Highlight partly transparent pixels').check();
+  await expect(page.getByTestId('soft-edges')).toHaveText('No partly transparent pixels');
+
+  // Antialiased disc: soft edges are found and marked.
+  await uploadDisplay(page, 'aa_disc_dark_fringe.png');
+  await page.getByRole('link', { name: 'Make an AR object from aa_disc_dark_fringe.png' }).click();
+  await page.getByLabel('Highlight partly transparent pixels').check();
+  await expect(page.getByTestId('soft-edges')).toHaveText(/^Partly transparent: \d+(\.\d)?% \(magenta\)$/);
+
+  await page.getByLabel('Real-world width').fill('30');
+  await page.getByRole('button', { name: 'Create AR object' }).click();
+  await expect(page.getByTestId('io-status')).toHaveText('Your AR object is ready.', { timeout: 30_000 });
+  const preview = page.getByTestId('model-preview');
+  await expect(preview).toHaveAttribute('data-state', 'ready', { timeout: 20_000 });
+  await expect(preview.getByRole('img', { name: /3D preview of the AR object: 30 cm × 30 cm · Blend/ })).toBeVisible();
+  // Dragging orbits the camera (render on demand) without errors.
+  const box = (await preview.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 80, box.y + box.height / 2 + 20, { steps: 5 });
+  await page.mouse.up();
+  await expect(preview).toHaveAttribute('data-state', 'ready');
+
+  // Place it in a wall experience.
+  await createExperience(page, 'Gallery wall', 'Wall');
+  const panel = page.getByTestId('image-objects');
+  await expect(panel).toContainText('No image objects yet.');
+  await panel.getByRole('button', { name: 'Add image object' }).click();
+  await panel.getByRole('button', { name: /Add aa_disc_dark_fringe\.png \(30 cm × 30 cm · Blend · front only\)/ }).click();
+  await expect(page.getByTestId('save-status')).toHaveText('All changes saved');
+  await expect(panel.getByTestId('placed-image-object')).toHaveCount(1);
+  await expect(panel.getByTestId('placed-image-object')).toContainText('30 cm × 30 cm · Blend · front only');
+  const url = page.url();
+  await page.reload();
+  await expect(page.getByTestId('image-objects').getByTestId('placed-image-object')).toHaveCount(1);
+
+  // The source image is protected while the experience uses its image object.
+  await page.goto('/library');
+  await page.getByRole('button', { name: 'Delete aa_disc_dark_fringe.png' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete permanently' }).click();
+  await expect(page.getByRole('alert')).toHaveText('This asset is used by “Gallery wall”. Remove it there first.');
+
+  await page.goto(url);
+  await page.getByTestId('image-objects').getByRole('button', { name: 'Remove aa_disc_dark_fringe.png' }).click();
+  await expect(page.getByTestId('save-status')).toHaveText('All changes saved');
+  await expect(page.getByTestId('image-objects')).toContainText('No image objects yet.');
 });

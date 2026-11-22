@@ -328,3 +328,16 @@ Accepted decisions may be superseded by new numbered entries; never rewrite prev
 - **Remote (approval each):** apply 0004 to Neon development; redeploy `ar-creator-dev` (first Container deploy: pushes the image to Cloudflare's registry; needs Workers Paid on the account); run REMOTE-CONVERT. Until then the Container path, cold-start time and `basic` sizing are **unverified**.
 - **Device:** Quick Look / Scene Viewer rendering of generated files is **NOT TESTED** (same open rows as the P0 alpha cases).
 - **Not built:** 3D preview of the result, adding the object to an experience, WebP/EXIF normalisation and downscaled texture derivatives (ADR-009), cleanup of failed jobs' partial outputs beyond reuse, cutout/extruded shapes (hidden).
+
+## ADR-024 — Image objects in experiences, 3D preview and soft-edge highlight (Phase 2 Milestone 7)
+
+**Date:** 2026-11-22
+**Status:** Accepted (verified locally; not yet deployed to the dev Worker)
+**Decision:**
+1. **What a scene references.** An `image-object` node's `derivativeId` is the id of the **GLB** derivative of a finished pair. A draft save accepts it only when the owner's GLB is `ready`, its source asset is validated, and the **USDZ partner** (same source and settings hash) is `ready` too — iOS needs the USDZ, Android/web the GLB. Another user's, a USDZ id, a missing or incomplete pair → 400 "This image object does not exist or is not ready." Nodes are placed at the anchor origin (identity transform) until the visual editor (Phase 3).
+2. **Deletion protection extends to generated objects.** Deleting a source image is refused (409 `asset_in_use`, naming the experiences) while any revision has a node whose `derivativeId` is one of the image's derivatives.
+3. **Listing.** `GET /api/image-objects`: the owner's succeeded conversions whose two outputs are ready, newest first (≤ 100), with signed GLB/USDZ links and a signed preview of the source.
+4. **3D preview** (`ModelPreview`, three.js 0.186.1 — the version the P0 probe pins): renders the real GLB with its authored alpha mode and sides, a 10 cm grid, orbit/zoom; render-on-demand (no animation loop); every GPU resource freed on unmount; WebGL-unavailable and load-error states. **Lazy-loaded**: three.js is only in its own chunk, the main bundle is unchanged in kind (159 KB gzip). Labelled as a desktop preview — it does not show how AR Quick Look or Scene Viewer render the files.
+5. **Soft-edge highlight.** Partly transparent pixels (0 < alpha < 255) are painted magenta over the 2D preview with the share reported. The image is drawn at ≤ 1024 px with **nearest-neighbour** sampling, so a hard cutout never shows false soft edges; the signed image is same-origin, so the canvas is readable under the existing CSP.
+
+**Consequences:** Publishing/compilation (Phase 5) will read image objects through the GLB id and its USDZ partner. Transform editing, multiple instances of the same object per scene (the picker hides already-placed objects) and per-device rendering checks remain open.

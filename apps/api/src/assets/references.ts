@@ -1,4 +1,5 @@
 import { and, eq, inArray } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { schema, type DbHandle } from '@ar-creator/db';
 import type { AssetRole, DraftExperienceScene } from '@ar-creator/schema';
 import { UUID } from '../http.ts';
@@ -41,14 +42,29 @@ export async function assetReferenceIssues(db: DbHandle['db'], ownerId: string, 
     else if (role !== w.role) issues.push({ path: w.path, message: `This asset is a ${roleLabel(role)}, not a ${roleLabel(w.role)}.` });
   }
 
+  // An image object is referenced by its GLB derivative and is usable only while its USDZ partner (same source and
+  // settings) is ready too: iOS needs the USDZ, Android/web the GLB (ADR-023).
   const derivativeIds = [...new Set(derivatives.map((d) => d.id).filter((id) => UUID.test(id)))];
   const ready = new Set<string>();
   if (derivativeIds.length) {
+    const usdz = alias(assetDerivatives, 'usdz');
     const rows = await db
       .select({ id: assetDerivatives.id })
       .from(assetDerivatives)
       .innerJoin(assets, eq(assets.id, assetDerivatives.sourceAssetId))
-      .where(and(eq(assets.ownerId, ownerId), eq(assetDerivatives.status, 'ready'), inArray(assetDerivatives.id, derivativeIds)));
+      .innerJoin(
+        usdz,
+        and(eq(usdz.sourceAssetId, assetDerivatives.sourceAssetId), eq(usdz.settingsHash, assetDerivatives.settingsHash), eq(usdz.outputType, 'image_object_usdz'), eq(usdz.status, 'ready')),
+      )
+      .where(
+        and(
+          eq(assets.ownerId, ownerId),
+          eq(assets.state, 'validated'),
+          eq(assetDerivatives.outputType, 'image_object_glb'),
+          eq(assetDerivatives.status, 'ready'),
+          inArray(assetDerivatives.id, derivativeIds),
+        ),
+      );
     for (const r of rows) ready.add(r.id);
   }
   for (const d of derivatives) if (!ready.has(d.id)) issues.push({ path: d.path, message: 'This image object does not exist or is not ready.' });

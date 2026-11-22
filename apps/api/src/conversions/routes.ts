@@ -2,6 +2,7 @@
  * Image-to-AR conversions (Phase 2 Milestone 1, ADR-023).
  *   POST /api/assets/:id/image-objects    start (or reuse) a conversion of a validated display image
  *   GET  /api/assets/:id/image-objects    conversions of one image, newest first
+ *   GET  /api/image-objects               finished GLB + USDZ pairs that can be placed in experiences (M7)
  *   GET  /api/conversions/:id             one conversion with its outputs (signed read URLs when ready)
  *   GET  /api/derivatives/:id/content     signed, cookieless read of a generated GLB/USDZ
  * Ownership is enforced in SQL; another user's asset or conversion is a 404.
@@ -13,10 +14,12 @@ import {
   ConversionListResponse,
   ConversionSummary,
   CreateImageObjectInput,
+  ImageObjectListResponse,
   MAX_ACTIVE_CONVERSIONS,
   USD_CONVERTER_VERSION,
   formatBytes,
   type DerivativeOutput,
+  type ImageObjectSummary,
 } from '@ar-creator/contracts';
 import { schema, type Database } from '@ar-creator/db';
 import type { AppEnv } from '../app.ts';
@@ -184,6 +187,41 @@ export function conversionRoutes() {
       .orderBy(desc(processingJobs.updatedAt))
       .limit(20);
     return c.json(ConversionListResponse.parse({ conversions: await Promise.all(jobs.map((j) => summarize(c, db, j, a.originalFilename))) }));
+  });
+
+  /** Finished image objects (GLB + USDZ both ready) the owner can place in experiences, newest first. */
+  r.get('/image-objects', requireSession, async (c) => {
+    const { db } = await c.get('db')();
+    const rows = await db
+      .select({ job: processingJobs, asset: assets })
+      .from(processingJobs)
+      .innerJoin(assets, eq(assets.id, processingJobs.assetId))
+      .where(and(eq(processingJobs.ownerId, c.get('user').id), eq(processingJobs.type, 'convert_image_to_ar'), eq(processingJobs.state, 'succeeded'), eq(assets.state, 'validated')))
+      .orderBy(desc(processingJobs.finishedAt))
+      .limit(100);
+    const secret = signingSecret(c);
+    const key = secret ? await assetSigningKey(secret) : null;
+    const out: ImageObjectSummary[] = [];
+    for (const { job, asset } of rows) {
+      const s = await summarize(c, db, job, asset.originalFilename);
+      if (!s.outputs.glb?.contentUrl || !s.outputs.usdz?.contentUrl) continue; // only complete pairs
+      const preview = key && asset.sha256 ? await signAssetUrl(key, appOrigin(c), { id: asset.id, sha256: asset.sha256 }, ASSET_LIMITS.readUrlTtlSeconds) : null;
+      out.push({
+        id: s.outputs.glb.id,
+        conversionId: s.id,
+        sourceAssetId: asset.id,
+        sourceFilename: asset.originalFilename,
+        previewUrl: preview?.url ?? null,
+        settings: s.settings,
+        resolvedAlphaMode: s.resolvedAlphaMode,
+        widthMeters: s.widthMeters,
+        heightMeters: s.heightMeters,
+        glb: s.outputs.glb,
+        usdz: s.outputs.usdz,
+        createdAt: s.finishedAt ?? s.createdAt,
+      });
+    }
+    return c.json(ImageObjectListResponse.parse({ imageObjects: out }));
   });
 
   r.get('/conversions/:id', requireSession, async (c) => {

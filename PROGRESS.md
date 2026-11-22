@@ -2,7 +2,7 @@
 
 **Updated:** 2026-11-22  
 **State:** P0 runtime-proof kit (incl. Android WebXR image probe) implemented and **structurally validated / desktop-tested**. **First device result: AND-IMG-01 PARTIAL** (native WebXR image tracking + DOM overlay worked on one Android/Chrome 157 device; visual/geometry checks outstanding). All other device rows NOT TESTED. **Phase 1 Milestones 1–5 done locally and verified on the isolated dev environment** (`ar-creator-dev` Worker → Hyperdrive → Neon development, R2 `ar-creator-assets-dev`): REMOTE-AUTH-01 9/9, REMOTE-CONTENT-01 8/8 (2026-11-22). Production not deployed or migrated.  
-**Current phase:** Phase 2 Milestone 6 (Image-to-AR conversion pipeline) **done locally** (ADR-023): GLB in the Worker, USDZ in a Cloudflare Container (Docker locally), driven by a Workflow. Not yet on Cloudflare: Neon migration 0004 and the first Container deploy need approval. Phase 1 is complete on dev (gate met on the edge with real R2). P0 device rows still open (AND-IMG-01 re-run, AND-IMG-02, iOS, Scene Viewer).
+**Current phase:** Phase 2 Milestones 6–7 **done locally** (ADR-023, ADR-024; M6 also deployed to the dev Worker with its Container, remote conversion check not run yet). Milestone 6 (Image-to-AR conversion pipeline): GLB in the Worker, USDZ in a Cloudflare Container (Docker locally), driven by a Workflow. Not yet on Cloudflare: Neon migration 0004 and the first Container deploy need approval. Phase 1 is complete on dev (gate met on the edge with real R2). P0 device rows still open (AND-IMG-01 re-run, AND-IMG-02, iOS, Scene Viewer).
 
 ## Implemented (automated evidence)
 
@@ -184,3 +184,11 @@ Not available yet: lint (ESLint/Prettier not configured), DB migrations, `apps/w
 
 - Owner upgraded the account to Workers Paid and ran `deploy:dev` successfully: `ar-creator-dev` version `f9096902-48f8-4097-80d9-cdf5dc3f1f0b` (build `afd101b`), container application `ar-creator-dev-usdconvertercontainer-dev` **ready** (0 live instances; read-only `wrangler containers list`). REMOTE-CONVERT not run yet.
 - New `npm run db:remote -- create-user --env development --email <owner email>`: one verified account in Neon development for the owner while sign-up is off. Password typed twice at a hidden prompt, hashed with Better Auth, never printed; runs as `ar_app`; development only; refuses existing emails. Refusal paths tested; the full path runs in the owner's terminal (same inserts as `remote-auth-test`).
+
+## Session handoff — 2026-11-22 (6) / Claude Code — Phase 2 Milestone 7 (preview and reuse)
+
+- Built: lazy three.js 3D preview of the generated GLB; soft-edge highlight; `GET /api/image-objects`; Image objects panel on the experience page; draft references require a complete GLB + USDZ pair; source deletion blocked while placed (ADR-024).
+- Verified locally: typecheck; Vitest 207; DB 46; integration 94; Playwright 60 (3D preview `ready` in headless Edge); npm audit 0; desktop and phone screenshots reviewed (2 fixes).
+- Not on the dev Worker yet (needs `deploy:dev`). REMOTE-CONVERT (first real Container conversion) still to run.
+- Device: AR rendering of image objects NOT TESTED; publishing/compilation of scenes is Phase 5.
+- Next: owner account via `create-user`, redeploy, remote suite; then M8 (WebP/EXIF normalisation, texture budgets).

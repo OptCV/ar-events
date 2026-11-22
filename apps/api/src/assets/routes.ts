@@ -304,7 +304,15 @@ export function assetRoutes() {
     if (!a) return notFound(c);
     const ownerId = c.get('user').id;
     const { db } = await c.get('db')();
-    // Any revision (draft or frozen) of this user's experiences that references the asset blocks deletion.
+    // Any revision (draft or frozen) of this user's experiences that references the asset, or an image object
+    // generated from it (scene `image-object` nodes reference its derivatives, ADR-023), blocks deletion.
+    const derivedIds = (await db.select({ id: assetDerivatives.id }).from(assetDerivatives).where(eq(assetDerivatives.sourceAssetId, id))).map((d) => d.id);
+    const usesDerivative = derivedIds.length
+      ? sql`EXISTS (SELECT 1 FROM jsonb_array_elements(${experienceRevisions.config} -> 'nodes') AS n WHERE n ->> 'derivativeId' IN (${sql.join(
+          derivedIds.map((d) => sql`${d}`),
+          sql`, `,
+        )}))`
+      : sql`false`;
     const users = await db
       .selectDistinct({ name: experiences.name })
       .from(experienceRevisions)
@@ -315,6 +323,7 @@ export function assetRoutes() {
           or(
             sql`${experienceRevisions.config} -> 'placement' ->> 'trackingTargetAssetId' = ${id}`,
             sql`${experienceRevisions.config} -> 'nodes' @> ${JSON.stringify([{ assetId: id }])}::jsonb`,
+            usesDerivative,
           ),
         ),
       )

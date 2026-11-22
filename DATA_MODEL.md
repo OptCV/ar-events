@@ -102,3 +102,4 @@ Implemented in `packages/db` (ADR-017): Better Auth `user`/`session`/`account`/`
 " + converterVersion)}/display.{glb|usdz}`.
 - Implemented API: `POST/GET /api/assets/:id/image-objects`, `GET /api/conversions/:id`, `GET /api/derivatives/:id/content` (signed). Contracts are in `packages/contracts/src/conversions.ts`.
 - Storage usage = originals + ready derivatives.
+- Milestone 7 (ADR-024): scene `image-object` nodes store the **GLB** derivative id; the USDZ partner is found by source + settings hash. `GET /api/image-objects` lists complete pairs.

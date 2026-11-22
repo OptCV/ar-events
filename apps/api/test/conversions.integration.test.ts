@@ -7,7 +7,8 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { ApiError, AssetListResponse, AssetSummary, ConversionListResponse, ConversionSummary, CreateUploadResponse, type ImageObjectSettingsInput, type UploadableRole } from '@ar-creator/contracts';
+import { ApiError, AssetListResponse, AssetSummary, ConversionListResponse, ConversionSummary, CreateUploadResponse, ExperienceDetail, ImageObjectListResponse, type ImageObjectSettingsInput, type UploadableRole } from '@ar-creator/contracts';
+import { IDENTITY_TRANSFORM } from '@ar-creator/schema';
 import { physicalSize, readGlb } from '@ar-creator/image-to-ar';
 import { createTempDatabase, migrateDatabase } from '../../../packages/db/test/helpers.ts';
 import { fixture, makeGlb, photoJpeg, sha256Hex, trackingPng } from './files.ts';
@@ -312,5 +313,58 @@ describe('limits, deletion and signed reads', () => {
     expect((await anon(glb.pathname + glb.search)).status).toBe(404);
     expect((await anon(usdz.pathname + usdz.search)).status).toBe(404);
     expect((await h.sql('SELECT count(*)::int AS n FROM asset_derivatives WHERE source_asset_id = $1', [a.id])).rows[0]!.n).toBe(0);
+  });
+});
+
+describe('image objects in experiences (M7)', () => {
+  const node = (derivativeId: string) => ({ id: 'io1', kind: 'image-object', derivativeId, name: 'Ring', transform: IDENTITY_TRANSFORM, visible: true, locked: false });
+  async function experience(jar: Jar) {
+    const r = await h.req('/api/experiences', { body: { name: 'Gallery', placementMode: 'wall' }, jar });
+    return ExperienceDetail.parse(await r.json());
+  }
+  const save = (jar: Jar, e: ExperienceDetail, nodes: unknown[]) =>
+    h.req(`/api/experiences/${e.id}/draft`, { method: 'PUT', body: { draftVersion: e.draftVersion, scene: { ...e.draft.scene, nodes } }, jar });
+
+  it('lists only complete GLB + USDZ pairs, with a source preview, newest first', async () => {
+    const carol = await signedIn();
+    expect(ImageObjectListResponse.parse(await (await h.req('/api/image-objects', { jar: carol })).json()).imageObjects).toEqual([]);
+    const a = await upload(carol, 'display-image', fixture('ring_inner_hole.png'), 'image/png', 'ring.png');
+    const ok = await convert(carol, a.id);
+    const bad = await convert(carol, a.id, settings({ alphaMode: 'OPAQUE' })); // fails: has transparency
+    expect(bad.state).toBe('failed');
+    const list = ImageObjectListResponse.parse(await (await h.req('/api/image-objects', { jar: carol })).json()).imageObjects;
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ id: ok.outputs.glb!.id, conversionId: ok.id, sourceAssetId: a.id, sourceFilename: 'ring.png', resolvedAlphaMode: 'MASK' });
+    expect((await anon(list[0]!.previewUrl!)).status).toBe(200);
+    expect((await h.req('/api/image-objects')).status).toBe(401);
+    expect(ImageObjectListResponse.parse(await (await h.req('/api/image-objects', { jar: bob })).json()).imageObjects.map((i) => i.id)).not.toContain(ok.outputs.glb!.id);
+  });
+
+  it('drafts accept the GLB id of a complete pair only; the source cannot be deleted while placed', async () => {
+    const a = await upload(alice, 'display-image', fixture('ring_inner_hole.png'), 'image/png', 'ring.png');
+    const conv = await convert(alice, a.id, settings({ widthMeters: 0.61 }));
+    const e = await experience(alice);
+
+    for (const wrong of [conv.outputs.usdz!.id, '00000000-0000-4000-8000-000000000000', a.id]) {
+      const r = await save(alice, e, [node(wrong)]);
+      expect(r.status, wrong).toBe(400);
+      expect(JSON.stringify(await r.json())).toContain('This image object does not exist or is not ready.');
+    }
+    // Another user cannot reference it.
+    const eb = await experience(bob);
+    expect((await save(bob, eb, [node(conv.outputs.glb!.id)])).status).toBe(400);
+
+    const saved = await save(alice, e, [node(conv.outputs.glb!.id)]);
+    expect(saved.status, await saved.clone().text()).toBe(200);
+    const after = ExperienceDetail.parse(await saved.json());
+    expect(after.draft.scene.nodes).toMatchObject([{ kind: 'image-object', derivativeId: conv.outputs.glb!.id }]);
+
+    const blocked = await h.req(`/api/assets/${a.id}`, { method: 'DELETE', jar: alice });
+    expect(blocked.status).toBe(409);
+    expect(await errorOf(blocked)).toMatchObject({ reason: 'asset_in_use', message: expect.stringContaining('“Gallery”') });
+
+    const cleared = await save(alice, after, []);
+    expect(cleared.status).toBe(200);
+    expect((await h.req(`/api/assets/${a.id}`, { method: 'DELETE', jar: alice })).status).toBe(204);
   });
 });

@@ -75,3 +75,27 @@ export type ConversionListResponse = z.infer<typeof ConversionListResponse>;
 
 /** Per-user cap on conversions that are queued or running at once. */
 export const MAX_ACTIVE_CONVERSIONS = 3;
+
+/**
+ * A finished image object that can be placed in an experience (Phase 2 Milestone 7). Its `id` is the GLB
+ * derivative id, which scene `image-object` nodes reference as `derivativeId`; the USDZ is the matching pair.
+ */
+export const ImageObjectSummary = z.object({
+  id: z.string(),
+  conversionId: z.string(),
+  sourceAssetId: z.string(),
+  sourceFilename: z.string().nullable(),
+  /** Signed URL of the source image, for thumbnails. */
+  previewUrl: z.string().nullable(),
+  settings: ImageObjectSettings,
+  resolvedAlphaMode: z.enum(['OPAQUE', 'MASK', 'BLEND']).nullable(),
+  widthMeters: z.number().nullable(),
+  heightMeters: z.number().nullable(),
+  glb: DerivativeOutput,
+  usdz: DerivativeOutput,
+  createdAt: z.string(),
+});
+export type ImageObjectSummary = z.infer<typeof ImageObjectSummary>;
+
+export const ImageObjectListResponse = z.object({ imageObjects: z.array(ImageObjectSummary) });
+export type ImageObjectListResponse = z.infer<typeof ImageObjectListResponse>;

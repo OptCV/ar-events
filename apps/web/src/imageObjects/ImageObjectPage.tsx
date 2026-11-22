@@ -1,4 +1,4 @@
-import { useId, useState, type FormEvent, type ReactNode } from 'react';
+import { Suspense, lazy, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 import { formatBytes, type AssetSummary, type ConversionSummary, type DerivativeOutput, type ImageObjectSettingsInput } from '@ar-creator/contracts';
 import { ApiRequestError } from '../api/client.ts';
@@ -7,18 +7,21 @@ import { Alert } from '../components/form/Alert.tsx';
 import formStyles from '../components/form/Form.module.css';
 import { SubmitButton } from '../components/form/SubmitButton.tsx';
 import { useAsset, useConversion, useConversions, useStartConversion } from './api.ts';
+import { ALPHA_LABEL } from './labels.ts';
 import styles from './ImageObjects.module.css';
+import type { Backdrop } from './ModelPreview.tsx';
+
+/** three.js is loaded only when a result is shown (keeps it out of the main bundle). */
+const ModelPreview = lazy(() => import('./ModelPreview.tsx'));
 
 type Unit = 'cm' | 'in';
 type AlphaChoice = ImageObjectSettingsInput['alphaMode'];
-type Backdrop = 'checker' | 'light' | 'dark';
 
 const TO_M: Record<Unit, number> = { cm: 0.01, in: 0.0254 };
 /** Six decimals: µm precision, and equal inputs always produce equal settings (and so reuse earlier results). */
 const roundM = (m: number) => Math.round(m * 1e6) / 1e6;
 const fmtLen = (m: number, unit: Unit) => `${Number((m / TO_M[unit]).toFixed(unit === 'cm' ? 1 : 2))} ${unit}`;
 
-export const ALPHA_LABEL: Record<'OPAQUE' | 'MASK' | 'BLEND', string> = { OPAQUE: 'Opaque', MASK: 'Cutout', BLEND: 'Blend' };
 const ALPHA_CHOICES: { value: AlphaChoice; title: string; hint: string }[] = [
   { value: 'auto', title: 'Auto (recommended)', hint: 'Picks Cutout for hard edges, Blend for soft or see-through areas, Opaque when there is no transparency.' },
   { value: 'MASK', title: 'Cutout', hint: 'Each pixel is either fully shown or fully hidden. Sharpest edges; nothing is see-through.' },
@@ -67,6 +70,7 @@ function Converter({ asset }: { asset: AssetSummary }) {
   const [pivot, setPivot] = useState<'center' | 'bottom-center'>('bottom-center');
   const [orientation, setOrientation] = useState<'upright' | 'flat'>('upright');
   const [backdrop, setBackdrop] = useState<Backdrop>('checker');
+  const [softEdges, setSoftEdges] = useState(false);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const start = useStartConversion(asset.id);
   const current = useConversion(currentId);
@@ -107,7 +111,10 @@ function Converter({ asset }: { asset: AssetSummary }) {
       <div className={styles.layout}>
         <div className={styles.previewColumn}>
           <div className={cx(styles.stage, styles[backdrop])} data-testid="io-preview">
-            {asset.contentUrl && <img src={asset.contentUrl} alt={`Preview of ${asset.filename ?? 'the image'}`} width={img.width} height={img.height} />}
+            <div className={styles.frame}>
+              {asset.contentUrl && <img src={asset.contentUrl} alt={`Preview of ${asset.filename ?? 'the image'}`} width={img.width} height={img.height} />}
+              {softEdges && asset.contentUrl && <SoftEdgeOverlay src={asset.contentUrl} />}
+            </div>
           </div>
           <fieldset className={styles.segmented}>
             <legend className={styles.srOnly}>Preview background</legend>
@@ -118,6 +125,12 @@ function Converter({ asset }: { asset: AssetSummary }) {
               </label>
             ))}
           </fieldset>
+          {img.mayHaveAlpha && (
+            <label className={styles.check}>
+              <input type="checkbox" checked={softEdges} onChange={(e) => setSoftEdges(e.target.checked)} />
+              Highlight partly transparent pixels
+            </label>
+          )}
           <p className={styles.hint}>
             {img.width} × {img.height} px{img.mayHaveAlpha ? ' · can contain transparency' : ' · no transparency'}. Check the edges on light and dark backgrounds: a dark or light fringe here will also show in AR.
           </p>
@@ -207,7 +220,7 @@ function Converter({ asset }: { asset: AssetSummary }) {
         </form>
       </div>
 
-      {currentId && <Result conversion={current.data} loading={current.isPending} />}
+      {currentId && <Result conversion={current.data} loading={current.isPending} backdrop={backdrop} />}
       <History conversions={history.data?.conversions ?? []} currentId={currentId} />
     </section>
   );
@@ -246,7 +259,7 @@ function Download({ out, label }: { out: DerivativeOutput | null; label: string 
   );
 }
 
-function Result({ conversion: c, loading }: { conversion: ConversionSummary | undefined; loading: boolean }) {
+function Result({ conversion: c, loading, backdrop }: { conversion: ConversionSummary | undefined; loading: boolean; backdrop: Backdrop }) {
   return (
     <section className={styles.result} aria-labelledby="io-result" data-testid="io-result">
       <h2 id="io-result">Result</h2>
@@ -262,13 +275,77 @@ function Result({ conversion: c, loading }: { conversion: ConversionSummary | un
               {Math.round(((c.alpha.transparentPixels + c.alpha.fractionalPixels) / c.alpha.pixels) * 100)}% of the pixels are transparent or partly transparent.
             </p>
           )}
+          {c.outputs.glb?.contentUrl && (
+            <Suspense fallback={<p role="status">Loading 3D preview…</p>}>
+              <ModelPreview url={c.outputs.glb.contentUrl} backdrop={backdrop} label={`3D preview of the AR object: ${describe(c)}. Drag to rotate, scroll to zoom.`} />
+            </Suspense>
+          )}
+          <p className={formStyles.hint}>Drag to rotate and scroll to zoom. The grid squares are 10 cm. This is a desktop preview of the GLB file; AR Quick Look and Scene Viewer may render it differently.</p>
           <div className={styles.downloads}>
             <Download out={c.outputs.usdz} label="Download USDZ (iPhone, iPad)" />
             <Download out={c.outputs.glb} label="Download GLB (Android, web)" />
           </div>
+          <p className={formStyles.hint}>
+            To place it in AR, open an experience and choose it under <strong>Image objects</strong>. <Link to="/dashboard">Go to your experiences</Link>
+          </p>
         </>
       )}
     </section>
+  );
+}
+
+/**
+ * Marks partly transparent pixels (0 < alpha < 255) in magenta over the preview, so soft edges, shadows and stray
+ * semi-transparent pixels are visible before converting. Sampled with nearest-neighbour scaling (≤ 1024 px), so a
+ * hard cutout never shows false soft edges.
+ */
+function SoftEdgeOverlay({ src }: { src: string }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  const [share, setShare] = useState<number | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const image = new Image();
+    image.decoding = 'async';
+    image.src = src;
+    image
+      .decode()
+      .then(() => {
+        const canvas = ref.current;
+        if (cancelled || !canvas) return;
+        const scale = Math.min(1, 1024 / Math.max(image.naturalWidth, image.naturalHeight));
+        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) return;
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+        const px = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        let soft = 0;
+        for (let i = 0; i < px.data.length; i += 4) {
+          const a = px.data[i + 3]!;
+          if (a > 0 && a < 255) {
+            soft++;
+            px.data[i] = 255;
+            px.data[i + 1] = 0;
+            px.data[i + 2] = 200;
+            px.data[i + 3] = 255;
+          } else px.data[i + 3] = 0;
+        }
+        ctx.putImageData(px, 0, 0);
+        setShare(soft / (canvas.width * canvas.height));
+      })
+      .catch(() => setShare(null));
+    return () => {
+      cancelled = true;
+    };
+  }, [src]);
+  return (
+    <>
+      <canvas ref={ref} className={styles.overlay} aria-hidden="true" />
+      <span className={styles.legend} role="status" data-testid="soft-edges">
+        {share === null ? 'Checking…' : share === 0 ? 'No partly transparent pixels' : `Partly transparent: ${share < 0.001 ? '< 0.1' : (share * 100).toFixed(1)}% (magenta)`}
+      </span>
+    </>
   );
 }
 

@@ -1,16 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ASSET_LIMITS, AssetSummary, ConversionListResponse, ConversionSummary, type ImageObjectSettingsInput } from '@ar-creator/contracts';
+import { ASSET_LIMITS, AssetSummary, ConversionListResponse, ConversionSummary, ImageObjectListResponse, type ImageObjectSettingsInput } from '@ar-creator/contracts';
 import { getJson, sendJson } from '../api/client.ts';
 import { assetKeys } from '../assets/api.ts';
 
 export const conversionKeys = {
   forAsset: (assetId: string) => ['conversions', 'asset', assetId] as const,
   one: (id: string) => ['conversions', 'one', id] as const,
+  imageObjects: ['conversions', 'image-objects'] as const,
 };
 
 const api = {
   asset: (id: string) => getJson(`/api/assets/${encodeURIComponent(id)}`, AssetSummary),
   list: (assetId: string) => getJson(`/api/assets/${encodeURIComponent(assetId)}/image-objects`, ConversionListResponse),
+  imageObjects: () => getJson('/api/image-objects', ImageObjectListResponse),
   get: (id: string) => getJson(`/api/conversions/${encodeURIComponent(id)}`, ConversionSummary),
   start: (assetId: string, settings: ImageObjectSettingsInput) =>
     sendJson('POST', `/api/assets/${encodeURIComponent(assetId)}/image-objects`, { settings }, ConversionSummary),
@@ -53,4 +55,10 @@ export function useStartConversion(assetId: string) {
       void qc.invalidateQueries({ queryKey: assetKeys.all }); // storage usage changes
     },
   });
+}
+
+/** Finished image objects (GLB + USDZ pairs) that can be placed in experiences. */
+export function useImageObjects() {
+  // Always refetch on mount: a conversion finished on another page must show up here.
+  return useQuery({ queryKey: conversionKeys.imageObjects, queryFn: api.imageObjects, staleTime: REFRESH_MS, refetchInterval: REFRESH_MS, refetchOnMount: 'always' });
 }

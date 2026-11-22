@@ -2,6 +2,18 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-22 — Phase 2 Milestone 7: 3D preview, soft edges, image objects in experiences (local)
+
+### Added
+- 3D preview of the generated GLB on the "Make AR object" page (three.js 0.186.1, lazy-loaded; orbit, 10 cm grid, background follows the 2D preview).
+- "Highlight partly transparent pixels" on the 2D preview (magenta overlay with the share).
+- Experience page: **Image objects** — add a finished image object, see size/transparency/sides, remove. `GET /api/image-objects`.
+- `npm run db:remote -- create-user`: owner account in Neon development while sign-up is off (hidden password prompt). ADR-024.
+
+### Changed
+- Draft saves require an image-object node to reference the GLB of a complete GLB + USDZ pair.
+- Deleting a source image is refused while an experience uses an image object made from it.
+
 ## 2026-11-22 — Dev deploy preflight for Containers
 
 ### Fixed

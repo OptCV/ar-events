@@ -13,6 +13,7 @@ import { SubmitButton } from '../components/form/SubmitButton.tsx';
 import { experienceKeys, useDeleteExperience, useExperience, useReadiness, useUpdateExperience } from './api.ts';
 import { PlacementSelector } from './PlacementSelector.tsx';
 import { TrackingImagePicker } from './TrackingImagePicker.tsx';
+import { ImageObjectsPanel } from './ImageObjectsPanel.tsx';
 import { useDraftEditor, type SaveStatus } from './useDraftEditor.ts';
 import styles from './Experiences.module.css';
 
@@ -153,7 +154,8 @@ function Editor({ experience, onReload }: { experience: ExperienceDetail; onRelo
               {editor.scene.nodes.length} object{editor.scene.nodes.length === 1 ? '' : 's'} · {editor.scene.actions.length} action
               {editor.scene.actions.length === 1 ? '' : 's'}
             </p>
-            <p className={styles.status}>The visual scene editor arrives in a later phase. Drafts are saved through the scene configuration API.</p>
+            <ImageObjectsPanel nodes={editor.scene.nodes} busy={editor.status === 'saving'} onChange={(nodes) => void editor.saveNow({ ...editor.scene, nodes })} />
+            <p className={styles.status}>Objects are placed at the anchor point for now; moving, rotating and scaling them arrives with the visual scene editor in a later phase.</p>
           </section>
 
           <SettingsForm experience={experience} />
