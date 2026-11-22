@@ -2,6 +2,11 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-22 — Dev deploy preflight for Containers
+
+### Fixed
+- `deploy:dev` checks Cloudflare Containers access (`wrangler containers list`) before asking for confirmation. Without it, an account lacking Workers Paid got a half-deployed Worker: wrangler activates the Worker before it pushes the container image. Observed on the first M6 dev deploy.
+
 ## 2026-11-22 — Phase 2 Milestone 6: Image-to-AR conversion pipeline (local)
 
 ### Added

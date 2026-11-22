@@ -92,7 +92,21 @@ for (const f of files) {
 }
 console.log(`\n  Worker        ${cfg.name}\n  URL           ${origin}\n  Hyperdrive    ${DEV_HYPERDRIVE} (ar-creator-db-dev → Neon development, role ar_app)\n  R2 bucket     ${DEV_BUCKET}\n  Workflow      ${DEV_WORKFLOW}\n  Container     UsdConverterContainer (max 3 instances, internet disabled)\n  APP_ENV       ${cfg.vars.APP_ENV}\n  sign-up       ${cfg.vars.AUTH_SIGNUP_ENABLED}\n  files         ${files.length} checked, 0 local secrets, no .dev.vars`);
 
-// 4. Deploy (or dry-run) after typed confirmation.
+// 4. Preflight (read-only): wrangler uploads and activates the Worker BEFORE it pushes the container image, so a
+//    missing Containers entitlement (Workers Paid) would leave a half-deployed Worker. Check access first.
+//    Observed 2026-11-22: without Workers Paid, the deploy failed at /containers/me after the Worker went live.
+if (!dryRun) {
+  const pre = spawnSync('npx', ['wrangler', 'containers', 'list'], { cwd: ROOT, encoding: 'utf8', shell: process.platform === 'win32' });
+  const out = `${pre.stdout ?? ''}${pre.stderr ?? ''}`;
+  if (pre.status !== 0 || /do not have access to Cloudflare Containers|Unauthorized/i.test(out)) {
+    fail(
+      /Workers Paid/i.test(out)
+        ? 'This account has no access to Cloudflare Containers (requires the Workers Paid plan). Nothing was uploaded.'
+        : 'Could not confirm access to Cloudflare Containers (`npx wrangler containers list` failed). Nothing was uploaded.',
+    );
+  }
+}
+// 5. Typed confirmation.
 if (!dryRun) {
   process.stdout.write(`\nType "${WORKER}" to upload this Worker: `);
   const answer = await new Promise<string>((resolve) => {

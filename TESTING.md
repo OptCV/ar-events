@@ -55,6 +55,8 @@
 
 Validators: GLB — Khronos `gltf-validator` 2.0.0-dev.3.10 (0 errors and 0 warnings required). USDZ — OpenUSD 26.8 `UsdValidation` (28 validators) + Quick Look profile checks (ADR-008). Neither is evidence of on-device behavior.
 
+**First Container deploy (2026-11-22): BLOCKED.** Cloudflare refused the container step with 401 ("Deploying containers requires the Workers Paid plan"); REMOTE-CONVERT has not run. `deploy:dev` now checks Containers access before uploading (refusal path verified; nothing uploaded).
+
 **Local conversion timing (P2 M1, dev server, warm Docker converter):** a 256 × 512 PNG converts end to end (queue → GLB → USDZ → stored) in ≈ 0.6 s. Cloudflare Container cold starts are not measured yet.
 
 ## Converter resource baseline (local Docker, not Cloudflare)
