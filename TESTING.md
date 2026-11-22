@@ -57,7 +57,7 @@
 
 Validators: GLB — Khronos `gltf-validator` 2.0.0-dev.3.10 (0 errors and 0 warnings required). USDZ — OpenUSD 26.8 `UsdValidation` (28 validators) + Quick Look profile checks (ADR-008). Neither is evidence of on-device behavior.
 
-**First Container deploy (2026-11-22): BLOCKED.** Cloudflare refused the container step with 401 ("Deploying containers requires the Workers Paid plan"); REMOTE-CONVERT has not run. `deploy:dev` now checks Containers access before uploading (refusal path verified; nothing uploaded).
+**First Container deploy (2026-11-22): BLOCKED, then resolved the same day** (Workers Paid; REMOTE-CONVERT-01 PASS). Original note: Cloudflare refused the container step with 401 ("Deploying containers requires the Workers Paid plan"); REMOTE-CONVERT has not run. `deploy:dev` now checks Containers access before uploading (refusal path verified; nothing uploaded).
 
 **Local conversion timing (P2 M1, dev server, warm Docker converter):** a 256 × 512 PNG converts end to end (queue → GLB → USDZ → stored) in ≈ 0.6 s. Cloudflare Container cold starts are not measured yet.
 
@@ -200,6 +200,19 @@ Target: Worker `ar-creator-dev` (version `aec8691a-6a47-4406-90e4-1d76d119868a`,
 Bucket privacy (read-only `wrangler r2 bucket dev-url get` / `domain list`, 2026-11-22): `ar-creator-assets-dev` and `ar-creator-assets` both have r2.dev public access **disabled** and **no custom domains**; objects are reachable only through the Worker binding.
 
 **Not captured:** the per-test annotations (upload time, the edge's answer to a `Range` request) are not printed by the list reporter; range requests are unimplemented either way (TASKS follow-up). Cleanup is checked through the API (row gone, URL 404); the bucket itself was not listed. **Not covered remotely:** cross-user isolation (covered by local integration tests), the external-reference GLB rejection (unit + integration), upload-slot expiry. The production Worker, production Neon and `ar-creator-assets` are untouched.
+
+### REMOTE-CONVERT-01 — Cloudflare Workflow + Container, isolated dev Worker — 2026-11-22 — PASS (full remote run 18/18 in 1.5 min)
+
+Target: Worker `ar-creator-dev` version `f0735057-3fa1-45ed-b5a1-398b9f6a2095` (build `f41be26`, Workers Paid), Workflow `ar-creator-dev-image-to-ar`, container application `ar-creator-dev-usdconvertercontainer-dev` (`basic`, max 3, internet disabled), R2 `ar-creator-assets-dev`, Neon development `ep-dark-butterfly-bctzb64e` (migrations 5/5). Run by the owner: `npm run db:remote -- remote-auth-test …`; temporary user removed afterwards.
+
+| Check | Result |
+|---|---|
+| REMOTE-AUTH-01 (9) + REMOTE-CONTENT-01 (8) re-run | all pass on the Phase 2 build |
+| REMOTE-CONVERT | display PNG (ring, 512 × 512) → **Workflow → GLB in the Worker → USDZ from the Cloudflare Container** → both in R2; auto alpha MASK; 40 × 40 cm; cookieless signed reads with `model/gltf-binary` / `model/vnd.usdz+zip`, checksums match, `glTF` / `PK` magic. **8.7 s** end to end for the test (the container application had 0 live instances before the run, so this includes a cold start) |
+
+After the run `wrangler containers list` (read-only) showed the application `active` with 2 live instances (requests are spread over a pool of 3; instances sleep after 3 min idle).
+
+**Not covered remotely:** the Milestone 7 UI on the edge (3D preview, image objects in experiences) beyond the shared API; converter outage and retry behaviour (tested locally); `basic` instance memory headroom with the largest (15 MB) images.
 
 ## Device results
 

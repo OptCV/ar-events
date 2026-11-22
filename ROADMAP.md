@@ -106,8 +106,8 @@ P0 device results (axes, alpha, CTA) → P2 converter adjustments → P4 compile
 
 | Milestone | Scope | Status |
 |---|---|---|
-| M6 Conversion pipeline | Display image → GLB (Worker) + USDZ (Container) through a Workflow; streaming alpha analysis; settings (width cm/in, alpha mode + cutoff, orientation, origin, sides); derivative storage with provenance and reuse; signed downloads; "Make AR object" page with preview backgrounds, status and earlier versions | **Done locally** (ADR-023); Neon 0004 applied and dev Worker deployed with the Container (2026-11-22, after the Workers Paid upgrade); REMOTE-CONVERT not run yet |
-| M7 Preview and reuse | 3D preview of the generated GLB in the page (three.js, lazy-loaded); alpha-edge highlighting; add the image object to an experience (image-object node referencing the derivative) | **Done locally** (ADR-024); not yet on the dev Worker |
+| M6 Conversion pipeline | Display image → GLB (Worker) + USDZ (Container) through a Workflow; streaming alpha analysis; settings (width cm/in, alpha mode + cutoff, orientation, origin, sides); derivative storage with provenance and reuse; signed downloads; "Make AR object" page with preview backgrounds, status and earlier versions | **Done**: local (ADR-023) + edge with Workflow + Cloudflare Container (REMOTE-CONVERT-01, 2026-11-22) |
+| M7 Preview and reuse | 3D preview of the generated GLB in the page (three.js, lazy-loaded); alpha-edge highlighting; add the image object to an experience (image-object node referencing the derivative) | **Done locally** (ADR-024); deployed to the dev Worker (build `f41be26`); its UI is not covered by the remote suite |
 | M8 Normalisation and budgets | WebP and EXIF-rotated JPEG → lossless PNG/JPEG before conversion (ADR-009); texture size limits / downscaled derivative for native viewer budgets | Not started |
 | Gate | Native visual tests of the alpha fixtures through the product (IOS-ALPHA-01, AND-ALPHA-01 with generated files) | Needs devices |
 

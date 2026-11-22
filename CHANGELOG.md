@@ -2,6 +2,11 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-22 — Remote verification of Phase 2 conversion
+
+### Verified
+- REMOTE-CONVERT-01 on `ar-creator-dev` (Workers Paid): a display PNG converted through the Workflow, the Worker (GLB) and the Cloudflare Container (USDZ) in 8.7 s including a cold start; outputs read back through signed URLs with correct types and checksums. Full remote run 18/18.
+
 ## 2026-11-22 — Phase 2 Milestone 7: 3D preview, soft edges, image objects in experiences (local)
 
 ### Added

@@ -2,7 +2,7 @@
 
 **Updated:** 2026-11-22  
 **State:** P0 runtime-proof kit (incl. Android WebXR image probe) implemented and **structurally validated / desktop-tested**. **First device result: AND-IMG-01 PARTIAL** (native WebXR image tracking + DOM overlay worked on one Android/Chrome 157 device; visual/geometry checks outstanding). All other device rows NOT TESTED. **Phase 1 Milestones 1–5 done locally and verified on the isolated dev environment** (`ar-creator-dev` Worker → Hyperdrive → Neon development, R2 `ar-creator-assets-dev`): REMOTE-AUTH-01 9/9, REMOTE-CONTENT-01 8/8 (2026-11-22). Production not deployed or migrated.  
-**Current phase:** Phase 2 Milestones 6–7 **done locally** (ADR-023, ADR-024; M6 also deployed to the dev Worker with its Container, remote conversion check not run yet). Milestone 6 (Image-to-AR conversion pipeline): GLB in the Worker, USDZ in a Cloudflare Container (Docker locally), driven by a Workflow. Not yet on Cloudflare: Neon migration 0004 and the first Container deploy need approval. Phase 1 is complete on dev (gate met on the edge with real R2). P0 device rows still open (AND-IMG-01 re-run, AND-IMG-02, iOS, Scene Viewer).
+**Current phase:** Phase 2 Milestones 6–7 **done locally** (ADR-023, ADR-024); both deployed to the dev Worker; **real Cloudflare Container conversion verified 2026-11-22 (REMOTE-CONVERT-01, 18/18)**. Milestone 6 (Image-to-AR conversion pipeline): GLB in the Worker, USDZ in a Cloudflare Container (Docker locally), driven by a Workflow. Not yet on Cloudflare: Neon migration 0004 and the first Container deploy need approval. Phase 1 is complete on dev (gate met on the edge with real R2). P0 device rows still open (AND-IMG-01 re-run, AND-IMG-02, iOS, Scene Viewer).
 
 ## Implemented (automated evidence)
 
@@ -192,3 +192,8 @@ Not available yet: lint (ESLint/Prettier not configured), DB migrations, `apps/w
 - Not on the dev Worker yet (needs `deploy:dev`). REMOTE-CONVERT (first real Container conversion) still to run.
 - Device: AR rendering of image objects NOT TESTED; publishing/compilation of scenes is Phase 5.
 - Next: owner account via `create-user`, redeploy, remote suite; then M8 (WebP/EXIF normalisation, texture budgets).
+
+### Addendum — 2026-11-22 (7): remote conversion verified
+
+- Owner created their development account with `create-user` (works end to end), redeployed (`ar-creator-dev` version `f0735057…`, build `f41be26`) and ran the remote suite: **18/18**, including REMOTE-CONVERT-01 (Workflow + Container, 8.7 s with a cold start). Neon development at 5/5 migrations.
+- Container application `active`, 2 live instances after the run (pool of 3, 3 min sleep).

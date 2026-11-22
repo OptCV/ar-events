@@ -62,9 +62,10 @@ Plan and slice order: `ROADMAP.md` "Phase 1 plan".
 - [x] Distinguish tracking image vs displayed image asset role. *(schema `AssetRole`; explicit role on upload; separate limits and checks; draft references require the right role (ADR-022))*
 - [x] Create checkerboard/size/alpha options UI. *(P2 M6: `/library/:assetId/ar-object` — transparency grid/light/dark preview, width cm/in with derived height, Auto/Cutout+threshold/Blend/Opaque, orientation, origin, sides (ADR-023))*
 - [x] **P2 M6 (local):** conversion pipeline — Workflow per attempt, GLB in the Worker, USDZ from the converter image (Cloudflare Container in deployments; Docker locally), streaming PNG alpha analysis, idempotent jobs + derivative reuse, signed downloads, quota/limits, migration `0004_image_to_ar_jobs` (ADR-023).
-- [ ] P2 M6 remote: ~~apply 0004 to Neon development~~ (done by the owner 2026-11-22); redeploy `ar-creator-dev` with the Container + Workflow — **blocked: the account has no Workers Paid plan** (deploy attempt left the M6 Worker live without a Container; see PROGRESS addendum); then run REMOTE-CONVERT and measure container cold start.
+- [x] P2 M6 remote (2026-11-22): 0004 applied; Workers Paid; dev Worker deployed with the Container + Workflow; REMOTE-CONVERT-01 PASS.
 - [x] **P2 M7 (local):** 3D preview of the generated GLB (lazy three.js), soft-edge highlight, image objects placed in experiences (GLB id of a complete pair; source deletion blocked while placed), `GET /api/image-objects` (ADR-024).
-- [ ] Run the remote suite against the redeployed dev Worker (REMOTE-CONVERT: first real Container conversion; record cold start).
+- [x] Remote suite against the redeployed dev Worker (2026-11-22): 18/18; REMOTE-CONVERT-01 — first real Container conversion, 8.7 s including a cold start.
+- [ ] Watch Container cost/instances: pool of 3 `basic` instances, 3 min sleep; consider 1–2 for dev.
 - [x] GLB image-plane generator with `MASK` / `BLEND` (structurally validated; device check pending).
 - [x] USDZ image-plane generator with alpha/opacity material (structurally validated; device check pending).
 - [ ] Normalize WebP and EXIF-rotated JPEG to PNG/JPEG before conversion (ADR-009).
