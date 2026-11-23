@@ -244,7 +244,15 @@ REMOTE-CONVERT took 17.9 s (was 8.7 s with a pool of 3): with one instance the t
 
 **Not covered remotely:** EXIF-rotated and > 2048 px images on the edge (local integration only); `basic` instance memory with a 64 MP decode.
 
-### REMOTE-VIEW-IN-AR — pending
+### REMOTE-VIEW-IN-AR — 2026-11-22 — PASS (full remote run 20/20 in 1.7 min)
+
+Dev Worker redeployed with ADR-026 by the owner. On HTTPS an iPhone browser gets `<a rel="ar">` to the signed USDZ and an Android browser a Scene Viewer floor intent whose `file` is the signed GLB; both files fetch cookieless with the right type. REMOTE-CONVERT 8.8 s, REMOTE-CONVERT-WEBP 6.1 s.
+
+**First device observations (owner, 2026-11-22, informal — not yet checklist runs):** Quick Look opens on iOS devices. **Scene Viewer does not open on the owner's Android device** (symptom being collected). The desktop 3D preview showed the shape in grey only.
+- Grey preview — **cause found and fixed:** the app CSP had `connect-src 'self'`; three.js loads embedded GLB textures with `fetch(blob:)`, so the texture was blocked (the P0 lab had the same fix). Now `connect-src 'self' blob:`; the preview reports `no-texture` instead of "ready" when a picture is missing, and the browser tests fail under the old policy (checked).
+- Scene Viewer — **suspected, not confirmed:** generated files carried `Cross-Origin-Resource-Policy: same-origin` (API default). Signed derivative reads now send `cross-origin` + `Access-Control-Allow-Origin: *` on 200 only (integration 96/96). Needs a redeploy and a retry on the device.
+
+Original description of the check: added with ADR-026 (`tests/remote/content.remote.spec.ts`). Locally (http) the browser tests assert the button is withheld and the fallback message.
 
 Added with ADR-026 (`tests/remote/content.remote.spec.ts`): on the HTTPS dev Worker, an iPhone browser gets `<a rel="ar">` to the signed USDZ and an Android browser a Scene Viewer floor intent whose `file` is the signed GLB (both fetched cookieless with the right type). Needs a redeploy and the owner's remote run. Locally (http) the browser tests assert the button is withheld and the fallback message (64/64).
 

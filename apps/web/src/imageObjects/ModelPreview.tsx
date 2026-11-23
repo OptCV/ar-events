@@ -7,7 +7,8 @@ import styles from './ImageObjects.module.css';
 export type Backdrop = 'checker' | 'light' | 'dark';
 const BG: Record<Backdrop, number> = { checker: 0xe9edf2, light: 0xffffff, dark: 0x15191e };
 
-type State = 'loading' | 'ready' | 'error' | 'unsupported';
+/** no-texture: the shape loaded but its picture did not (e.g. blocked by the page's CSP) — never shown as "ready". */
+type State = 'loading' | 'ready' | 'no-texture' | 'error' | 'unsupported';
 
 /**
  * Desktop 3D preview of a generated GLB (three.js, lazy-loaded). Shows the real file the Android/web runtimes get,
@@ -86,7 +87,12 @@ export default function ModelPreview({ url, backdrop, label }: { url: string; ba
         camera.far = span * 100;
         controls.update();
         resize();
-        setState('ready');
+        let textured = false;
+        root.traverse((o) => {
+          const m = (o as Mesh).material as (Material & { map?: Texture | null }) | undefined;
+          if (m?.map?.image) textured = true;
+        });
+        setState(textured ? 'ready' : 'no-texture');
       },
       undefined,
       () => {
@@ -121,8 +127,14 @@ export default function ModelPreview({ url, backdrop, label }: { url: string; ba
     <div className={styles.stage3d} data-testid="model-preview" data-state={state}>
       <div ref={host} className={styles.canvasHost} />
       {state !== 'ready' && (
-        <p className={styles.overlayText} role={state === 'error' || state === 'unsupported' ? 'alert' : 'status'}>
-          {state === 'loading' ? 'Loading 3D preview…' : state === 'error' ? 'The 3D preview could not be loaded.' : 'This browser cannot show 3D previews (WebGL is unavailable).'}
+        <p className={styles.overlayText} role={state === 'loading' ? 'status' : 'alert'}>
+          {state === 'loading'
+            ? 'Loading 3D preview…'
+            : state === 'no-texture'
+              ? 'The preview shows the shape only: the picture could not be loaded here. The downloaded files are not affected.'
+              : state === 'error'
+                ? 'The 3D preview could not be loaded.'
+                : 'This browser cannot show 3D previews (WebGL is unavailable).'}
         </p>
       )}
     </div>

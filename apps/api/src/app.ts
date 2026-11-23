@@ -110,6 +110,16 @@ export function createApp(info: BuildInfo, deps: AppDeps = {}) {
     c.set('conversions', () => (deps.conversionRunner ?? defaultConversionRunner)(c.env));
     await next();
   });
+  // Generated AR files are fetched by native viewers (Scene Viewer, Quick Look) from another origin. The signed,
+  // cookieless URL is the only credential, so allowing cross-origin reads exposes nothing a URL holder cannot already
+  // fetch. Registered before secureHeaders so its post-processing runs last and replaces the same-origin default.
+  app.use('/derivatives/:id/content', async (c, next) => {
+    await next();
+    if (c.res.status === 200) {
+      c.res.headers.set('Cross-Origin-Resource-Policy', 'cross-origin');
+      c.res.headers.set('Access-Control-Allow-Origin', '*');
+    }
+  });
   app.use(
     '*',
     secureHeaders({

@@ -167,6 +167,13 @@ describe('every display fixture converts to a matching GLB + USDZ pair', () => {
       expect(g.status).toBe(200);
       expect(g.headers.get('content-type')).toBe('model/gltf-binary');
       expect(g.headers.get('cache-control')).toMatch(/^private, max-age=\d+$/);
+      // Native viewers fetch from another origin (ADR-026): readable cross-origin only with a valid signature.
+      expect(g.headers.get('cross-origin-resource-policy')).toBe('cross-origin');
+      expect(g.headers.get('access-control-allow-origin')).toBe('*');
+      const bad = await anon(glbOut.contentUrl!.replace(/sig=[^&]+/, 'sig=AAAA'));
+      expect(bad.status).toBe(403);
+      expect(bad.headers.get('cross-origin-resource-policy')).toBe('same-origin');
+      expect(bad.headers.get('access-control-allow-origin')).toBeNull();
       const glb = new Uint8Array(await g.arrayBuffer());
       expect(await sha256Hex(glb)).toBe(glbOut.sha256);
       const { json, bin } = readGlb(glb);

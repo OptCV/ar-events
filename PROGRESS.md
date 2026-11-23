@@ -224,3 +224,10 @@ Not available yet: lint (ESLint/Prettier not configured), DB migrations, `apps/w
 - Found while writing it: Android had no way to open product files in Scene Viewer, and a reloaded page hid the latest result. Added "View in AR" (ADR-026) and newest-version-by-default.
 - Verified locally: typecheck; Vitest 215; Playwright 64; phone screenshot reviewed. Integration/USD suites unaffected (no API or converter change).
 - **Owner:** redeploy dev (`npm run deploy:dev -- --subdomain quiet-dawn-af59`, no migration), run the remote suite (REMOTE-VIEW-IN-AR new), then the device checklist.
+
+## Session handoff — 2026-11-22 (12) / Claude Code — first phone checks
+
+- Remote 20/20 on the ADR-026 build (REMOTE-VIEW-IN-AR pass). Owner: Quick Look works on iOS; Scene Viewer does not open on Android; desktop preview grey.
+- Fixed grey preview (CSP `connect-src blob:`, same cause as the P0 lab); preview now flags a missing texture. Added cross-origin read headers on signed GLB/USDZ responses (suspected Scene Viewer cause, unconfirmed).
+- Verified locally: typecheck; Vitest 215; integration 96; Playwright 64 (and the texture check fails with the old CSP).
+- Next: owner redeploys and retries View in AR on Android; report what happens on tap.

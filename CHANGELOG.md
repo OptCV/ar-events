@@ -2,6 +2,15 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-22 — Fixes from the first phone and desktop checks
+
+### Fixed
+- Desktop 3D preview showed the shape in grey: the CSP blocked three.js from reading the GLB's embedded texture (`connect-src` now allows `blob:`). The preview now says when only the shape could be loaded.
+- Generated GLB/USDZ responses allow cross-origin reads (`Cross-Origin-Resource-Policy: cross-origin`, `Access-Control-Allow-Origin: *`) on valid signed URLs, for native viewers. Suspected cause of Scene Viewer not opening; unconfirmed until retried on the device.
+
+### Verified
+- Remote run 20/20 incl. REMOTE-VIEW-IN-AR on the redeployed dev Worker.
+
 ## 2026-11-22 — Phase 2 device checklist and "View in AR"
 
 ### Added

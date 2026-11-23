@@ -72,7 +72,8 @@ Plan and slice order: `ROADMAP.md` "Phase 1 plan".
 - [x] Texture size limits / downscaled derivative for native viewer budgets. *(2048 px longest edge, premultiplied Lanczos, stored as `image_object_texture` (ADR-025); the budget still needs device confirmation)*
 - [x] P2 M8 remote (2026-11-22): 0005 applied to Neon development (6/6), redeployed (`4bd1bd1c…`, build `e8de023`), remote suite 19/19 incl. REMOTE-CONVERT-WEBP (Pillow in the Container, 6.5 s).
 - [x] Phase 2 device checklist (`tests/device/phase-2-checklist.md`) and "View in AR" on the Make AR object page (ADR-026); browser tests 64/64.
-- [ ] Redeploy dev with ADR-026 and run the remote suite (REMOTE-VIEW-IN-AR).
+- [x] Redeploy dev with ADR-026 and run the remote suite (REMOTE-VIEW-IN-AR): 20/20.
+- [ ] Scene Viewer does not open on the owner's Android phone: collect the symptom; redeploy with the cross-origin headers and retry.
 - [ ] Run the Phase 2 device checklist on one iPhone and one ARCore Android phone (gate).
 - [ ] Colour profiles: convert non-sRGB ICC to sRGB when preparing textures (prepared textures currently drop ICC data).
 - [ ] Batch alpha fixtures native device verification.
