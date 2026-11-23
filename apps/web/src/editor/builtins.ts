@@ -26,6 +26,7 @@ export function buildContent(n: SceneNode): Object3D | null {
   if (n.kind === 'primitive') return primitive(n.shape, n.color ?? PRIMITIVE_DEFAULT_COLOR);
   if (n.kind === 'text') return text(n.text, n.style.color, n.style.sizeMeters);
   if (n.kind === 'panel') return panel(n.title, n.body);
+  if (n.kind === 'hotspot') return hotspot();
   return null;
 }
 
@@ -34,6 +35,7 @@ export function contentKey(n: SceneNode): string | null {
   if (n.kind === 'primitive') return `prim:${n.shape}:${n.color ?? ''}`;
   if (n.kind === 'text') return `text:${JSON.stringify([n.text, n.style])}`;
   if (n.kind === 'panel') return `panel:${JSON.stringify([n.title, n.body])}`;
+  if (n.kind === 'hotspot') return 'hotspot';
   return null;
 }
 
@@ -134,4 +136,14 @@ function panel(title: string, body: string): Mesh {
     y += bodyLine;
   }
   return canvasPlane(c, PANEL_WIDTH_METERS, (PANEL_WIDTH_METERS * c.height) / c.width, 'panel');
+}
+
+/**
+ * Hotspot marker: a 4 cm accent sphere. Only the editor and the Android image runtime draw it; Quick Look and Scene
+ * Viewer cannot run taps, so there the action is listed on the experience page (capabilities: hotspots).
+ */
+function hotspot(): Mesh {
+  const m = new Mesh(new SphereGeometry(0.02, 24, 12), new MeshStandardMaterial({ color: new Color('#215cc5'), roughness: 0.4, emissive: new Color('#0b2a66') }));
+  m.name = 'hotspot';
+  return m;
 }

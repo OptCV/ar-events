@@ -1,7 +1,7 @@
 /**
  * Valid, self-contained test GLBs built at runtime (no large fixtures in git): one mesh, one untextured PBR material.
  */
-function build(positions: Float32Array, indices: Uint32Array, name: string): Buffer {
+function build(positions: Float32Array, indices: Uint32Array, name: string, clip?: string): Buffer {
   const min = [Infinity, Infinity, Infinity];
   const max = [-Infinity, -Infinity, -Infinity];
   for (let i = 0; i < positions.length; i += 3)
@@ -11,7 +11,10 @@ function build(positions: Float32Array, indices: Uint32Array, name: string): Buf
     }
   const pos = Buffer.from(positions.buffer, positions.byteOffset, positions.byteLength);
   const idx = Buffer.from(indices.buffer, indices.byteOffset, indices.byteLength);
-  const bin = Buffer.concat([pos, idx]); // both 4-byte aligned
+  // Optional animation: one rotation clip (2 keyframes) on the mesh node.
+  const times = Buffer.from(new Float32Array([0, 1]).buffer);
+  const rots = Buffer.from(new Float32Array([0, 0, 0, 1, 0, Math.SQRT1_2, 0, Math.SQRT1_2]).buffer);
+  const bin = clip ? Buffer.concat([pos, idx, times, rots]) : Buffer.concat([pos, idx]); // all 4-byte aligned
   const gltf = {
     asset: { version: '2.0', generator: 'ar-creator e2e' },
     scene: 0,
@@ -22,11 +25,24 @@ function build(positions: Float32Array, indices: Uint32Array, name: string): Buf
     accessors: [
       { bufferView: 0, componentType: 5126, count: positions.length / 3, type: 'VEC3', min, max },
       { bufferView: 1, componentType: 5125, count: indices.length, type: 'SCALAR' },
+      ...(clip
+        ? [
+            { bufferView: 2, componentType: 5126, count: 2, type: 'SCALAR', min: [0], max: [1] },
+            { bufferView: 3, componentType: 5126, count: 2, type: 'VEC4' },
+          ]
+        : []),
     ],
     bufferViews: [
       { buffer: 0, byteOffset: 0, byteLength: pos.length, target: 34962 },
       { buffer: 0, byteOffset: pos.length, byteLength: idx.length, target: 34963 },
+      ...(clip
+        ? [
+            { buffer: 0, byteOffset: pos.length + idx.length, byteLength: times.length },
+            { buffer: 0, byteOffset: pos.length + idx.length + times.length, byteLength: rots.length },
+          ]
+        : []),
     ],
+    ...(clip ? { animations: [{ name: clip, channels: [{ sampler: 0, target: { node: 0, path: 'rotation' } }], samplers: [{ input: 2, output: 3, interpolation: 'LINEAR' }] }] } : {}),
     buffers: [{ byteLength: bin.length }],
   };
   let json = Buffer.from(JSON.stringify(gltf));
@@ -45,11 +61,11 @@ function build(positions: Float32Array, indices: Uint32Array, name: string): Buf
 }
 
 /** A cube `edge` meters wide, centred on its origin: 8 vertices, 12 triangles. */
-export function cubeGlb(edge = 0.3): Buffer {
+export function cubeGlb(edge = 0.3, clip?: string): Buffer {
   const h = edge / 2;
   const p = new Float32Array([-h, -h, -h, h, -h, -h, h, h, -h, -h, h, -h, -h, -h, h, h, -h, h, h, h, h, -h, h, h]);
   const i = new Uint32Array([0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 3, 7, 6, 3, 6, 2, 0, 4, 7, 0, 7, 3, 1, 2, 6, 1, 6, 5]);
-  return build(p, i, 'cube');
+  return build(p, i, 'cube', clip);
 }
 
 /** A flat 1 m grid of `n` × `n` quads: 2·n² triangles (n = 250 → 125,000). */

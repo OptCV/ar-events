@@ -124,6 +124,17 @@ P0 device results (axes, alpha, CTA) → P2 converter adjustments → P4 compile
 
 Actions, the primary CTA and capability previews stay in P4 (Interactions and compatibility).
 
+## Phase 4 plan (2026-11-22)
+
+**Gate (unchanged):** no unsupported action silently disappears.
+
+| Milestone | Scope | Status |
+|---|---|---|
+| M12 Actions in the editor | Create/edit/delete actions (web link, email, phone, show/hide an object, play a model animation); tap action per object; hotspots; the primary button (web links only, one per experience); edits that keep the scene valid (deleting an object removes the actions that target it, with a notice); undo covers actions | **Done locally** (ADR-030); not deployed |
+| M13 Interaction plan and compatibility matrix | One pure plan per runtime: where the primary button and every action end up (Quick Look banner, Scene Viewer `link`, WebXR overlay/tap, experience page); launch builders fed from it; compatibility matrix and experience-page preview in the editor; readiness warnings; tests that every action is reachable on every runtime | Not started |
+
+The runtimes that execute the plan (USDZ/GLB exporters, WebXR viewer, public page) are P5/P6.
+
 **Phase 1 risks:** Hyperdrive caching of auth reads (ADR-013 §5); request-body size limits for large model uploads; Better Auth minor-version churn (pin exact, review changelogs); `@cloudflare/vite-plugin` + monorepo layout (validated locally in M1; edge deploy pending). Client bundle is 133 KB gzip for a skeleton, mostly React + Zod 4; watch it as features land (consider `zod/mini` on the client).
 
 ### Milestone 3 findings (2026-11-14)

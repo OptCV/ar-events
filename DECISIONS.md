@@ -416,3 +416,15 @@ Accepted decisions may be superseded by new numbered entries; never rewrite prev
 6. **Budgets** follow Google's Scene Viewer file requirements (read 2026-11-22): 100,000 triangles, 10 materials, 2048 px textures and 10 MB recommended; 15 MB is an error. Shown per object (triangles, materials, textures, largest texture) and for the scene (visible objects; triangles/materials add up per copy, files count once). Quick Look publishes no hard numbers; device tests decide.
 7. **"In AR"** in the inspector shows the capability registry's plan for the object's kind per viewer, labelled as planned and not device-tested. A `shape` feature was added to the registry (iOS/Scene Viewer `verify`, Android image `native`).
 **Consequences:** Text, panels, shapes and models do not appear in AR until the compilers exist (P4); the editor says so. Model files over 15 MB can be placed but are flagged.
+
+## ADR-030 — Actions, tap actions, hotspots and the main button in the editor (Phase 4 Milestone 12)
+
+**Date:** 2026-11-22
+**Status:** Accepted (browser tests read the saved scene back; where each action appears per AR viewer is M13).
+**Decision:**
+1. **Action kinds** are the schema's: web link (https only), email, phone, show/hide an object, play a model animation. Validation is the scene schema itself, with plain-language messages. Button text is optional (defaults: "Visit website", "Send email", "Call").
+2. **Uses:** any object can have one tap action ("On tap"); a **hotspot** (4 cm marker, drawn in the editor) exists only to run an action, so it always has one; **one main button** per experience, and only a web link can be it (Quick Look banner and Scene Viewer `link` carry an https URL). Editing the main button into another kind clears that role, with a notice.
+3. **No dangling references, nothing removed silently:** deleting an action clears its tap uses and main-button role and lists them; an action used by a hotspot cannot be deleted until the hotspot changes; removing an object also removes the actions that show/hide or animate it, and hotspots left without an action, and says exactly what went. The result is always a valid draft (unit-tested against the schema).
+4. **Undo covers content:** nodes, actions and the main button are edited and undone as one unit (so one undo restores an object together with the actions removed with it). Placement, tracking image and details remain outside undo.
+5. **Animation clips** are read from the loaded model file (unnamed clips as "#index"); the play-animation action is offered only when the scene has a model.
+**Consequences:** Whether a tap or a link actually works depends on the viewer (Quick Look and Scene Viewer have no taps): M13 computes and shows that plan, and nothing is dropped from the experience page.

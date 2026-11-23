@@ -2,6 +2,15 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-22 — Phase 4 Milestone 12: actions in the editor (local)
+
+### Added
+- Actions panel: web link, email, phone, show/hide an object, play a model animation; edit and delete; "Used by" for each action; the main button (web links only).
+- "On tap" for every object; hotspots (need an action; drawn as a marker in the editor). ADR-030.
+
+### Changed
+- Removing an object also removes the actions that show/hide or animate it and hotspots left without an action, and says so; undo now restores objects and actions together.
+
 ## 2026-11-22 — Phase 3 Milestone 11: models, text, panels, shapes, budgets (local)
 
 ### Added

@@ -40,6 +40,8 @@ import styles from './Editor.module.css';
 export type Tool = 'select' | 'move' | 'rotate' | 'scale';
 export interface NodeStats extends ObjectStats {
   size: [number, number, number];
+  /** Animation clip names of a model (unnamed clips as "#index"); null for kinds without a file. */
+  clips: string[] | null;
 }
 export type AlignKind = 'ground' | 'wall' | 'fit';
 
@@ -345,7 +347,7 @@ export default function Viewport(props: ViewportProps) {
       if (h.model || !key || !effectivelyVisible(nodes, n.id)) continue;
       const built = buildContent(n);
       if (built) {
-        attach(h, built, true, true, n.id);
+        attach(h, built, true, true, n.id, null);
         continue;
       }
       if (!file) continue;
@@ -361,19 +363,19 @@ export default function Viewport(props: ViewportProps) {
           if (cancelled || h.model || h.key !== file.key) return;
           const model = gltf.scene.clone(true);
           const definesPictures = ((gltf.parser.json as { images?: unknown[] }).images?.length ?? 0) > 0;
-          attach(h, model, false, !definesPictures || countTextures(model).textures > 0, nodeId);
+          attach(h, model, false, !definesPictures || countTextures(model).textures > 0, nodeId, gltf.animations.map((a, i) => a.name.trim() || `#${i}`));
         }),
       );
     }
 
-    function attach(h: Holder, model: Object3D, owned: boolean, textured: boolean, nodeId: string) {
+    function attach(h: Holder, model: Object3D, owned: boolean, textured: boolean, nodeId: string, clips: string[] | null) {
       h.model = model;
       h.owned = owned;
       h.textured = textured;
       // Measured before it joins the node, so the size excludes the node's own transform.
       const size = new Box3().setFromObject(model).getSize(new Vector3());
       h.group.add(model);
-      latest.current.onStats(nodeId, { size: [size.x, size.y, size.z], ...statsOf(model) });
+      latest.current.onStats(nodeId, { size: [size.x, size.y, size.z], clips, ...statsOf(model) });
     }
 
     const finish = () => {

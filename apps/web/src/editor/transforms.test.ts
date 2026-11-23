@@ -52,7 +52,7 @@ describe('transform math (M10)', () => {
 });
 
 describe('undo/redo history (M10)', () => {
-  const n = (id: string) => [{ id, kind: 'group', transform: IDENTITY_TRANSFORM, visible: true, locked: false }] as SceneNode[];
+  const n = (id: string) => ({ nodes: [{ id, kind: 'group', transform: IDENTITY_TRANSFORM, visible: true, locked: false }] as SceneNode[], actions: [] });
 
   it('undoes and redoes in order; a new edit clears redo; no-op edits are not recorded', () => {
     let h = emptyHistory();
@@ -60,13 +60,13 @@ describe('undo/redo history (M10)', () => {
     h = record(h, n('b'), n('c'));
     expect(record(h, n('c'), n('c'))).toBe(h);
     const u1 = undo(h, n('c'))!;
-    expect(u1.nodes[0]!.id).toBe('b');
-    const u2 = undo(u1.history, u1.nodes)!;
-    expect(u2.nodes[0]!.id).toBe('a');
-    expect(undo(u2.history, u2.nodes)).toBeNull();
-    const r1 = redo(u2.history, u2.nodes)!;
-    expect(r1.nodes[0]!.id).toBe('b');
-    const branched = record(r1.history, r1.nodes, n('x'));
+    expect(u1.content.nodes[0]!.id).toBe('b');
+    const u2 = undo(u1.history, u1.content)!;
+    expect(u2.content.nodes[0]!.id).toBe('a');
+    expect(undo(u2.history, u2.content)).toBeNull();
+    const r1 = redo(u2.history, u2.content)!;
+    expect(r1.content.nodes[0]!.id).toBe('b');
+    const branched = record(r1.history, r1.content, n('x'));
     expect(redo(branched, n('x'))).toBeNull();
   });
 
@@ -74,6 +74,6 @@ describe('undo/redo history (M10)', () => {
     let h = emptyHistory();
     for (let i = 0; i < HISTORY_LIMIT + 20; i++) h = record(h, n(`s${i}`), n(`s${i + 1}`));
     expect(h.past).toHaveLength(HISTORY_LIMIT);
-    expect(h.past[0]![0]!.id).toBe('s20');
+    expect(h.past[0]!.nodes[0]!.id).toBe('s20');
   });
 });

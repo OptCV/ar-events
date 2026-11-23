@@ -8,11 +8,13 @@ import { capability, type Feature } from '@ar-creator/capabilities';
 import { Thumb, describeImageObject, newNodeId } from '../experiences/ImageObjectsPanel.tsx';
 import { useAssets } from '../assets/api.ts';
 import { AddContent } from './AddContent.tsx';
+import { ActionsPanel } from './ActionsPanel.tsx';
+import { actionTitle, describeAction, removeNodeCascade, setTapAction, type Content } from './actions.ts';
 import { budgetIssues, sceneTotals } from './budgets.ts';
 import { ContentFields } from './ContentFields.tsx';
 import { useAsset, useImageObjects } from '../imageObjects/api.ts';
 import { emptyHistory, record, redo, undo } from './history.ts';
-import { DRAWN_KINDS, KIND_LABEL, effectivelyVisible, formatSize, nodeLabel, removeNode, setVisible, trackingImageSize, treeRows } from './sceneModel.ts';
+import { DRAWN_KINDS, KIND_LABEL, effectivelyVisible, formatSize, nodeLabel, setVisible, trackingImageSize, treeRows } from './sceneModel.ts';
 import { LIMITS, cleanTransform, duplicateNode, eulerDegFromQuat, isUniform, quatFromEulerDeg } from './transforms.ts';
 import type { AlignKind, NodeStats, Tool, ViewportApi } from './Viewport.tsx';
 import styles from './Editor.module.css';
@@ -40,7 +42,8 @@ export function SceneEditor({ scene, busy, onChange }: { scene: DraftExperienceS
   const [stats, setStats] = useState<Record<string, NodeStats>>({});
   const [tool, setTool] = useState<Tool>('select');
   const [snapOn, setSnapOn] = useState(true);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNoticeState] = useState<{ text: string; tone: 'status' | 'info' | 'error' } | null>(null);
+  const setNotice = (text: string | null, tone: 'status' | 'info' | 'error' = 'error') => setNoticeState(text ? { text, tone } : null);
   const viewportApi = useRef<ViewportApi | null>(null);
   const history = useRef(emptyHistory());
   const [, rerender] = useReducer((x: number) => x + 1, 0);
@@ -76,26 +79,39 @@ export function SceneEditor({ scene, busy, onChange }: { scene: DraftExperienceS
   const trackingImage = size ? { url: tracking.data?.contentUrl ?? null, ...size } : null;
   const selected = scene.nodes.find((n) => n.id === selectedId) ?? null;
 
-  /** Node edits apply to the latest scene (never to the copy this render saw) and are recorded for undo. */
-  const editNodes = useCallback(
-    (fn: (nodes: SceneNode[]) => SceneNode[]) =>
+  /**
+   * Content edits (nodes, actions, primary action) apply to the latest scene — never to the copy this render saw — as
+   * one unit, so references stay valid, and are recorded for undo.
+   */
+  const editContent = useCallback(
+    (fn: (c: Content) => Content) =>
       onChange((s) => {
-        const next = fn(s.nodes);
-        history.current = record(history.current, s.nodes, next);
+        const before = contentOf(s);
+        const next = fn(before);
+        if (next === before) return s;
+        history.current = record(history.current, before, next);
         rerender();
-        return next === s.nodes ? s : { ...s, nodes: next };
+        return withContent(s, next);
       }),
     [onChange],
+  );
+  const editNodes = useCallback(
+    (fn: (nodes: SceneNode[]) => SceneNode[]) =>
+      editContent((c) => {
+        const nodes = fn(c.nodes);
+        return nodes === c.nodes ? c : { ...c, nodes };
+      }),
+    [editContent],
   );
   const step = useCallback(
     (dir: 'undo' | 'redo') =>
       onChange((s) => {
-        const r = (dir === 'undo' ? undo : redo)(history.current, s.nodes);
+        const r = (dir === 'undo' ? undo : redo)(history.current, contentOf(s));
         if (!r) return s;
         history.current = r.history;
         rerender();
-        setNotice(dir === 'undo' ? 'Undone.' : 'Redone.');
-        return { ...s, nodes: r.nodes };
+        setNoticeState({ text: dir === 'undo' ? 'Undone.' : 'Redone.', tone: 'status' });
+        return withContent(s, r.content);
       }),
     [onChange],
   );
@@ -116,9 +132,17 @@ export function SceneEditor({ scene, busy, onChange }: { scene: DraftExperienceS
     });
     if (copyId) setSelectedId(copyId);
   };
+  /** Removes an object and whatever would dangle without it (actions that target it, hotspots left without one) — and says so. */
   const remove = (id: string) => {
-    editNodes((ns) => (ns.find((n) => n.id === id)?.locked ? ns : removeNode(ns, id)));
+    let removed: string[] = [];
+    editContent((c) => {
+      if (c.nodes.find((n) => n.id === id)?.locked) return c;
+      const r = removeNodeCascade(c, id);
+      removed = r.removed;
+      return r.content;
+    });
     setSelectedId(null);
+    setNotice(removed.length ? `Also removed ${removed.join(' and ')}.` : null, 'info');
   };
   const align = (id: string, kind: AlignKind) => {
     const t = viewportApi.current?.aligned(id, kind);
@@ -164,7 +188,11 @@ export function SceneEditor({ scene, busy, onChange }: { scene: DraftExperienceS
   const canUndo = history.current.past.length > 0;
   const canRedo = history.current.future.length > 0;
 
+  const content = contentOf(scene);
+  const clipsFor = (nodeId: string) => stats[nodeId]?.clips ?? null;
+
   return (
+    <>
     <div className={styles.workspace} data-testid="scene-editor">
       <section className={styles.tree} aria-labelledby="tree-h">
         <h3 id="tree-h" className={styles.paneTitle}>
@@ -173,6 +201,7 @@ export function SceneEditor({ scene, busy, onChange }: { scene: DraftExperienceS
         <ObjectTree nodes={scene.nodes} selectedId={selectedId} busy={busy} imageObjects={byDerivative} onSelect={setSelectedId} onToggle={(id, v) => editNodes((ns) => setVisible(ns, id, v))} />
         <AddContent
           nodes={scene.nodes}
+          actions={scene.actions}
           mode={placement.mode}
           busy={busy}
           onAdd={(node) => {
@@ -220,7 +249,7 @@ export function SceneEditor({ scene, busy, onChange }: { scene: DraftExperienceS
           />
         </Suspense>
         <p className={styles.srOnly} role="status" aria-live="polite">
-          {notice ?? ''}
+          {notice?.text ?? ''}
         </p>
         <p className={formStyles.hint}>
           {placement.mode === 'floor'
@@ -239,7 +268,11 @@ export function SceneEditor({ scene, busy, onChange }: { scene: DraftExperienceS
         <h3 id="inspector-h" className={styles.paneTitle}>
           Inspector
         </h3>
-        {notice && notice !== 'Undone.' && notice !== 'Redone.' && <p className={formStyles.error}>{notice}</p>}
+        {notice && notice.tone !== 'status' && (
+          <p className={notice.tone === 'error' ? formStyles.error : formStyles.hint} data-testid="editor-notice">
+            {notice.text}
+          </p>
+        )}
         {selected ? (
           <Inspector
             key={selected.id}
@@ -254,6 +287,8 @@ export function SceneEditor({ scene, busy, onChange }: { scene: DraftExperienceS
             stats={stats[selected.id]}
             fileBytes={fileFor(selected)?.bytes ?? null}
             onContent={(patch) => editNodes((ns) => ns.map((n) => (n.id === selected.id && !n.locked ? ({ ...n, ...patch } as SceneNode) : n)))}
+            actions={scene.actions}
+            onTapAction={(actionId) => editContent((c) => setTapAction(c, selected.id, actionId))}
             onRename={(name) => editNodes((ns) => ns.map((n) => (n.id === selected.id ? { ...n, name } : n)))}
             onToggle={(v) => editNodes((ns) => setVisible(ns, selected.id, v))}
             onLock={(v) => editNodes((ns) => ns.map((n) => (n.id === selected.id ? { ...n, locked: v } : n)))}
@@ -267,7 +302,15 @@ export function SceneEditor({ scene, busy, onChange }: { scene: DraftExperienceS
         )}
       </section>
     </div>
+    <ActionsPanel content={content} busy={busy} clipsFor={clipsFor} onEdit={editContent} onNotice={(t, tone) => setNotice(t, tone)} />
+    </>
   );
+}
+
+const contentOf = (s: DraftExperienceScene): Content => ({ nodes: s.nodes, actions: s.actions, ...(s.primaryActionId !== undefined ? { primaryActionId: s.primaryActionId } : {}) });
+function withContent(s: DraftExperienceScene, c: Content): DraftExperienceScene {
+  const { primaryActionId: _old, ...rest } = s;
+  return { ...rest, nodes: c.nodes, actions: c.actions, ...(c.primaryActionId !== undefined ? { primaryActionId: c.primaryActionId } : {}) };
 }
 
 function ObjectTree(props: {
@@ -320,6 +363,8 @@ function Inspector(props: {
   stats: NodeStats | undefined;
   fileBytes: number | null;
   onContent: (patch: Partial<SceneNode>) => void;
+  actions: DraftExperienceScene['actions'];
+  onTapAction: (actionId: string | null) => void;
   onRename: (name: string) => void;
   onToggle: (visible: boolean) => void;
   onLock: (locked: boolean) => void;
@@ -401,6 +446,7 @@ function Inspector(props: {
         </ul>
       )}
       <ContentFields key={node.id} node={node} disabled={props.busy || locked} onChange={props.onContent} />
+      <TapAction node={node} nodes={props.nodes} actions={props.actions} disabled={props.busy} onChange={props.onTapAction} />
       <TransformFields key={JSON.stringify(t)} transform={t} disabled={props.busy || locked} onCommit={props.onTransform} />
       {locked && <p className={formStyles.hint}>Locked: unlock it to move, rotate, scale or remove it.</p>}
 
@@ -557,7 +603,7 @@ function SceneBudget({ totals, count }: { totals: ReturnType<typeof sceneTotals>
   );
 }
 
-const FEATURE_OF: Partial<Record<SceneNode['kind'], Feature>> = { 'image-object': 'image_object_flat', model: 'model', text: 'text_panel', panel: 'text_panel', primitive: 'shape' };
+const FEATURE_OF: Partial<Record<SceneNode['kind'], Feature>> = { 'image-object': 'image_object_flat', model: 'model', text: 'text_panel', panel: 'text_panel', primitive: 'shape', hotspot: 'hotspots' };
 const RUNTIME_LABEL = [
   ['ios_quicklook_floor', 'iPhone, iPad (Quick Look)'],
   ['android_webxr_image', 'Android image tracking'],
@@ -593,5 +639,26 @@ function InAr({ kind }: { kind: SceneNode['kind'] }) {
         })}
       </dl>
     </details>
+  );
+}
+
+/** What tapping the object does (any action); a hotspot must have one. Where taps work is shown under "In AR". */
+function TapAction({ node, nodes, actions, disabled, onChange }: { node: SceneNode; nodes: SceneNode[]; actions: DraftExperienceScene['actions']; disabled: boolean; onChange: (id: string | null) => void }) {
+  const hotspot = node.kind === 'hotspot';
+  return (
+    <div className={styles.content}>
+      <label className={formStyles.label} htmlFor="tap-action">
+        {hotspot ? 'Action' : 'On tap'}
+      </label>
+      <select id="tap-action" className={styles.input} value={node.actionId ?? ''} disabled={disabled} onChange={(e) => onChange(e.target.value || null)}>
+        {!hotspot && <option value="">Nothing</option>}
+        {actions.map((a) => (
+          <option key={a.id} value={a.id}>
+            {actionTitle(a, nodes)} — {describeAction(a, nodes)}
+          </option>
+        ))}
+      </select>
+      {!actions.length && <p className={formStyles.hint}>Create actions under “Actions” below the 3D view.</p>}
+    </div>
   );
 }

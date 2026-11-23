@@ -16,7 +16,7 @@ export const KIND_LABEL: Record<SceneNode['kind'], string> = {
 };
 
 /** Node kinds the editor viewport can draw today; others are listed but not drawn yet. */
-export const DRAWN_KINDS: ReadonlySet<SceneNode['kind']> = new Set(['image-object', 'model', 'text', 'panel', 'primitive']);
+export const DRAWN_KINDS: ReadonlySet<SceneNode['kind']> = new Set(['image-object', 'model', 'text', 'panel', 'primitive', 'hotspot']);
 
 export function nodeLabel(n: SceneNode): string {
   return n.name?.trim() || KIND_LABEL[n.kind];

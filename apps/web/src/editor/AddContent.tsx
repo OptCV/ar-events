@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { formatBytes, type AssetSummary, type ImageObjectSummary } from '@ar-creator/contracts';
-import { IDENTITY_TRANSFORM, PANEL_DEFAULTS, PRIMITIVE_START_SCALE, TEXT_DEFAULTS, type PlacementMode, type SceneNode, type Transform } from '@ar-creator/schema';
+import { IDENTITY_TRANSFORM, PANEL_DEFAULTS, PRIMITIVE_START_SCALE, TEXT_DEFAULTS, type Action, type PlacementMode, type SceneNode, type Transform } from '@ar-creator/schema';
 import { AssetUploader } from '../assets/AssetUploader.tsx';
 import { useAssets } from '../assets/api.ts';
 import { Alert } from '../components/form/Alert.tsx';
@@ -25,7 +25,7 @@ function startTransform(mode: PlacementMode, halfHeight: number, halfDepth: numb
 const base = { visible: true, locked: false } as const;
 
 /** "Add" in the editor (Phase 3 M11): image objects, uploaded 3D models, text, panels and shapes. */
-export function AddContent({ nodes, mode, busy, onAdd }: { nodes: SceneNode[]; mode: PlacementMode; busy: boolean; onAdd: (node: SceneNode) => void }) {
+export function AddContent({ nodes, actions, mode, busy, onAdd }: { nodes: SceneNode[]; actions: Action[]; mode: PlacementMode; busy: boolean; onAdd: (node: SceneNode) => void }) {
   const [picker, setPicker] = useState<Picker>(null);
   const add = (node: SceneNode) => {
     onAdd(node);
@@ -56,6 +56,16 @@ export function AddContent({ nodes, mode, busy, onAdd }: { nodes: SceneNode[]; m
         </button>
         <button type="button" className={styles.addButton} disabled={busy} aria-label="Add shape" onClick={addShape}>
           Shape
+        </button>
+        <button
+          type="button"
+          className={styles.addButton}
+          disabled={busy || actions.length === 0}
+          aria-label="Add hotspot"
+          title={actions.length ? undefined : 'Create an action first (Actions, below the 3D view)'}
+          onClick={() => add({ ...base, id: newNodeId(nodes, 'hs'), kind: 'hotspot', name: 'Hotspot', actionId: actions[0]!.id, transform: startTransform(mode, 0.02, 0.02) })}
+        >
+          Hotspot
         </button>
       </div>
       {picker === 'image' && <ImageObjectPicker busy={busy} onPick={(io) => add({ ...base, id: newNodeId(nodes, 'io'), kind: 'image-object', derivativeId: io.id, name: (io.sourceFilename ?? 'Image object').slice(0, 120), transform: IDENTITY_TRANSFORM })} onCancel={() => setPicker(null)} />}
