@@ -14,6 +14,7 @@ export const FEATURES = [
   'image_object_flat',
   'semitransparency',
   'text_panel',
+  'shape',
   'primary_cta',
   'additional_links',
   'hotspots',
@@ -63,6 +64,11 @@ const TABLE: Record<Feature, Row> = {
     ios: { status: 'compiled_visual', fallback: 'static_geometry', message: 'Baked into textured geometry (not interactive).' },
     android_image: { status: 'native', message: 'Rendered live in Three.js.' },
     android_sv: { status: 'compiled_visual', fallback: 'static_geometry', message: 'Baked into the composed GLB (not interactive).' },
+  },
+  shape: {
+    ios: { status: 'verify', message: 'Exported as USD geometry with a plain colour.' },
+    android_image: { status: 'native', message: 'Rendered live in Three.js.' },
+    android_sv: { status: 'verify', message: 'Composed into the single Scene Viewer GLB.' },
   },
   primary_cta: {
     ios: { status: 'verify', message: 'Quick Look banner action; the page handles the tap.' },

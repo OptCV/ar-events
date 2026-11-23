@@ -26,6 +26,7 @@ export type Transform = z.infer<typeof Transform>;
 
 export const IDENTITY_TRANSFORM: Transform = { position: [0, 0, 0], rotation: [0, 0, 0, 1], scale: [1, 1, 1] };
 
+const HexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'colours are #rrggbb');
 const Id = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/, 'ids must be 1-64 url-safe characters');
 
 /** Physical tracking widths outside this range are almost certainly unit mistakes. */
@@ -63,10 +64,11 @@ export const SceneNode = z.discriminatedUnion('kind', [
     ...NodeBase,
     kind: z.literal('text'),
     text: z.string().min(1).max(500),
-    style: z.object({ color: z.string().regex(/^#[0-9a-fA-F]{6}$/), sizeMeters: z.number().positive().max(2) }),
+    style: z.object({ color: HexColor, sizeMeters: z.number().positive().max(2) }),
   }),
   z.object({ ...NodeBase, kind: z.literal('panel'), title: z.string().max(120), body: z.string().max(2000) }),
-  z.object({ ...NodeBase, kind: z.literal('primitive'), shape: z.enum(['box', 'sphere', 'cylinder', 'plane']) }),
+  /** Geometry and defaults: content.ts (ADR-029). `color` is optional (added in M11; older scenes stay valid). */
+  z.object({ ...NodeBase, kind: z.literal('primitive'), shape: z.enum(['box', 'sphere', 'cylinder', 'plane']), color: HexColor.optional() }),
   z.object({ ...NodeBase, kind: z.literal('hotspot'), actionId: Id }),
 ]);
 export type SceneNode = z.infer<typeof SceneNode>;

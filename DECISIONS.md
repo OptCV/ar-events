@@ -402,3 +402,17 @@ Accepted decisions may be superseded by new numbered entries; never rewrite prev
 5. **Commands:** lock (blocks transforms, gizmo, align and remove), duplicate (new id, " copy", +10 cm X, unlocked; children are not copied), remove; align by the real drawn bounds — *Put on floor/image* (lowest point to y = 0), *Flush to wall* (back to z = 0), *Fit to image* (uniform scale to the tracking image's width, centred, resting on it).
 6. **Undo/redo** covers node edits of this editing session (limit 100; buttons, Ctrl/⌘+Z, Ctrl/⌘+Shift+Z, Ctrl+Y). Placement, tracking image and details are not part of it, so undo never reverts them; a placement change clears the history. Each undo/redo is autosaved like any edit. Shortcuts are ignored while typing in a field or with a dialog open.
 **Consequences:** History does not survive a reload (by design for now). Device behaviour unchanged and unverified.
+
+## ADR-029 — Models, text, panels, shapes and budgets in the editor (Phase 3 Milestone 11)
+
+**Date:** 2026-11-22
+**Status:** Accepted (browser tests; desktop only; AR output of these kinds arrives with the P4 compilers).
+**Decision:**
+1. **Canonical geometry** (`packages/schema/src/content.ts`), which the P4 compilers must reproduce: every built-in is centred on its node origin, in the node's XY plane facing +Z. Shapes are 1 m unit shapes (box 1³, sphere Ø 1, cylinder Ø 1 × 1 along +Y, plane 1 × 1) sized by the node scale (new shapes 20 %). Text: `style.sizeMeters` is one line box; lines centred. Panels: a white card 30 cm wide, height from the content.
+2. **Schema:** `primitive.color` (#rrggbb) added as an **optional** field (default #9aa5b1); existing scenes stay valid; `schemaVersion` stays 1 (additive). All colours share one #rrggbb rule.
+3. **Text and panels are drawn onto a canvas texture**, the same approach the compilers will use to bake them for Quick Look and Scene Viewer (capabilities `text_panel` = `compiled_visual`); device fonts may differ slightly.
+4. **Models** are uploaded GLBs (role `model`) picked from the library or uploaded inside the editor; the server already validates ownership/role and blocks deleting a model in use. Animations are listed, not played.
+5. **New content starts on the surface** (centred kinds lifted by half their height, or 2 mm in front of a wall).
+6. **Budgets** follow Google's Scene Viewer file requirements (read 2026-11-22): 100,000 triangles, 10 materials, 2048 px textures and 10 MB recommended; 15 MB is an error. Shown per object (triangles, materials, textures, largest texture) and for the scene (visible objects; triangles/materials add up per copy, files count once). Quick Look publishes no hard numbers; device tests decide.
+7. **"In AR"** in the inspector shows the capability registry's plan for the object's kind per viewer, labelled as planned and not device-tested. A `shape` feature was added to the registry (iOS/Scene Viewer `verify`, Android image `native`).
+**Consequences:** Text, panels, shapes and models do not appear in AR until the compilers exist (P4); the editor says so. Model files over 15 MB can be placed but are flagged.

@@ -80,3 +80,24 @@
 .axisY { color: #2a8a3e !important; }
 .axisZ { color: #2457c5 !important; }
 .num { width: 100%; min-width: 0; min-height: 36px; padding: 0 var(--ui-space-2); font: inherit; font-variant-numeric: tabular-nums; border: 1px solid var(--ui-border); border-radius: var(--ui-radius-sm); background: var(--ui-surface); }
+
+/* M11: add menu, content fields, budgets, in-AR notes */
+.add { display: grid; gap: var(--ui-space-2); }
+.addTitle { margin: 0; font-size: var(--ui-text-sm); font-weight: 700; color: var(--ui-text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
+.addButtons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ui-space-1); }
+.addButton { min-height: 40px; padding: 0 var(--ui-space-2); font: inherit; font-size: var(--ui-text-sm); font-weight: 600; color: var(--ui-text); background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: var(--ui-radius-sm); cursor: pointer; }
+.addButton:hover:not(:disabled) { border-color: var(--ui-accent); }
+.addButton[aria-expanded='true'] { border-color: var(--ui-accent); box-shadow: inset 0 0 0 1px var(--ui-accent); }
+.content { display: grid; gap: var(--ui-space-2); border: 0; padding: 0; margin: var(--ui-space-2) 0 0; min-width: 0; }
+.content:disabled { opacity: 0.6; }
+.contentRow { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--ui-space-3); align-items: end; }
+.textarea { min-height: 64px; padding: var(--ui-space-2) var(--ui-space-3); font: inherit; border: 1px solid var(--ui-border); border-radius: var(--ui-radius-sm); background: var(--ui-surface); resize: vertical; }
+.color { display: grid; gap: 2px; }
+.color input { width: 56px; height: 36px; padding: 2px; border: 1px solid var(--ui-border); border-radius: var(--ui-radius-sm); background: var(--ui-surface); cursor: pointer; }
+.sceneBudget { display: grid; gap: var(--ui-space-1); padding-top: var(--ui-space-2); border-top: 1px solid var(--ui-border); }
+.budgetIssues { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: var(--ui-text-sm); }
+.issueError::before { content: '✗ '; color: var(--ui-danger); }
+.issueWarning::before { content: '! '; color: var(--ui-warning); font-weight: 700; }
+.inAr { font-size: var(--ui-text-sm); }
+.inAr summary { cursor: pointer; font-weight: 600; padding: var(--ui-space-1) 0; }
+.factRow { display: contents; }

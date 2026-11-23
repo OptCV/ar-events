@@ -1,15 +1,20 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useReducer, useRef, useState, type FormEvent } from 'react';
-import type { ImageObjectSummary } from '@ar-creator/contracts';
+import { formatBytes, type AssetSummary, type ImageObjectSummary } from '@ar-creator/contracts';
 import type { DraftExperienceScene, SceneNode, Transform } from '@ar-creator/schema';
 import type { SceneEdit } from '../experiences/useDraftEditor.ts';
 import { cx } from '../components/cx.ts';
 import formStyles from '../components/form/Form.module.css';
-import { AddImageObject, Thumb, describeImageObject, newNodeId } from '../experiences/ImageObjectsPanel.tsx';
+import { capability, type Feature } from '@ar-creator/capabilities';
+import { Thumb, describeImageObject, newNodeId } from '../experiences/ImageObjectsPanel.tsx';
+import { useAssets } from '../assets/api.ts';
+import { AddContent } from './AddContent.tsx';
+import { budgetIssues, sceneTotals } from './budgets.ts';
+import { ContentFields } from './ContentFields.tsx';
 import { useAsset, useImageObjects } from '../imageObjects/api.ts';
 import { emptyHistory, record, redo, undo } from './history.ts';
 import { DRAWN_KINDS, KIND_LABEL, effectivelyVisible, formatSize, nodeLabel, removeNode, setVisible, trackingImageSize, treeRows } from './sceneModel.ts';
 import { LIMITS, cleanTransform, duplicateNode, eulerDegFromQuat, isUniform, quatFromEulerDeg } from './transforms.ts';
-import type { AlignKind, Tool, ViewportApi } from './Viewport.tsx';
+import type { AlignKind, NodeStats, Tool, ViewportApi } from './Viewport.tsx';
 import styles from './Editor.module.css';
 
 /** three.js loads only with the editor viewport (keeps it out of the main bundle). */
@@ -32,7 +37,7 @@ const MOD = isMac ? '⌘' : 'Ctrl+';
  */
 export function SceneEditor({ scene, busy, onChange }: { scene: DraftExperienceScene; busy: boolean; onChange: (edit: SceneEdit) => void }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [measured, setMeasured] = useState<Record<string, [number, number, number]>>({});
+  const [stats, setStats] = useState<Record<string, NodeStats>>({});
   const [tool, setTool] = useState<Tool>('select');
   const [snapOn, setSnapOn] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
@@ -43,9 +48,29 @@ export function SceneEditor({ scene, busy, onChange }: { scene: DraftExperienceS
   const placement = scene.placement;
   const tracking = useAsset(placement.mode === 'image' ? placement.trackingTargetAssetId : null);
 
+  const models = useAssets('model');
   const byDerivative = useMemo(() => new Map((imageObjects.data?.imageObjects ?? []).map((io) => [io.id, io])), [imageObjects.data]);
-  const glbUrl = useCallback((id: string) => byDerivative.get(id)?.glb.contentUrl ?? null, [byDerivative]);
-  const onMeasured = useCallback((id: string, size: [number, number, number]) => setMeasured((m) => (m[id] ? m : { ...m, [id]: size })), []);
+  const byModel = useMemo(() => new Map((models.data?.assets ?? []).map((a) => [a.id, a])), [models.data]);
+  /** The file a node draws: the GLB of an image object, or an uploaded model. Keys are stable; signed URLs are not. */
+  const fileFor = useCallback(
+    (n: SceneNode) => {
+      if (n.kind === 'image-object') {
+        const io = byDerivative.get(n.derivativeId);
+        return io?.glb.contentUrl ? { key: 'io:' + n.derivativeId, url: io.glb.contentUrl, bytes: io.glb.sizeBytes } : null;
+      }
+      if (n.kind === 'model') {
+        const a = byModel.get(n.assetId);
+        return a?.contentUrl ? { key: 'model:' + n.assetId, url: a.contentUrl, bytes: a.sizeBytes } : null;
+      }
+      return null;
+    },
+    [byDerivative, byModel],
+  );
+  const onStats = useCallback((id: string, st: NodeStats) => setStats((m) => (JSON.stringify(m[id]) === JSON.stringify(st) ? m : { ...m, [id]: st })), []);
+  const totals = useMemo(
+    () => sceneTotals(scene.nodes.filter((n) => stats[n.id] && effectivelyVisible(scene.nodes, n.id)).map((n) => ({ stats: stats[n.id]!, file: fileFor(n) }))),
+    [scene.nodes, stats, fileFor],
+  );
 
   const size = trackingImageSize(placement, placement.mode === 'image' && placement.trackingTargetAssetId ? (tracking.data?.image ?? null) : null);
   const trackingImage = size ? { url: tracking.data?.contentUrl ?? null, ...size } : null;
@@ -146,14 +171,16 @@ export function SceneEditor({ scene, busy, onChange }: { scene: DraftExperienceS
           Objects <span className={styles.count}>({scene.nodes.length})</span>
         </h3>
         <ObjectTree nodes={scene.nodes} selectedId={selectedId} busy={busy} imageObjects={byDerivative} onSelect={setSelectedId} onToggle={(id, v) => editNodes((ns) => setVisible(ns, id, v))} />
-        <AddImageObject
+        <AddContent
           nodes={scene.nodes}
+          mode={placement.mode}
           busy={busy}
           onAdd={(node) => {
             editNodes((ns) => [...ns, node]);
             setSelectedId(node.id);
           }}
         />
+        <SceneBudget totals={totals} count={scene.nodes.length} />
       </section>
 
       <div className={styles.stage}>
@@ -182,10 +209,10 @@ export function SceneEditor({ scene, busy, onChange }: { scene: DraftExperienceS
             placement={placement}
             trackingImage={trackingImage}
             nodes={scene.nodes}
-            glbUrl={glbUrl}
+            fileFor={fileFor}
             selectedId={selectedId}
             onSelect={setSelectedId}
-            onMeasured={onMeasured}
+            onStats={onStats}
             tool={tool}
             snap={snapOn}
             onTransform={setTransform}
@@ -222,8 +249,11 @@ export function SceneEditor({ scene, busy, onChange }: { scene: DraftExperienceS
             placementMode={placement.mode}
             hasTrackingImage={Boolean(trackingImage && placement.mode === 'image' && placement.trackingTargetAssetId)}
             imageObject={selected.kind === 'image-object' ? byDerivative.get(selected.derivativeId) : undefined}
-            imageObjectsLoading={imageObjects.isPending}
-            measured={selected.kind === 'image-object' ? measured[selected.derivativeId] : undefined}
+            model={selected.kind === 'model' ? byModel.get(selected.assetId) : undefined}
+            sourcesLoading={imageObjects.isPending || models.isPending}
+            stats={stats[selected.id]}
+            fileBytes={fileFor(selected)?.bytes ?? null}
+            onContent={(patch) => editNodes((ns) => ns.map((n) => (n.id === selected.id && !n.locked ? ({ ...n, ...patch } as SceneNode) : n)))}
             onRename={(name) => editNodes((ns) => ns.map((n) => (n.id === selected.id ? { ...n, name } : n)))}
             onToggle={(v) => editNodes((ns) => setVisible(ns, selected.id, v))}
             onLock={(v) => editNodes((ns) => ns.map((n) => (n.id === selected.id ? { ...n, locked: v } : n)))}
@@ -285,8 +315,11 @@ function Inspector(props: {
   placementMode: DraftExperienceScene['placement']['mode'];
   hasTrackingImage: boolean;
   imageObject: ImageObjectSummary | undefined;
-  imageObjectsLoading: boolean;
-  measured: [number, number, number] | undefined;
+  model: AssetSummary | undefined;
+  sourcesLoading: boolean;
+  stats: NodeStats | undefined;
+  fileBytes: number | null;
+  onContent: (patch: Partial<SceneNode>) => void;
   onRename: (name: string) => void;
   onToggle: (visible: boolean) => void;
   onLock: (locked: boolean) => void;
@@ -295,11 +328,12 @@ function Inspector(props: {
   onAlign: (kind: AlignKind) => void;
   onRemove: () => void;
 }) {
-  const { node, imageObject: io, measured } = props;
+  const { node, imageObject: io, model, stats } = props;
   const [name, setName] = useState(node.name ?? '');
   useEffect(() => setName(node.name ?? ''), [node.name]);
   const t = node.transform;
-  const scaled = measured?.map((v, i) => v * t.scale[i]!) as [number, number, number] | undefined;
+  const scaled = stats?.size.map((v, i) => v * t.scale[i]!) as [number, number, number] | undefined;
+  const issues = stats ? budgetIssues(stats, props.fileBytes, 'object') : [];
   const locked = node.locked === true;
   const visible = effectivelyVisible(props.nodes, node.id);
   return (
@@ -323,18 +357,54 @@ function Inspector(props: {
         {node.kind === 'image-object' && (
           <>
             <dt>Made from</dt>
-            <dd>{io ? `${io.sourceFilename ?? 'image'} (${describeImageObject(io)})` : props.imageObjectsLoading ? 'Loading…' : 'No longer available — remove it from the scene.'}</dd>
+            <dd>{io ? (io.sourceFilename ?? 'image') + ' (' + describeImageObject(io) + ')' : props.sourcesLoading ? 'Loading…' : 'No longer available — remove it from the scene.'}</dd>
+          </>
+        )}
+        {node.kind === 'model' && (
+          <>
+            <dt>File</dt>
+            <dd>{model ? (model.filename ?? '3D model') + (model.sizeBytes !== null ? ' (' + formatBytes(model.sizeBytes) + ')' : '') : props.sourcesLoading ? 'Loading…' : 'No longer available — remove it from the scene.'}</dd>
+            {model?.model && model.model.animations > 0 && (
+              <>
+                <dt>Animations</dt>
+                <dd>{model.model.animations} (not played in the editor)</dd>
+              </>
+            )}
+          </>
+        )}
+        {DRAWN_KINDS.has(node.kind) && (
+          <>
             <dt>Size in the scene</dt>
             <dd data-testid="inspector-size">{scaled ? formatSize(scaled) : visible ? 'Measuring…' : 'Shown when visible'}</dd>
+          </>
+        )}
+        {stats && (
+          <>
+            <dt>Budget</dt>
+            <dd data-testid="inspector-budget">
+              {stats.triangles.toLocaleString('en-US')} triangles · {stats.materials} material{stats.materials === 1 ? '' : 's'}
+              {stats.textures ? ' · ' + stats.textures + ' texture' + (stats.textures === 1 ? '' : 's') + ' (largest ' + stats.maxTexturePx + ' px)' : ''}
+            </dd>
           </>
         )}
         <dt>Visible</dt>
         <dd>{node.visible === false ? 'No' : visible ? 'Yes' : 'Hidden by its parent'}</dd>
       </dl>
 
+      {issues.length > 0 && (
+        <ul className={styles.budgetIssues} data-testid="inspector-budget-issues">
+          {issues.map((i) => (
+            <li key={i.message} className={i.level === 'error' ? styles.issueError : styles.issueWarning}>
+              {i.message}
+            </li>
+          ))}
+        </ul>
+      )}
+      <ContentFields key={node.id} node={node} disabled={props.busy || locked} onChange={props.onContent} />
       <TransformFields key={JSON.stringify(t)} transform={t} disabled={props.busy || locked} onCommit={props.onTransform} />
       {locked && <p className={formStyles.hint}>Locked: unlock it to move, rotate, scale or remove it.</p>}
 
+      <InAr kind={node.kind} />
       <div className={styles.inspectorActions} role="group" aria-label="Align">
         {props.placementMode !== 'wall' && (
           <button type="button" className={cx(formStyles.button, formStyles.secondary)} disabled={props.busy || locked} onClick={() => props.onAlign('ground')}>
@@ -462,5 +532,66 @@ function TransformFields({ transform: t, disabled, onCommit }: { transform: Tran
       {/* Enter applies the values. */}
       <button type="submit" hidden tabIndex={-1} />
     </form>
+  );
+}
+
+function SceneBudget({ totals, count }: { totals: ReturnType<typeof sceneTotals>; count: number }) {
+  if (!count) return null;
+  const issues = budgetIssues(totals.stats, totals.bytes, 'scene');
+  return (
+    <div className={styles.sceneBudget} data-testid="scene-budget">
+      <p className={styles.unit}>
+        Scene (visible objects): {totals.stats.triangles.toLocaleString('en-US')} triangles · {totals.stats.materials} materials · {formatBytes(totals.bytes)} of files. Scene Viewer recommends at most 100,000 ·
+        10 · 10 MB.
+      </p>
+      {issues.length > 0 && (
+        <ul className={styles.budgetIssues}>
+          {issues.map((i) => (
+            <li key={i.message} className={i.level === 'error' ? styles.issueError : styles.issueWarning}>
+              {i.message}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+const FEATURE_OF: Partial<Record<SceneNode['kind'], Feature>> = { 'image-object': 'image_object_flat', model: 'model', text: 'text_panel', panel: 'text_panel', primitive: 'shape' };
+const RUNTIME_LABEL = [
+  ['ios_quicklook_floor', 'iPhone, iPad (Quick Look)'],
+  ['android_webxr_image', 'Android image tracking'],
+  ['android_scene_viewer_floor', 'Android Scene Viewer'],
+] as const;
+const STATUS_LABEL: Record<string, string> = {
+  native: 'Supported',
+  compiled_visual: 'As a picture',
+  fallback_page: 'On the page',
+  experimental: 'Experimental',
+  unsupported: 'Not supported',
+  verify: 'Planned, not yet device-tested',
+};
+
+/** How this kind of object is planned to appear in each AR viewer (capability registry: planning, not device-verified). */
+function InAr({ kind }: { kind: SceneNode['kind'] }) {
+  const feature = FEATURE_OF[kind];
+  if (!feature) return null;
+  return (
+    <details className={styles.inAr} data-testid="in-ar">
+      <summary>In AR</summary>
+      <dl className={styles.facts}>
+        {RUNTIME_LABEL.map(([runtime, label]) => {
+          const e = capability(feature, runtime);
+          return (
+            <div key={runtime} className={styles.factRow}>
+              <dt>{label}</dt>
+              <dd>
+                {STATUS_LABEL[e.status]}: {e.message}
+              </dd>
+            </div>
+          );
+        })}
+      </dl>
+    </details>
   );
 }

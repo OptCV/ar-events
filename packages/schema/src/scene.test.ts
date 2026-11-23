@@ -96,3 +96,25 @@ describe('checkOutboundUrl', () => {
     expect(checkOutboundUrl('https://exa\nmple.com').ok).toBe(false);
   });
 });
+
+describe('built-in content nodes (M11, ADR-029)', () => {
+  const scene = (nodes: unknown[]) => ExperienceScene.safeParse({ ...base, placement: { mode: 'floor' }, nodes });
+  const n = { transform: IDENTITY_TRANSFORM, visible: true, locked: false };
+  it('accepts shapes with and without a colour (older scenes stay valid), text and panels; roundtrips them', () => {
+    const nodes = [
+      { ...n, id: 'p1', kind: 'primitive', shape: 'box' },
+      { ...n, id: 'p2', kind: 'primitive', shape: 'sphere', color: '#ff8800' },
+      { ...n, id: 't1', kind: 'text', text: 'Hello', style: { color: '#17202a', sizeMeters: 0.05 } },
+      { ...n, id: 'g1', kind: 'panel', title: 'Title', body: 'Body' },
+    ];
+    const r = scene(nodes);
+    expect(r.success).toBe(true);
+    expect(JSON.parse(JSON.stringify(r.data!.nodes))).toEqual(nodes);
+  });
+  it('refuses bad colours, empty text and oversize text', () => {
+    expect(scene([{ ...n, id: 'p', kind: 'primitive', shape: 'box', color: 'red' }]).success).toBe(false);
+    expect(scene([{ ...n, id: 't', kind: 'text', text: '', style: { color: '#000000', sizeMeters: 0.05 } }]).success).toBe(false);
+    expect(scene([{ ...n, id: 't', kind: 'text', text: 'x', style: { color: '#000000', sizeMeters: 3 } }]).success).toBe(false);
+    expect(scene([{ ...n, id: 'p', kind: 'primitive', shape: 'cone' }]).success).toBe(false);
+  });
+});

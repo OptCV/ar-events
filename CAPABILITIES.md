@@ -12,6 +12,7 @@
 | Semitransparency | USD opacity, verify on device | GLB `BLEND`, verify | GLB `BLEND`, verify |
 | Cutout silhouette geometry | compiled USD | compiled GLB | compiled GLB |
 | Text label / static panel | compatible USD geometry/text | Three.js text/panels | baked visual GLB geometry |
+| Basic shape (box, sphere, cylinder, plane; one colour) | USD geometry, verify | Three.js | composed GLB, verify |
 | Logo/graphic | textured USD geometry | GLB/Three.js | composed textured GLB |
 | Model animation | compatible USD animations | supported Three.js clips | native GLB supported subsets; typically first clip |
 | Primary external CTA | Quick Look action/banner | WebXR DOM overlay | Scene Viewer `link` |

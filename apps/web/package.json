@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@ar-creator/api": "0.1.0",
+    "@ar-creator/capabilities": "0.0.0",
     "@ar-creator/contracts": "0.0.0",
     "@ar-creator/platform-launch": "0.0.0",
     "@tanstack/react-query": "5.105.0",

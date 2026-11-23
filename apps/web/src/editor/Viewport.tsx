@@ -32,10 +32,15 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import type { DraftPlacement, SceneNode, Transform } from '@ar-creator/schema';
 import { effectivelyVisible } from './sceneModel.ts';
+import { buildContent, contentKey } from './builtins.ts';
+import type { ObjectStats } from './budgets.ts';
 import { SNAP, cleanTransform, sameTransform, uniformFromDrag, type Quat, type Vec3 } from './transforms.ts';
 import styles from './Editor.module.css';
 
 export type Tool = 'select' | 'move' | 'rotate' | 'scale';
+export interface NodeStats extends ObjectStats {
+  size: [number, number, number];
+}
 export type AlignKind = 'ground' | 'wall' | 'fit';
 
 /** Measurements only the viewport can make (it has the loaded files). */
@@ -49,12 +54,12 @@ export interface ViewportProps {
   /** Image placement: the tracking image (signed URL) and its printed size in meters. */
   trackingImage: { url: string | null; width: number; height: number } | null;
   nodes: SceneNode[];
-  /** GLB URL for an image-object node, keyed by derivative id (URLs are re-signed; the id is the cache key). */
-  glbUrl: (derivativeId: string) => string | null;
+  /** The GLB to draw for an image-object or model node: `key` caches the file (signed URLs change), null = not available. */
+  fileFor: (node: SceneNode) => { key: string; url: string } | null;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
-  /** Size of a drawn node's file in meters (x, y, z, before node scale), reported after it loads. */
-  onMeasured: (derivativeId: string, size: [number, number, number]) => void;
+  /** What a node draws, once drawn: size in meters before the node's own scale, and budget counts. */
+  onStats: (nodeId: string, stats: NodeStats) => void;
   tool: Tool;
   snap: boolean;
   /** A finished gizmo drag: the node's new local transform (one undo step). */
@@ -67,6 +72,9 @@ interface Holder {
   group: Group;
   key: string | null;
   model: Object3D | null;
+  /** Built-in content owns its GPU resources; GLB clones share them with the cache. */
+  owned: boolean;
+  /** False only when a file defines pictures that did not load. */
   textured: boolean;
 }
 interface Engine {
@@ -311,7 +319,7 @@ export default function Viewport(props: ViewportProps) {
         const group = new Group();
         group.name = n.id;
         group.userData.nodeId = n.id;
-        hs.set(n.id, { group, key: null, model: null, textured: false });
+        hs.set(n.id, { group, key: null, model: null, owned: false, textured: true });
       }
     }
     const hadContent = rendered.length > 0;
@@ -325,37 +333,47 @@ export default function Viewport(props: ViewportProps) {
       h.group.visible = n.visible !== false;
       if (dragging.current?.id !== n.id) setTransform(h.group, n.transform);
 
-      const key = n.kind === 'image-object' ? n.derivativeId : null;
+      const file = n.kind === 'image-object' || n.kind === 'model' ? latest.current.fileFor(n) : null;
+      const key = file?.key ?? contentKey(n);
       if (h.key !== key && h.model) {
         h.model.removeFromParent();
+        if (h.owned) disposeTree(h.model);
         h.model = null;
-        h.textured = false;
+        h.textured = true;
       }
       h.key = key;
-      if (n.kind !== 'image-object' || h.model || !effectivelyVisible(nodes, n.id)) continue;
-      const url = latest.current.glbUrl(n.derivativeId);
-      if (!url) continue;
-      let p = cache.current.get(n.derivativeId);
-      if (!p) {
-        p = new GLTFLoader().loadAsync(url);
-        cache.current.set(n.derivativeId, p);
-        p.catch(() => cache.current.delete(n.derivativeId));
+      if (h.model || !key || !effectivelyVisible(nodes, n.id)) continue;
+      const built = buildContent(n);
+      if (built) {
+        attach(h, built, true, true, n.id);
+        continue;
       }
-      const derivativeId = n.derivativeId;
+      if (!file) continue;
+      let p = cache.current.get(file.key);
+      if (!p) {
+        p = new GLTFLoader().loadAsync(file.url);
+        cache.current.set(file.key, p);
+        p.catch(() => cache.current.delete(file.key));
+      }
+      const nodeId = n.id;
       pending.push(
         p.then((gltf) => {
-          if (cancelled || h.model || h.key !== derivativeId) return;
+          if (cancelled || h.model || h.key !== file.key) return;
           const model = gltf.scene.clone(true);
-          const size = new Box3().setFromObject(model).getSize(new Vector3());
-          latest.current.onMeasured(derivativeId, [size.x, size.y, size.z]);
-          model.traverse((o) => {
-            const m = (o as Mesh).material as (Material & { map?: Texture | null }) | undefined;
-            if (m?.map?.image) h.textured = true;
-          });
-          h.model = model;
-          h.group.add(model);
+          const definesPictures = ((gltf.parser.json as { images?: unknown[] }).images?.length ?? 0) > 0;
+          attach(h, model, false, !definesPictures || countTextures(model).textures > 0, nodeId);
         }),
       );
+    }
+
+    function attach(h: Holder, model: Object3D, owned: boolean, textured: boolean, nodeId: string) {
+      h.model = model;
+      h.owned = owned;
+      h.textured = textured;
+      // Measured before it joins the node, so the size excludes the node's own transform.
+      const size = new Box3().setFromObject(model).getSize(new Vector3());
+      h.group.add(model);
+      latest.current.onStats(nodeId, { size: [size.x, size.y, size.z], ...statsOf(model) });
     }
 
     const finish = () => {
@@ -440,6 +458,37 @@ function setTransform(o: Object3D, t: Transform) {
 
 function transformOf(o: Object3D): Transform {
   return { position: o.position.toArray() as Vec3, rotation: o.quaternion.toArray() as Quat, scale: o.scale.toArray() as Vec3 };
+}
+
+function countTextures(root: Object3D) {
+  const textures = new Set<Texture>();
+  const materials = new Set<Material>();
+  root.traverse((o) => {
+    const m = o as Mesh;
+    for (const mat of (Array.isArray(m.material) ? m.material : m.material ? [m.material] : []) as Material[]) {
+      materials.add(mat);
+      for (const v of Object.values(mat)) if ((v as Texture | null)?.isTexture) textures.add(v as Texture);
+    }
+  });
+  return { textures: textures.size, materials: materials.size, set: textures };
+}
+
+/** Budget counts of what a node draws (ADR-029): triangles, materials, textures, longest texture edge. */
+function statsOf(root: Object3D): ObjectStats {
+  let triangles = 0;
+  root.traverse((o) => {
+    const m = o as Mesh;
+    if (!m.isMesh) return;
+    const g = m.geometry;
+    triangles += Math.floor((g.index ? g.index.count : (g.getAttribute('position')?.count ?? 0)) / 3);
+  });
+  const t = countTextures(root);
+  let maxTexturePx = 0;
+  for (const tex of t.set) {
+    const img = tex.image as { width?: number; height?: number } | null;
+    maxTexturePx = Math.max(maxTexturePx, img?.width ?? 0, img?.height ?? 0);
+  }
+  return { triangles, materials: t.materials, textures: t.textures, maxTexturePx };
 }
 
 function shownInScene(o: Object3D | null): boolean {

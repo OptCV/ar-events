@@ -119,7 +119,7 @@ P0 device results (axes, alpha, CTA) → P2 converter adjustments → P4 compile
 |---|---|---|
 | M9 Editor workspace and viewport | Object tree (left), three.js viewport (centre, lazy) with the anchor reference drawn per placement mode in canonical axes (floor grid, wall plane, tracking image at its printed size), image objects rendered from their GLBs with node transforms, selection from tree or viewport, show/hide, inspector (right) with real size from the loaded file; stacked on phones; labelled as a 3D preview, not AR | **Done locally** (ADR-027); not deployed |
 | M10 Transforms and history | Numeric position (cm) / rotation (degrees, quaternion stored) / scale with snapping; move/rotate/scale gizmos with an explicit tool; lock, duplicate, delete; ground-align, wall-flush, fit-to-target; undo/redo over autosave | **Done locally** (ADR-028); not deployed |
-| M11 More content | Uploaded GLB models, text, panels, primitives; reusable asset library in the editor; bounds, polygon and texture budgets per object | Not started |
+| M11 More content | Uploaded GLB models, text, panels, primitives; reusable asset library in the editor; bounds, polygon and texture budgets per object | **Done locally** (ADR-029); not deployed |
 | Gate | Roundtrip (save → reload → identical scene, schema-validated) for every node kind; real-world dimensions shown in the editor equal the files' dimensions (tests), then on devices with the Phase 2 checklist | — |
 
 Actions, the primary CTA and capability previews stay in P4 (Interactions and compatibility).

@@ -2,6 +2,13 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-22 — Phase 3 Milestone 11: models, text, panels, shapes, budgets (local)
+
+### Added
+- Editor "Add" menu: image object, 3D model (from the library or uploaded in place), text, panel and shape; inspector fields for text (content, colour, line height), panels (title, text) and shapes (box/sphere/cylinder/flat square, colour).
+- Per-object budget (triangles, materials, textures) and scene budget with Scene Viewer guidance; "In AR" notes per object from the capability registry. ADR-029.
+- Schema: optional `color` on shapes; canonical sizes of built-in content (`packages/schema/src/content.ts`).
+
 ## 2026-11-22 — Phase 3 Milestone 10: transforms, gizmos, undo/redo (local)
 
 ### Added
