@@ -9,6 +9,7 @@ access disabled). One request at a time; every job works in a fresh temporary di
     GET  /healthz                       -> 200 {"ok": true, "converterVersion": ..., "usd": ...}
     POST /v1/texture?max_edge=2048        body: PNG/JPEG/WebP -> framed JSON + prepared PNG or JPEG (ADR-025)
     POST /v1/scene/glb                    body: scene request (scene/request.py) -> framed JSON + composed GLB (ADR-032)
+    POST /v1/scene/usdz                   body: the same scene request -> framed JSON + anchored USDZ (ADR-033)
     POST /v1/image-plane?width_m=0.5&alpha_mode=BLEND&alpha_cutoff=0.5&double_sided=0&pivot=center&orientation=upright
          body: image bytes (PNG/JPEG, Content-Length required, <= MAX_BODY)
          header X-Source-SHA256 (optional): refuse if the body does not hash to it
@@ -35,6 +36,7 @@ from pxr import Usd
 from .image_plane import CONVERTER_VERSION, ConversionError, ImagePlaneRequest, build_image_plane_usdz
 from .texture import TEXTURE_CONVERTER_VERSION, TextureError, prepare_texture
 from .scene.compose_glb import SCENE_COMPILER_VERSION, SceneCompileError, compose_glb
+from .scene.compose_usdz import SCENE_USDZ_VERSION, SceneUsdzError, compose_usdz
 from .scene.request import SceneRequestError, parse_scene_request
 
 MAX_BODY = 32 * 1024 * 1024
@@ -149,22 +151,23 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         if urlsplit(self.path).path == "/healthz":
-            self._json(200, {"ok": True, "converterVersion": CONVERTER_VERSION, "textureVersion": TEXTURE_CONVERTER_VERSION, "sceneVersion": SCENE_COMPILER_VERSION, "usd": ".".join(map(str, Usd.GetVersion()))})
+            self._json(200, {"ok": True, "converterVersion": CONVERTER_VERSION, "textureVersion": TEXTURE_CONVERTER_VERSION, "sceneVersion": SCENE_COMPILER_VERSION, "sceneUsdzVersion": SCENE_USDZ_VERSION, "usd": ".".join(map(str, Usd.GetVersion()))})
         else:
             self._json(404, {"ok": False, "code": "not_found", "error": "not found"})
 
     def do_POST(self) -> None:  # noqa: N802
         url = urlsplit(self.path)
         try:
-            if url.path not in ("/v1/image-plane", "/v1/texture", "/v1/scene/glb"):
+            if url.path not in ("/v1/image-plane", "/v1/texture", "/v1/scene/glb", "/v1/scene/usdz"):
                 raise BadRequest(404, "not_found", "not found")
-            if url.path == "/v1/scene/glb":
+            scene = url.path.startswith("/v1/scene/")
+            if scene:
                 if url.query:
                     raise BadRequest(400, "bad_parameter", "this endpoint takes no parameters")
                 params = {}
             else:
                 params = parse_image_plane_query(url.query) if url.path == "/v1/image-plane" else parse_texture_query(url.query)
-            limit = MAX_SCENE_BODY if url.path == "/v1/scene/glb" else MAX_BODY
+            limit = MAX_SCENE_BODY if scene else MAX_BODY
             length_raw = self.headers.get("Content-Length")
             if length_raw is None or not length_raw.isdigit():
                 raise BadRequest(411, "length_required", "Content-Length is required")
@@ -187,6 +190,19 @@ class Handler(BaseHTTPRequestHandler):
                 except SceneCompileError as e:
                     raise BadRequest(422, e.code, str(e)) from None
                 self._frame({"ok": True, **res.to_dict()}, glb)
+                return
+            if url.path == "/v1/scene/usdz":
+                try:
+                    usdz, ures = compose_usdz(parse_scene_request(body))
+                except SceneRequestError as e:
+                    raise BadRequest(400 if e.code == "bad_scene" else 422, e.code, str(e)) from None
+                except SceneUsdzError as e:
+                    if e.report is not None:
+                        self.close_connection = True
+                        self._json(422, {"ok": False, "code": e.code, "error": str(e), "result": e.report})
+                        return
+                    raise BadRequest(422, e.code, str(e)) from None
+                self._frame({"ok": True, **ures.to_dict()}, usdz)
                 return
             if url.path == "/v1/texture":
                 try:

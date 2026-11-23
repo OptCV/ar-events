@@ -2,6 +2,12 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-23 — Phase 5 Milestone 15: scene USDZ for Quick Look (local)
+
+### Added
+- `POST /v1/scene/usdz`: the same scene compiled to an anchored USDZ (image reference image, horizontal or vertical plane), with our own glTF → USD converter for image objects and models, and the same shapes, text and panels. Deterministic, structurally validated. ADR-033.
+- The inspector says what a model loses on iPhone (animation; compressed meshes cannot be exported yet).
+
 ## 2026-11-23 — Phase 5 Milestone 14: scene compiler, composed GLB (local)
 
 ### Added

@@ -9,7 +9,7 @@ import { IDENTITY_TRANSFORM, type DraftExperienceScene, type SceneNode } from '@
 // @ts-expect-error - the validator ships without type declarations
 import validator from 'gltf-validator';
 import { frameSceneRequest, sceneManifest } from '../src/compile/sceneRequest.ts';
-import { cubeGlb } from '../../../tests/e2e/app/glb.ts';
+import { cubeGlb, gridGlb } from '../../../tests/e2e/app/glb.ts';
 import { fixture, sha256Hex } from './files.ts';
 import { LOCAL_USD_URL } from './harness.ts';
 
@@ -19,9 +19,9 @@ interface Report {
 }
 const validate = (glb: Uint8Array): Promise<Report> => validator.validateBytes(glb, { maxIssues: 100 });
 
-async function compile(scene: Pick<DraftExperienceScene, 'placement' | 'nodes'>, files: { id: string; data: Uint8Array }[], refs: { io?: Record<string, string>; model?: Record<string, string> }) {
-  const body = await frameSceneRequest(sceneManifest(scene, { imageObject: (id) => refs.io?.[id] ?? null, model: (id) => refs.model?.[id] ?? null }), files);
-  const res = await fetch(`${LOCAL_USD_URL}/v1/scene/glb`, { method: 'POST', body: body as Uint8Array<ArrayBuffer> });
+async function compile(scene: Pick<DraftExperienceScene, 'placement' | 'nodes'>, files: { id: string; data: Uint8Array }[], refs: { io?: Record<string, string>; model?: Record<string, string>; tracking?: string }, output: 'glb' | 'usdz' = 'glb') {
+  const body = await frameSceneRequest(sceneManifest(scene, { imageObject: (id) => refs.io?.[id] ?? null, model: (id) => refs.model?.[id] ?? null, ...(refs.tracking ? { tracking: refs.tracking } : {}) }), files);
+  const res = await fetch(`${LOCAL_USD_URL}/v1/scene/${output}`, { method: 'POST', body: body as Uint8Array<ArrayBuffer> });
   const raw = new Uint8Array(await res.arrayBuffer());
   if (res.status !== 200) return { status: res.status, error: JSON.parse(new TextDecoder().decode(raw)) as { code: string; error: string } };
   const n = new DataView(raw.buffer).getUint32(0);
@@ -85,5 +85,66 @@ describe('scene compiler: composed GLB (ADR-032)', () => {
     const notGlb = await compile({ placement: { mode: 'floor' }, nodes: [{ ...base, id: 'm', kind: 'model', assetId: 'a', transform: T() }] }, [{ id: 'f', data: fixture('ring_inner_hole.png') }], { model: { a: 'f' } });
     expect(notGlb).toMatchObject({ status: 422, error: { code: 'bad_file' } });
     expect(() => sceneManifest({ placement: { mode: 'floor' }, nodes: [{ ...base, id: 'm', kind: 'model', assetId: 'missing', transform: T() }] }, { imageObject: () => null, model: () => null })).toThrow(/not available/);
+  });
+});
+
+/** Stored zip entries (USDZ packages are uncompressed): name → bytes. */
+function zipEntries(z: Uint8Array): Map<string, Uint8Array> {
+  const dv = new DataView(z.buffer, z.byteOffset, z.byteLength);
+  const out = new Map<string, Uint8Array>();
+  for (let o = 0; o + 30 <= z.length && dv.getUint32(o, true) === 0x04034b50; ) {
+    const size = dv.getUint32(o + 18, true);
+    const nameLen = dv.getUint16(o + 26, true);
+    const extra = dv.getUint16(o + 28, true);
+    const name = new TextDecoder().decode(z.subarray(o + 30, o + 30 + nameLen));
+    const start = o + 30 + nameLen + extra;
+    out.set(name, z.subarray(start, start + size));
+    o = start + size;
+  }
+  return out;
+}
+
+describe('scene compiler: anchored USDZ (ADR-033)', () => {
+  it('an image-placement scene with every kind packages, validates and embeds the tracking image and pictures unchanged', async () => {
+    const ring = fixture('ring_inner_hole.png');
+    const tracking = fixture('tracking_target_20cm.png');
+    const io = buildImagePlaneGlb({ image: ring, settings: { widthMeters: 0.15, pivot: 'center', orientation: 'flat', doubleSided: true, alphaCutoff: 0.5 }, alphaMode: 'BLEND' }).glb;
+    const nodes: SceneNode[] = [
+      { ...base, id: 'ring', kind: 'image-object', derivativeId: 'd1', transform: T([0, 0.001, 0]) },
+      { ...base, id: 'cube', kind: 'model', assetId: 'a1', transform: T([0.15, 0.15, 0]) },
+      { ...base, id: 'title', kind: 'text', text: 'Hello AR', style: { color: '#c0392b', sizeMeters: 0.03 }, transform: T([0, 0.1, -0.08]) },
+      { ...base, id: 'card', kind: 'panel', title: 'Info', body: 'Visible in Quick Look.', transform: T([0.2, 0.1, 0]) },
+      { ...base, id: 'ball', kind: 'primitive', shape: 'sphere', color: '#215cc5', transform: T([-0.15, 0.05, 0], 0.1) },
+    ];
+    const r = await compile(
+      { placement: { mode: 'image', trackingTargetAssetId: 't', physicalWidthMeters: 0.2 }, nodes },
+      [{ id: 'f-io', data: io }, { id: 'f-m', data: new Uint8Array(cubeGlb(0.3, 'Spin')) }, { id: 'f-t', data: tracking }],
+      { io: { d1: 'f-io' }, model: { a1: 'f-m' }, tracking: 'f-t' },
+      'usdz',
+    );
+    expect(r.status, JSON.stringify(r.error)).toBe(200);
+    expect(r.meta).toMatchObject({ ok: true, anchor: 'image', compilerVersion: 'scene-usdz@0.1.0', nodeIds: ['ring', 'cube', 'title', 'card', 'ball'], warnings: ['Animations are not carried over to iPhone yet.'] });
+    expect(r.meta.openusdValidatorsRun).toBeGreaterThan(0);
+    expect(r.meta.sha256).toBe(await sha256Hex(r.glb!));
+    const entries = zipEntries(r.glb!);
+    const names = [...entries.keys()];
+    expect(names[0]).toBe('scene.usdc');
+    const byBase = (suffix: string) => [...entries].find(([n]) => n.endsWith(suffix))?.[1];
+    expect(await sha256Hex(byBase('tracking_target.png')!)).toBe(await sha256Hex(tracking));
+    expect(await sha256Hex(byBase('_0.png')!)).toBe(await sha256Hex(ring)); // the image object's picture, unchanged
+    expect(names.some((n) => /text_[0-9a-f]{16}.png$/.test(n)) && names.some((n) => /panel_[0-9a-f]{16}.png$/.test(n))).toBe(true);
+  });
+
+  it('a 125,000-triangle model converts in reasonable time; identical input → identical bytes', async () => {
+    const nodes: SceneNode[] = [{ ...base, id: 'grid', kind: 'model', assetId: 'g', transform: T() }];
+    const files = [{ id: 'f', data: new Uint8Array(gridGlb(250)) }];
+    const t0 = Date.now();
+    const a = await compile({ placement: { mode: 'floor' }, nodes }, files, { model: { g: 'f' } }, 'usdz');
+    const ms = Date.now() - t0;
+    expect(a.status, JSON.stringify(a.error)).toBe(200);
+    console.log(`USDZ for 125,000 triangles: ${ms} ms, ${a.meta.sizeBytes} bytes`);
+    expect(ms).toBeLessThan(20_000);
+    const b = await compile({ placement: { mode: 'floor' }, nodes }, files, { model: { g: 'f' } }, 'usdz');
+    expect(b.meta.sha256).toBe(a.meta.sha256);
   });
 });

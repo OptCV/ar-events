@@ -146,6 +146,7 @@ test('play animation: clips come from the loaded model file', async ({ page, req
   await page.getByTestId('model-picker').locator('input[type=file]').setInputFiles({ name: 'spinner.glb', mimeType: 'model/gltf-binary', buffer: cubeGlb(0.3, 'Spin') });
   await expect(page.getByTestId('inspector')).toContainText('1 (not played in the editor)', { timeout: 20_000 });
   await expect(page.getByTestId('inspector').getByTestId('inspector-size')).toHaveText('30 × 30 × 30 cm');
+  await expect(page.getByTestId('inspector').getByTestId('iphone-notes')).toHaveText('Its animation is not included yet; the model is shown still.');
   await addAction(page, 'Play a model animation', { '3D model': 'spinner.glb', Animation: 'Spin' });
   await expect(page.getByTestId('action-row')).toContainText('Play “Spin” on “spinner.glb”');
   const scene = await saved(page);

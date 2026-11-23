@@ -417,6 +417,12 @@ function Inspector(props: {
                 <dd>{model.model.animations} (not played in the editor)</dd>
               </>
             )}
+            {model?.model && iphoneNotes(model.model).length > 0 && (
+              <>
+                <dt>On iPhone</dt>
+                <dd data-testid="iphone-notes">{iphoneNotes(model.model).join(' ')}</dd>
+              </>
+            )}
           </>
         )}
         {DRAWN_KINDS.has(node.kind) && (
@@ -655,4 +661,13 @@ function TapAction({ node, nodes, actions, disabled, onChange }: { node: SceneNo
       {!actions.length && <p className={formStyles.hint}>Create actions under “Actions” below the 3D view.</p>}
     </div>
   );
+}
+
+/** What the iPhone (USDZ) export cannot carry over for this model yet (ADR-033). */
+function iphoneNotes(m: NonNullable<AssetSummary['model']>): string[] {
+  const notes: string[] = [];
+  const compressed = m.extensionsRequired.filter((e) => e === 'KHR_draco_mesh_compression' || e === 'EXT_meshopt_compression' || e === 'KHR_mesh_quantization');
+  if (compressed.length) notes.push('This model uses compressed meshes and cannot be exported for iPhone yet; re-export it without compression.');
+  if (m.animations > 0) notes.push('Its animation is not included yet; the model is shown still.');
+  return notes;
 }
