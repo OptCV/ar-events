@@ -1,24 +1,44 @@
-import { Suspense, lazy, useCallback, useMemo, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useReducer, useRef, useState, type FormEvent } from 'react';
 import type { ImageObjectSummary } from '@ar-creator/contracts';
-import type { DraftExperienceScene, SceneNode } from '@ar-creator/schema';
+import type { DraftExperienceScene, SceneNode, Transform } from '@ar-creator/schema';
 import type { SceneEdit } from '../experiences/useDraftEditor.ts';
 import { cx } from '../components/cx.ts';
 import formStyles from '../components/form/Form.module.css';
-import { AddImageObject, Thumb, describeImageObject } from '../experiences/ImageObjectsPanel.tsx';
+import { AddImageObject, Thumb, describeImageObject, newNodeId } from '../experiences/ImageObjectsPanel.tsx';
 import { useAsset, useImageObjects } from '../imageObjects/api.ts';
+import { emptyHistory, record, redo, undo } from './history.ts';
 import { DRAWN_KINDS, KIND_LABEL, effectivelyVisible, formatSize, nodeLabel, removeNode, setVisible, trackingImageSize, treeRows } from './sceneModel.ts';
+import { LIMITS, cleanTransform, duplicateNode, eulerDegFromQuat, isUniform, quatFromEulerDeg } from './transforms.ts';
+import type { AlignKind, Tool, ViewportApi } from './Viewport.tsx';
 import styles from './Editor.module.css';
 
 /** three.js loads only with the editor viewport (keeps it out of the main bundle). */
 const Viewport = lazy(() => import('./Viewport.tsx'));
 
+const TOOLS: { id: Tool; label: string; key: string }[] = [
+  { id: 'select', label: 'Select', key: 'Q' },
+  { id: 'move', label: 'Move', key: 'W' },
+  { id: 'rotate', label: 'Rotate', key: 'E' },
+  { id: 'scale', label: 'Scale', key: 'R' },
+];
+
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+const MOD = isMac ? '⌘' : 'Ctrl+';
+
 /**
- * Scene editor workspace (Phase 3 M9): object tree (left), 3D viewport (centre), inspector (right); stacked on phones.
- * Every change is a new canonical scene handed to `onChange` (autosaved by the draft editor).
+ * Scene editor workspace (Phase 3 M9–M10): object tree (left), 3D viewport with tools (centre), inspector (right);
+ * stacked on phones. Every change is an edit of the latest canonical scene handed to `onChange` (autosaved), and
+ * node edits are undoable (placement, tracking image and details are not part of undo).
  */
 export function SceneEditor({ scene, busy, onChange }: { scene: DraftExperienceScene; busy: boolean; onChange: (edit: SceneEdit) => void }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [measured, setMeasured] = useState<Record<string, [number, number, number]>>({});
+  const [tool, setTool] = useState<Tool>('select');
+  const [snapOn, setSnapOn] = useState(true);
+  const [notice, setNotice] = useState<string | null>(null);
+  const viewportApi = useRef<ViewportApi | null>(null);
+  const history = useRef(emptyHistory());
+  const [, rerender] = useReducer((x: number) => x + 1, 0);
   const imageObjects = useImageObjects();
   const placement = scene.placement;
   const tracking = useAsset(placement.mode === 'image' ? placement.trackingTargetAssetId : null);
@@ -30,8 +50,94 @@ export function SceneEditor({ scene, busy, onChange }: { scene: DraftExperienceS
   const size = trackingImageSize(placement, placement.mode === 'image' && placement.trackingTargetAssetId ? (tracking.data?.image ?? null) : null);
   const trackingImage = size ? { url: tracking.data?.contentUrl ?? null, ...size } : null;
   const selected = scene.nodes.find((n) => n.id === selectedId) ?? null;
-  /** Node edits apply to the latest scene, never to the copy this render saw. */
-  const editNodes = (fn: (nodes: SceneNode[]) => SceneNode[]) => onChange((s) => ({ ...s, nodes: fn(s.nodes) }));
+
+  /** Node edits apply to the latest scene (never to the copy this render saw) and are recorded for undo. */
+  const editNodes = useCallback(
+    (fn: (nodes: SceneNode[]) => SceneNode[]) =>
+      onChange((s) => {
+        const next = fn(s.nodes);
+        history.current = record(history.current, s.nodes, next);
+        rerender();
+        return next === s.nodes ? s : { ...s, nodes: next };
+      }),
+    [onChange],
+  );
+  const step = useCallback(
+    (dir: 'undo' | 'redo') =>
+      onChange((s) => {
+        const r = (dir === 'undo' ? undo : redo)(history.current, s.nodes);
+        if (!r) return s;
+        history.current = r.history;
+        rerender();
+        setNotice(dir === 'undo' ? 'Undone.' : 'Redone.');
+        return { ...s, nodes: r.nodes };
+      }),
+    [onChange],
+  );
+  // A placement change re-measures everything from a new surface: earlier steps no longer apply.
+  useEffect(() => {
+    history.current = emptyHistory();
+    rerender();
+  }, [placement.mode]);
+
+  const setTransform = useCallback((id: string, t: Transform) => editNodes((ns) => ns.map((n) => (n.id === id && !n.locked ? { ...n, transform: cleanTransform(t) } : n))), [editNodes]);
+  const duplicate = (id: string) => {
+    let copyId = '';
+    editNodes((ns) => {
+      const i = ns.findIndex((n) => n.id === id);
+      if (i < 0) return ns;
+      copyId = newNodeId(ns, ns[i]!.kind === 'image-object' ? 'io' : 'n');
+      return [...ns.slice(0, i + 1), duplicateNode(ns[i]!, copyId), ...ns.slice(i + 1)];
+    });
+    if (copyId) setSelectedId(copyId);
+  };
+  const remove = (id: string) => {
+    editNodes((ns) => (ns.find((n) => n.id === id)?.locked ? ns : removeNode(ns, id)));
+    setSelectedId(null);
+  };
+  const align = (id: string, kind: AlignKind) => {
+    const t = viewportApi.current?.aligned(id, kind);
+    if (!t) return setNotice('This object has to be visible and loaded in the 3D view first.');
+    setTransform(id, t);
+    setNotice(null);
+  };
+
+  // Keyboard shortcuts (not while typing in a field, and never with a dialog open).
+  const keyState = useRef({ selected, tool });
+  keyState.current = { selected, tool };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t?.closest('input, textarea, select, [contenteditable="true"], dialog[open]') || document.querySelector('dialog[open]')) return;
+      const mod = e.metaKey || e.ctrlKey;
+      const key = e.key.toLowerCase();
+      const sel = keyState.current.selected;
+      if (mod && key === 'z') {
+        e.preventDefault();
+        step(e.shiftKey ? 'redo' : 'undo');
+      } else if (mod && key === 'y') {
+        e.preventDefault();
+        step('redo');
+      } else if (mod && key === 'd' && sel) {
+        e.preventDefault();
+        duplicate(sel.id);
+      } else if ((key === 'delete' || key === 'backspace') && sel && !sel.locked) {
+        e.preventDefault();
+        remove(sel.id);
+      } else if (key === 'escape') {
+        setSelectedId(null);
+      } else if (!mod && !e.altKey) {
+        const t2 = TOOLS.find((x) => x.key.toLowerCase() === key);
+        if (t2) setTool(t2.id);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+
+  const canUndo = history.current.past.length > 0;
+  const canRedo = history.current.future.length > 0;
 
   return (
     <div className={styles.workspace} data-testid="scene-editor">
@@ -51,9 +157,44 @@ export function SceneEditor({ scene, busy, onChange }: { scene: DraftExperienceS
       </section>
 
       <div className={styles.stage}>
+        <div className={styles.toolbar} role="toolbar" aria-label="Editing tools">
+          <div className={styles.toolGroup} role="group" aria-label="Tool">
+            {TOOLS.map((t) => (
+              <button key={t.id} type="button" className={styles.tool} aria-pressed={tool === t.id} onClick={() => setTool(t.id)} title={`${t.label} (${t.key})`}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <label className={styles.snap}>
+            <input type="checkbox" checked={snapOn} onChange={(e) => setSnapOn(e.target.checked)} /> Snap
+          </label>
+          <div className={styles.toolGroup} role="group" aria-label="History">
+            <button type="button" className={styles.tool} disabled={!canUndo || busy} onClick={() => step('undo')} title={`Undo (${MOD}Z)`}>
+              Undo
+            </button>
+            <button type="button" className={styles.tool} disabled={!canRedo || busy} onClick={() => step('redo')} title={`Redo (${MOD}Shift+Z)`}>
+              Redo
+            </button>
+          </div>
+        </div>
         <Suspense fallback={<p role="status" className={styles.viewportFallback}>Loading the 3D view…</p>}>
-          <Viewport placement={placement} trackingImage={trackingImage} nodes={scene.nodes} glbUrl={glbUrl} selectedId={selectedId} onSelect={setSelectedId} onMeasured={onMeasured} />
+          <Viewport
+            placement={placement}
+            trackingImage={trackingImage}
+            nodes={scene.nodes}
+            glbUrl={glbUrl}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onMeasured={onMeasured}
+            tool={tool}
+            snap={snapOn}
+            onTransform={setTransform}
+            apiRef={viewportApi}
+          />
         </Suspense>
+        <p className={styles.srOnly} role="status" aria-live="polite">
+          {notice ?? ''}
+        </p>
         <p className={formStyles.hint}>
           {placement.mode === 'floor'
             ? 'The grid is the floor (10 cm squares); the coloured axes mark where the experience is anchored.'
@@ -62,7 +203,8 @@ export function SceneEditor({ scene, busy, onChange }: { scene: DraftExperienceS
               : trackingImage && placement.mode === 'image' && placement.trackingTargetAssetId
                 ? `The tracking image is shown at its printed size (${formatSize([trackingImage.width, trackingImage.height])}), lying flat; its top edge points away from you.`
                 : 'Choose a tracking image to see it here at its printed size.'}{' '}
-          Drag to orbit, scroll to zoom, click an object to select it.
+          Drag to orbit, scroll to zoom, click an object to select it. Choose Move, Rotate or Scale to change it with the handles
+          {snapOn ? ' (snapping to 1 cm, 15° and 5%)' : ''}.
         </p>
       </div>
 
@@ -70,21 +212,25 @@ export function SceneEditor({ scene, busy, onChange }: { scene: DraftExperienceS
         <h3 id="inspector-h" className={styles.paneTitle}>
           Inspector
         </h3>
+        {notice && notice !== 'Undone.' && notice !== 'Redone.' && <p className={formStyles.error}>{notice}</p>}
         {selected ? (
           <Inspector
             key={selected.id}
             node={selected}
             nodes={scene.nodes}
             busy={busy}
+            placementMode={placement.mode}
+            hasTrackingImage={Boolean(trackingImage && placement.mode === 'image' && placement.trackingTargetAssetId)}
             imageObject={selected.kind === 'image-object' ? byDerivative.get(selected.derivativeId) : undefined}
             imageObjectsLoading={imageObjects.isPending}
             measured={selected.kind === 'image-object' ? measured[selected.derivativeId] : undefined}
             onRename={(name) => editNodes((ns) => ns.map((n) => (n.id === selected.id ? { ...n, name } : n)))}
             onToggle={(v) => editNodes((ns) => setVisible(ns, selected.id, v))}
-            onRemove={() => {
-              editNodes((ns) => removeNode(ns, selected.id));
-              setSelectedId(null);
-            }}
+            onLock={(v) => editNodes((ns) => ns.map((n) => (n.id === selected.id ? { ...n, locked: v } : n)))}
+            onTransform={(t) => setTransform(selected.id, t)}
+            onDuplicate={() => duplicate(selected.id)}
+            onAlign={(k) => align(selected.id, k)}
+            onRemove={() => remove(selected.id)}
           />
         ) : (
           <p className={formStyles.hint}>{scene.nodes.length ? 'Select an object in the list or in the 3D view.' : 'Add an object to start building the scene.'}</p>
@@ -117,6 +263,7 @@ function ObjectTree(props: {
                 <span className={styles.treeName}>{label}</span>
                 <span className={styles.treeKind}>
                   {KIND_LABEL[node.kind]}
+                  {node.locked && ' · locked'}
                   {!DRAWN_KINDS.has(node.kind) && ' · not shown in the 3D view yet'}
                 </span>
               </span>
@@ -135,17 +282,26 @@ function Inspector(props: {
   node: SceneNode;
   nodes: SceneNode[];
   busy: boolean;
+  placementMode: DraftExperienceScene['placement']['mode'];
+  hasTrackingImage: boolean;
   imageObject: ImageObjectSummary | undefined;
   imageObjectsLoading: boolean;
   measured: [number, number, number] | undefined;
   onRename: (name: string) => void;
   onToggle: (visible: boolean) => void;
+  onLock: (locked: boolean) => void;
+  onTransform: (t: Transform) => void;
+  onDuplicate: () => void;
+  onAlign: (kind: AlignKind) => void;
   onRemove: () => void;
 }) {
   const { node, imageObject: io, measured } = props;
   const [name, setName] = useState(node.name ?? '');
+  useEffect(() => setName(node.name ?? ''), [node.name]);
   const t = node.transform;
   const scaled = measured?.map((v, i) => v * t.scale[i]!) as [number, number, number] | undefined;
+  const locked = node.locked === true;
+  const visible = effectivelyVisible(props.nodes, node.id);
   return (
     <div className={styles.inspectorBody} data-testid="inspector">
       <label className={formStyles.label} htmlFor="node-name">
@@ -169,23 +325,142 @@ function Inspector(props: {
             <dt>Made from</dt>
             <dd>{io ? `${io.sourceFilename ?? 'image'} (${describeImageObject(io)})` : props.imageObjectsLoading ? 'Loading…' : 'No longer available — remove it from the scene.'}</dd>
             <dt>Size in the scene</dt>
-            <dd data-testid="inspector-size">{scaled ? formatSize(scaled) : effectivelyVisible(props.nodes, node.id) ? 'Measuring…' : 'Shown when visible'}</dd>
+            <dd data-testid="inspector-size">{scaled ? formatSize(scaled) : visible ? 'Measuring…' : 'Shown when visible'}</dd>
           </>
         )}
-        <dt>Position</dt>
-        <dd data-testid="inspector-position">{t.position.map((v) => Number((v * 100).toFixed(1))).join(', ')} cm</dd>
         <dt>Visible</dt>
-        <dd>{node.visible === false ? 'No' : effectivelyVisible(props.nodes, node.id) ? 'Yes' : 'Hidden by its parent'}</dd>
+        <dd>{node.visible === false ? 'No' : visible ? 'Yes' : 'Hidden by its parent'}</dd>
       </dl>
-      <p className={formStyles.hint}>Moving, rotating and scaling arrive in the next milestone.</p>
+
+      <TransformFields key={JSON.stringify(t)} transform={t} disabled={props.busy || locked} onCommit={props.onTransform} />
+      {locked && <p className={formStyles.hint}>Locked: unlock it to move, rotate, scale or remove it.</p>}
+
+      <div className={styles.inspectorActions} role="group" aria-label="Align">
+        {props.placementMode !== 'wall' && (
+          <button type="button" className={cx(formStyles.button, formStyles.secondary)} disabled={props.busy || locked} onClick={() => props.onAlign('ground')}>
+            {props.placementMode === 'floor' ? 'Put on floor' : 'Put on image'}
+          </button>
+        )}
+        {props.placementMode === 'wall' && (
+          <button type="button" className={cx(formStyles.button, formStyles.secondary)} disabled={props.busy || locked} onClick={() => props.onAlign('wall')}>
+            Flush to wall
+          </button>
+        )}
+        {props.placementMode === 'image' && (
+          <button type="button" className={cx(formStyles.button, formStyles.secondary)} disabled={props.busy || locked || !props.hasTrackingImage} onClick={() => props.onAlign('fit')} title={props.hasTrackingImage ? undefined : 'Choose a tracking image first'}>
+            Fit to image
+          </button>
+        )}
+      </div>
       <div className={styles.inspectorActions}>
         <button type="button" className={cx(formStyles.button, formStyles.secondary)} disabled={props.busy} onClick={() => props.onToggle(node.visible === false)}>
           {node.visible === false ? 'Show' : 'Hide'}
         </button>
-        <button type="button" className={styles.dangerButton} disabled={props.busy} onClick={props.onRemove} aria-label={`Remove ${nodeLabel(node)}`}>
+        <button type="button" className={cx(formStyles.button, formStyles.secondary)} disabled={props.busy} aria-pressed={locked} onClick={() => props.onLock(!locked)}>
+          {locked ? 'Unlock' : 'Lock'}
+        </button>
+        <button type="button" className={cx(formStyles.button, formStyles.secondary)} disabled={props.busy} onClick={props.onDuplicate} title={`Duplicate (${MOD}D)`}>
+          Duplicate
+        </button>
+        <button type="button" className={styles.dangerButton} disabled={props.busy || locked} onClick={props.onRemove} aria-label={`Remove ${nodeLabel(node)}`}>
           Remove
         </button>
       </div>
     </div>
+  );
+}
+
+const fmt = (v: number, digits: number) => String(Number(v.toFixed(digits)));
+const AXES = ['X', 'Y', 'Z'] as const;
+
+/**
+ * Position (cm), rotation (degrees) and uniform scale (%) as typed numbers. Applied on Enter or when focus leaves the
+ * whole form (moving between its fields does not apply, so a field is never replaced while typing); rotation is only recomputed when one of its fields changed, so the stored quaternion is never disturbed by
+ * a round trip through degrees.
+ */
+function TransformFields({ transform: t, disabled, onCommit }: { transform: Transform; disabled: boolean; onCommit: (t: Transform) => void }) {
+  const initial = useMemo(
+    () => ({
+      pos: t.position.map((v) => fmt(v * 100, 2)),
+      rot: eulerDegFromQuat(t.rotation).map((v) => fmt(v, 2)),
+      scale: fmt(t.scale[0] * 100, 2),
+    }),
+    [t],
+  );
+  const [pos, setPos] = useState(initial.pos);
+  const [rot, setRot] = useState(initial.rot);
+  const [scale, setScale] = useState(initial.scale);
+  const [error, setError] = useState<string | null>(null);
+  const uniform = isUniform(t.scale);
+
+  const commit = (e?: FormEvent) => {
+    e?.preventDefault();
+    const num = (s: string) => Number(s.replace(',', '.').trim());
+    const p = pos.map(num);
+    const r = rot.map(num);
+    const sc = num(scale) / 100;
+    if (![...p, ...r, sc].every(Number.isFinite) || pos.some((s) => !s.trim()) || rot.some((s) => !s.trim()) || !scale.trim()) return setError('Enter a number in every field.');
+    if (p.some((v) => Math.abs(v / 100) > LIMITS.positionM)) return setError(`Positions must be within ±${LIMITS.positionM} m.`);
+    if (sc < LIMITS.scaleMin || sc > LIMITS.scaleMax) return setError(`Scale must be between ${LIMITS.scaleMin * 100}% and ${LIMITS.scaleMax * 100}%.`);
+    setError(null);
+    const rotationChanged = rot.some((s, i) => s !== initial.rot[i]);
+    const scaleChanged = scale !== initial.scale;
+    const next = cleanTransform({
+      position: p.map((v) => v / 100) as [number, number, number],
+      rotation: rotationChanged ? quatFromEulerDeg(r) : t.rotation,
+      scale: scaleChanged ? [sc, sc, sc] : t.scale,
+    });
+    if (JSON.stringify(next) !== JSON.stringify(cleanTransform(t))) onCommit(next);
+  };
+
+  const row = (label: string, unit: string, values: string[], set: (v: string[]) => void, testid: string) => (
+    <fieldset className={styles.xyz} disabled={disabled} data-testid={testid}>
+      <legend className={styles.xyzLegend}>
+        {label} <span className={styles.unit}>({unit})</span>
+      </legend>
+      {AXES.map((a, i) => (
+        <label key={a} className={styles.axis}>
+          <span className={styles[`axis${a}`]}>{a}</span>
+          <input
+            className={styles.num}
+            inputMode="decimal"
+            aria-label={`${label} ${a}`}
+            value={values[i]}
+            onChange={(e) => set(values.map((v, j) => (j === i ? e.target.value : v)))}
+          />
+        </label>
+      ))}
+    </fieldset>
+  );
+
+  return (
+    <form
+      className={styles.transform}
+      onSubmit={commit}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) commit();
+      }}
+      noValidate
+    >
+      {row('Position', 'cm', pos, setPos, 'inspector-position')}
+      {row('Rotation', '°', rot, setRot, 'inspector-rotation')}
+      <fieldset className={styles.xyz} disabled={disabled}>
+        <legend className={styles.xyzLegend}>
+          Scale <span className={styles.unit}>(%)</span>
+        </legend>
+        <label className={styles.axis}>
+          <span aria-hidden="true">⇔</span>
+          <input className={styles.num} inputMode="decimal" aria-label="Scale" value={scale} onChange={(e) => setScale(e.target.value)} />
+        </label>
+        {!uniform && <span className={styles.unit}>Uneven scale from the file; a new value makes it even.</span>}
+      </fieldset>
+      {error && (
+        <p className={formStyles.error} role="alert">
+          {error}
+        </p>
+      )}
+      {/* Enter applies the values. */}
+      <button type="submit" hidden tabIndex={-1} />
+    </form>
   );
 }

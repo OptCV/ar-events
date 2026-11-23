@@ -389,3 +389,16 @@ Accepted decisions may be superseded by new numbered entries; never rewrite prev
 6. Removing a node never removes its children (they move to its parent). The same image object may be placed more than once.
 7. The viewport flags objects whose picture failed to load ("shape only") instead of drawing them grey.
 **Consequences:** Transforms are read-only until M10. The preview is labelled "3D preview — not AR"; device rendering is unchanged and unverified.
+
+## ADR-028 — Transforms, gizmos and undo/redo in the scene editor (Phase 3 Milestone 10)
+
+**Date:** 2026-11-22
+**Status:** Accepted (browser tests read the saved scene back from the API; desktop only).
+**Decision:**
+1. **Units:** the inspector shows position in centimetres, rotation in degrees (intrinsic X→Y→Z, three.js 'XYZ') and one uniform scale in %; the scene stores meters, a unit quaternion (canonical sign w ≥ 0) and `[s, s, s]`. Values are rounded (µm, 1e-9) so equal-looking transforms are equal. Rotation is recomputed only when a rotation field changed, so a quaternion is never disturbed by a round trip through degrees. The math lives in `apps/web/src/editor/transforms.ts` without three.js (unit-tested against known rotations).
+2. **Typed values** apply on Enter or when focus leaves the transform form (moving between its fields does not apply, so a field is never replaced mid-typing). Limits: ±100 m, 1 %–10 000 %; errors are explained and nothing is saved.
+3. **Gizmos** (three.js TransformControls) appear only with an explicit tool (Move/Rotate/Scale; Q/W/E/R) on a visible, unlocked selection; the camera does not orbit during a gizmo drag; pressing a handle never changes the selection; a drag is committed once at the end (one undo step). Scale stays uniform whichever handle is dragged (pictures are never stretched). Snapping (default on): 1 cm, 15°, 5 %.
+4. **Hierarchy:** the viewport now builds the node hierarchy (children follow parents); gizmo and align edits are in the node's parent space.
+5. **Commands:** lock (blocks transforms, gizmo, align and remove), duplicate (new id, " copy", +10 cm X, unlocked; children are not copied), remove; align by the real drawn bounds — *Put on floor/image* (lowest point to y = 0), *Flush to wall* (back to z = 0), *Fit to image* (uniform scale to the tracking image's width, centred, resting on it).
+6. **Undo/redo** covers node edits of this editing session (limit 100; buttons, Ctrl/⌘+Z, Ctrl/⌘+Shift+Z, Ctrl+Y). Placement, tracking image and details are not part of it, so undo never reverts them; a placement change clears the history. Each undo/redo is autosaved like any edit. Shortcuts are ignored while typing in a field or with a dialog open.
+**Consequences:** History does not survive a reload (by design for now). Device behaviour unchanged and unverified.

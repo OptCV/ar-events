@@ -85,10 +85,10 @@ Plan and slice order: `ROADMAP.md` "Phase 1 plan".
 - [ ] Dashboard and creation wizard.
 - [ ] Placement mode selector and mode migration flow.
 - [x] Scene graph, object tree and Three.js viewport. *(P3 M9, ADR-027: tree, viewport with canonical anchors, inspector, selection, show/hide, rename, remove; lost-update fix)*
-- [ ] Transform inspector with canonical coordinates and snapping.
+- [x] Transform inspector with canonical coordinates and snapping. *(P3 M10, ADR-028: cm/°/% fields, gizmos with explicit tools, snapping, lock/duplicate/remove, put on floor/image, flush to wall, fit to image)*
 - [ ] Multiple models, image objects, panels, text and primitives.
 - [ ] Actions, primary CTA and page-link fallbacks.
-- [ ] Autosave, undo/redo, reusable asset library.
+- [-] Autosave, undo/redo, reusable asset library. *(autosave M4; undo/redo M10 (ADR-028); reusable asset library in the editor: M11)*
 - [-] Platform capability preview. *(registry `packages/capabilities` done; UI pending)*
 
 ## P4: Runtimes

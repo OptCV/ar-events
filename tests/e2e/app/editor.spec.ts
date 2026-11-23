@@ -3,21 +3,11 @@
  * The image objects are converted for real (local Workflow + the converter image in Docker), like image-objects.spec.ts.
  */
 import { readFileSync } from 'node:fs';
-import { expect, test, type Page } from '@playwright/test';
-import { createExperience, verifiedSignedIn } from './helpers.ts';
+import { expect, test } from '@playwright/test';
+import { createExperience, makeImageObject, verifiedSignedIn } from './helpers.ts';
 
 const FIX = 'tests/fixtures/images/';
 
-async function makeImageObject(page: Page, name: string, widthCm: string) {
-  await page.goto('/library');
-  await page.getByRole('group', { name: 'What is this file for?' }).getByText('Display image', { exact: true }).click();
-  await page.getByTestId('uploader-display-image').locator('input[type=file]').setInputFiles({ name, mimeType: 'image/png', buffer: readFileSync(`${FIX}${name}`) });
-  await expect(page.getByRole('status').filter({ hasText: `Uploaded ${name}.` })).toBeVisible();
-  await page.getByRole('link', { name: `Make an AR object from ${name}` }).click();
-  await page.getByLabel('Real-world width').fill(widthCm);
-  await page.getByRole('button', { name: 'Create AR object' }).click();
-  await expect(page.getByTestId('io-status')).toHaveText('Your AR object is ready.', { timeout: 30_000 });
-}
 
 test('scene editor: add → drawn from its file at its real size → select from tree and 3D view → hide, rename → survives reload → remove', async ({ page, request }) => {
   test.setTimeout(120_000);
@@ -49,7 +39,7 @@ test('scene editor: add → drawn from its file at its real size → select from
   await expect(row.getByRole('button', { name: /^ring_inner_hole\.png/ })).toHaveAttribute('aria-pressed', 'true');
   const inspector = page.getByTestId('inspector');
   await expect(inspector.getByTestId('inspector-size')).toHaveText('40 × 40 × 0 cm');
-  await expect(inspector.getByTestId('inspector-position')).toHaveText('0, 0, 0 cm');
+  await expect(inspector.getByLabel('Position X')).toHaveValue('0');
 
   // Clicking empty space in the 3D view clears the selection; clicking the object selects it (orbit drags never do).
   await viewport.scrollIntoViewIfNeeded();

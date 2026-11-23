@@ -39,3 +39,16 @@ export async function createExperience(page: Page, name: string, mode: 'Image an
   await expect(page.getByTestId('save-status')).toHaveText('All changes saved');
   return page.url();
 }
+
+/** Upload a display image fixture and convert it (real local Workflow + converter image). */
+export async function makeImageObject(page: Page, name: string, widthCm: string) {
+  const { readFileSync } = await import('node:fs');
+  await page.goto('/library');
+  await page.getByRole('group', { name: 'What is this file for?' }).getByText('Display image', { exact: true }).click();
+  await page.getByTestId('uploader-display-image').locator('input[type=file]').setInputFiles({ name, mimeType: 'image/png', buffer: readFileSync(`tests/fixtures/images/${name}`) });
+  await expect(page.getByRole('status').filter({ hasText: `Uploaded ${name}.` })).toBeVisible();
+  await page.getByRole('link', { name: `Make an AR object from ${name}` }).click();
+  await page.getByLabel('Real-world width').fill(widthCm);
+  await page.getByRole('button', { name: 'Create AR object' }).click();
+  await expect(page.getByTestId('io-status')).toHaveText('Your AR object is ready.', { timeout: 30_000 });
+}

@@ -2,6 +2,12 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-22 — Phase 3 Milestone 10: transforms, gizmos, undo/redo (local)
+
+### Added
+- Inspector position (cm), rotation (°) and scale (%) fields; Move/Rotate/Scale handles in the 3D view (Q/W/E/R) with snapping (1 cm, 15°, 5 %); Lock, Duplicate (Ctrl/⌘+D), Remove (Delete); Put on floor / Put on image / Flush to wall / Fit to image using the object's real bounds; Undo/Redo (buttons and Ctrl/⌘+Z, Ctrl/⌘+Shift+Z, Ctrl+Y). ADR-028.
+- The 3D view follows the scene hierarchy (children move with their parent).
+
 ## 2026-11-22 — Phase 3 Milestone 9: scene editor workspace (local)
 
 ### Added
