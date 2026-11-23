@@ -40,6 +40,7 @@ function main() {
       'run', ...SANDBOX, '-w', '/app', '-e', 'PYTHONDONTWRITEBYTECODE=1',
       ...mount(join(SVC, 'usd_processor'), '/app/usd_processor'),
       ...mount(join(SVC, 'tests'), '/app/tests'),
+      ...mount(join(SVC, 'fonts'), '/app/fonts'),
       ...mount(join(ROOT, 'tests', 'fixtures'), '/fixtures'),
       IMAGE, 'python', '-m', 'pytest', '-q', '-p', 'no:cacheprovider', 'tests',
     ]);

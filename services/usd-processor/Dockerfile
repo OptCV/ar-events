@@ -12,6 +12,7 @@ RUN pip install -r requirements.txt && useradd --create-home --uid 10001 usd
 FROM base AS test
 COPY requirements-test.txt .
 RUN pip install -r requirements-test.txt
+COPY fonts ./fonts
 COPY usd_processor ./usd_processor
 COPY tests ./tests
 RUN chown -R usd /app
@@ -19,6 +20,7 @@ USER usd
 CMD ["python", "-m", "usd_processor", "--help"]
 
 FROM base AS runtime
+COPY fonts ./fonts
 COPY usd_processor ./usd_processor
 RUN chown -R usd /app
 USER usd

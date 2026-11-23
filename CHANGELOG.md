@@ -2,6 +2,16 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-23 — Phase 5 Milestone 14: scene compiler, composed GLB (local)
+
+### Added
+- Scene compiler in the converter container: `POST /v1/scene/glb` composes one GLB from a scene (image objects and models merged losslessly; shapes; text and panels rendered with a bundled font), deterministic, Scene Viewer's 15 MB limit enforced. ADR-032.
+- Bundled DejaVu Sans for text and panels, used by both the compiler and the editor; Khronos glTF Validator in the integration tests.
+- `apps/api/src/compile/sceneRequest.ts`: builds compile requests from a scene (used by the M16 pipeline).
+
+### Changed
+- The editor draws text and panels with the bundled font (waits for it to load), so its preview matches the exported files.
+
 ## 2026-11-22 — Phase 4 Milestone 13: interaction plan and compatibility matrix (local)
 
 ### Added

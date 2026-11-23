@@ -32,7 +32,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import type { DraftPlacement, SceneNode, Transform } from '@ar-creator/schema';
 import { effectivelyVisible } from './sceneModel.ts';
-import { buildContent, contentKey } from './builtins.ts';
+import { buildContent, contentKey, loadContentFonts } from './builtins.ts';
 import type { ObjectStats } from './budgets.ts';
 import { SNAP, cleanTransform, sameTransform, uniformFromDrag, type Quat, type Vec3 } from './transforms.ts';
 import styles from './Editor.module.css';
@@ -236,8 +236,11 @@ export default function Viewport(props: ViewportProps) {
 
     engine.current = { render, scene, anchor, content, gizmo, frame, selection: null };
     latest.current.apiRef.current = { aligned: (id, kind) => aligned(holders.current.get(id)?.group ?? null, kind, latest.current.trackingImage) };
-    setState('ready');
+    // Text and panels use the bundled font (as exported); draw once it is loaded (or after a short timeout).
+    let live = true;
+    void loadContentFonts().then(() => live && setState('ready'));
     return () => {
+      live = false;
       engine.current = null;
       latest.current.apiRef.current = null;
       ro.disconnect();

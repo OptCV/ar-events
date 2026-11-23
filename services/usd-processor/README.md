@@ -53,3 +53,9 @@ Locally (Windows cannot run Cloudflare Containers): `npm run usd:serve` builds t
 texture is PNG (anything with transparency, or lossless sources) or JPEG q92 4:4:4 (opaque lossy sources), rotated
 upright from EXIF and downscaled in premultiplied alpha. Pillow is pinned (13.0.0). WebP test fixtures:
 `node --experimental-strip-types scripts/usd.ts fixtures-webp` (writes `tests/fixtures/normalize/` + SHA256SUMS).
+
+## Scene compiler (ADR-032)
+
+`POST /v1/scene/glb` — body `u32be(len) + manifest JSON + payload` (see `usd_processor/scene/request.py`; the Worker side
+is `apps/api/src/compile/sceneRequest.ts`) → framed JSON + composed GLB. Text and panels use the bundled DejaVu Sans in
+`fonts/` (licence: `fonts/DejaVu-LICENSE.txt`; the same files are in `apps/web/public/fonts`).

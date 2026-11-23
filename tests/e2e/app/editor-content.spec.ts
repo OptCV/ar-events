@@ -81,7 +81,8 @@ test('text, panel and shape: added at the surface, edited, drawn at their real s
   await inspector.getByLabel('Line height (cm)').fill('10');
   await inspector.getByLabel('Line height (cm)').press('Enter');
   await inspector.getByLabel('Colour').fill('#c0392b');
-  await expect(inspector.getByTestId('inspector-size')).toHaveText(/ × 20 × 0 cm$/);
+  // Same layout as the scene compiler (bundled font): the server measures this text at 402 × 320 px → 25.1 × 20 cm.
+  await expect(inspector.getByTestId('inspector-size')).toHaveText('25.1 × 20 × 0 cm');
   let nodes = await savedNodes(page);
   expect(nodes[0]).toMatchObject({ kind: 'text', text: 'Hello\nAR', style: { color: '#c0392b', sizeMeters: 0.1 }, transform: { position: [0, 0.025, 0] } });
   await inspector.getByLabel('Text', { exact: true }).fill('');
@@ -95,6 +96,8 @@ test('text, panel and shape: added at the surface, edited, drawn at their real s
   await inspector.getByLabel('Title').fill('Opening hours');
   await inspector.getByLabel('Text', { exact: true }).fill('Monday to Friday, 9:00 to 17:00. Closed on public holidays.');
   await inspector.getByLabel('Title').click();
+  // Server layout for this panel: 1024 × 340 px (title + two body lines) → 30 × 10 cm.
+  await expect(inspector.getByTestId('inspector-size')).toHaveText('30 × 10 × 0 cm');
 
   // Shape: a 20 cm box resting on the floor; then a red sphere.
   await add.getByRole('button', { name: 'Add shape' }).click();

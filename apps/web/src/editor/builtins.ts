@@ -52,7 +52,30 @@ function primitive(shape: 'box' | 'sphere' | 'cylinder' | 'plane', color: string
   return m;
 }
 
-const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+/**
+ * The bundled DejaVu Sans (apps/web/public/fonts, the same files the scene compiler uses), so the preview matches the
+ * exported text and panels. Loaded by `loadContentFonts()` before the viewport draws.
+ */
+const FONT = '"AR Creator Sans", system-ui, sans-serif';
+const FACES = [
+  { weight: '400', url: '/fonts/DejaVuSans.ttf' },
+  { weight: '700', url: '/fonts/DejaVuSans-Bold.ttf' },
+] as const;
+let fontsReady: Promise<void> | null = null;
+
+/** Registers and loads the content font once; resolves (never rejects) so drawing can proceed with a fallback. */
+export function loadContentFonts(timeoutMs = 4000): Promise<void> {
+  fontsReady ??= Promise.race([
+    Promise.all(
+      FACES.map(async (f) => {
+        const face = new FontFace('AR Creator Sans', `url(${f.url})`, { weight: f.weight });
+        document.fonts.add(await face.load());
+      }),
+    ).then(() => undefined),
+    new Promise<void>((r) => setTimeout(r, timeoutMs)),
+  ]).catch(() => undefined);
+  return fontsReady;
+}
 const MAX_CANVAS = 4096;
 
 function canvasPlane(canvas: HTMLCanvasElement, width: number, height: number, name: string): Mesh {
@@ -72,18 +95,18 @@ function text(value: string, color: string, lineMeters: number): Mesh {
   const linePx = () => Math.round(fontPx * 1.25);
   const c = document.createElement('canvas');
   const ctx = c.getContext('2d')!;
-  ctx.font = `600 ${fontPx}px ${FONT}`;
+  ctx.font = `700 ${fontPx}px ${FONT}`;
   let widest = Math.max(1, ...lines.map((l) => ctx.measureText(l).width));
   // Keep the canvas within GPU limits for long text.
   const scale = Math.min(1, (MAX_CANVAS - 32) / widest, MAX_CANVAS / (linePx() * lines.length));
   if (scale < 1) {
     fontPx = Math.max(8, Math.floor(fontPx * scale));
-    ctx.font = `600 ${fontPx}px ${FONT}`;
+    ctx.font = `700 ${fontPx}px ${FONT}`;
     widest = Math.max(1, ...lines.map((l) => ctx.measureText(l).width));
   }
   c.width = Math.ceil(widest + fontPx * 0.25);
   c.height = linePx() * lines.length;
-  ctx.font = `600 ${fontPx}px ${FONT}`;
+  ctx.font = `700 ${fontPx}px ${FONT}`;
   ctx.fillStyle = color;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';

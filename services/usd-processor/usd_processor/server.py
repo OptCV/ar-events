@@ -8,6 +8,7 @@ access disabled). One request at a time; every job works in a fresh temporary di
 
     GET  /healthz                       -> 200 {"ok": true, "converterVersion": ..., "usd": ...}
     POST /v1/texture?max_edge=2048        body: PNG/JPEG/WebP -> framed JSON + prepared PNG or JPEG (ADR-025)
+    POST /v1/scene/glb                    body: scene request (scene/request.py) -> framed JSON + composed GLB (ADR-032)
     POST /v1/image-plane?width_m=0.5&alpha_mode=BLEND&alpha_cutoff=0.5&double_sided=0&pivot=center&orientation=upright
          body: image bytes (PNG/JPEG, Content-Length required, <= MAX_BODY)
          header X-Source-SHA256 (optional): refuse if the body does not hash to it
@@ -33,8 +34,12 @@ from pxr import Usd
 
 from .image_plane import CONVERTER_VERSION, ConversionError, ImagePlaneRequest, build_image_plane_usdz
 from .texture import TEXTURE_CONVERTER_VERSION, TextureError, prepare_texture
+from .scene.compose_glb import SCENE_COMPILER_VERSION, SceneCompileError, compose_glb
+from .scene.request import SceneRequestError, parse_scene_request
 
 MAX_BODY = 32 * 1024 * 1024
+#: A scene request carries every model and image-object file it uses (models up to 25 MB each).
+MAX_SCENE_BODY = 64 * 1024 * 1024
 FRAME_TYPE = "application/vnd.ar-creator.conversion"
 
 
@@ -144,30 +149,45 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         if urlsplit(self.path).path == "/healthz":
-            self._json(200, {"ok": True, "converterVersion": CONVERTER_VERSION, "textureVersion": TEXTURE_CONVERTER_VERSION, "usd": ".".join(map(str, Usd.GetVersion()))})
+            self._json(200, {"ok": True, "converterVersion": CONVERTER_VERSION, "textureVersion": TEXTURE_CONVERTER_VERSION, "sceneVersion": SCENE_COMPILER_VERSION, "usd": ".".join(map(str, Usd.GetVersion()))})
         else:
             self._json(404, {"ok": False, "code": "not_found", "error": "not found"})
 
     def do_POST(self) -> None:  # noqa: N802
         url = urlsplit(self.path)
         try:
-            if url.path not in ("/v1/image-plane", "/v1/texture"):
+            if url.path not in ("/v1/image-plane", "/v1/texture", "/v1/scene/glb"):
                 raise BadRequest(404, "not_found", "not found")
-            params = parse_image_plane_query(url.query) if url.path == "/v1/image-plane" else parse_texture_query(url.query)
+            if url.path == "/v1/scene/glb":
+                if url.query:
+                    raise BadRequest(400, "bad_parameter", "this endpoint takes no parameters")
+                params = {}
+            else:
+                params = parse_image_plane_query(url.query) if url.path == "/v1/image-plane" else parse_texture_query(url.query)
+            limit = MAX_SCENE_BODY if url.path == "/v1/scene/glb" else MAX_BODY
             length_raw = self.headers.get("Content-Length")
             if length_raw is None or not length_raw.isdigit():
                 raise BadRequest(411, "length_required", "Content-Length is required")
             length = int(length_raw)
             if length == 0:
                 raise BadRequest(400, "empty_body", "the request has no image")
-            if length > MAX_BODY:
-                raise BadRequest(413, "too_large", f"the image is larger than {MAX_BODY} bytes")
+            if length > limit:
+                raise BadRequest(413, "too_large", f"the request is larger than {limit} bytes")
             body = self.rfile.read(length)
             if len(body) != length:
                 raise BadRequest(400, "incomplete_body", "the request body ended early")
             expected = self.headers.get("X-Source-SHA256")
             if expected is not None and hashlib.sha256(body).hexdigest() != expected.strip().lower():
                 raise BadRequest(422, "checksum_mismatch", "the image does not match X-Source-SHA256")
+            if url.path == "/v1/scene/glb":
+                try:
+                    glb, res = compose_glb(parse_scene_request(body))
+                except SceneRequestError as e:
+                    raise BadRequest(400 if e.code == "bad_scene" else 422, e.code, str(e)) from None
+                except SceneCompileError as e:
+                    raise BadRequest(422, e.code, str(e)) from None
+                self._frame({"ok": True, **res.to_dict()}, glb)
+                return
             if url.path == "/v1/texture":
                 try:
                     data, tex = prepare_texture(body, params["max_edge"])
