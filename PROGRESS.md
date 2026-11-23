@@ -285,3 +285,9 @@ Not available yet: lint (ESLint/Prettier not configured), DB migrations, `apps/w
 - Built M15: `scene/gltf_to_usd.py` (static glTF → USD with PBR materials; warnings for what is not carried over; compressed meshes refused), `scene/compose_usdz.py` (anchoring, nodes, built-ins, packaging, validation), `/v1/scene/usdz`; inspector "On iPhone" notes for models.
 - Verified locally: typecheck; Vitest 246; USD 97; integration 101; Playwright 89; deploy dry run.
 - Not deployed (nothing calls the compiler yet). Next: M16 — compile pipeline (Workflow) and short-lived device test links, which make the first device runs of compiled scenes possible.
+
+## Session handoff — 2026-11-23 (20) / Claude Code — Phase 5 Milestone 16 IN PROGRESS (stopped: usage limit)
+
+- Done (typecheck clean; Vitest 246; DB 47): contracts `builds.ts` (BuildSummary, TestBuildResponse, BUILD_ERRORS, limits) + conflict reasons `not_ready`, `build_running`; DB schema + migration **0006_build_outputs** (revision state `ready`, `content_hash` unique per experience and immutable via the updated trigger, `generated_outputs.size_bytes` required when ready) with integrity tests; converter client `scene('glb'|'usdz', request, sha)`.
+- Migration 0006 is applied to LOCAL Postgres only. **Not applied to Neon development — needs the owner's approval.**
+- Remaining for M16: signing kinds `output`/`build`; `compile/pipeline.ts` (start → GLB step → USDZ step → finish; per-output failure → partially_ready); Workflow param `kind: 'build'` in the existing workflow class + inline runner; routes (POST /api/experiences/:id/builds, GET build, GET /api/test-builds/:id signed, GET /api/outputs/:id/content signed with CORP cross-origin); web "Test on device" panel + /test/:id page (Quick Look banner + tap handler, Scene Viewer intent with link, desktop 3D preview + QR via qrcode-generator 2.0.4); integration + browser tests; ADR-034; docs.

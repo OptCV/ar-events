@@ -41,6 +41,8 @@ export const revisionStateEnum = pgEnum('revision_state', [
   'compiling',
   'partially_ready',
   'published',
+  /** A test build whose every output is ready (Phase 5 M16, ADR-034). */
+  'ready',
   'failed',
   'superseded',
 ]);
@@ -118,6 +120,11 @@ export const experienceRevisions = pgTable(
     createdBy: text('created_by').references(() => user.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     frozenAt: timestamp('frozen_at', { withTimezone: true }),
+    /**
+     * Builds (ADR-034): SHA-256 over the scene, the files it uses and the compiler versions. An unchanged draft reuses
+     * its build. Immutable once frozen (trigger).
+     */
+    contentHash: char('content_hash', { length: 64 }),
   },
   (t) => [
     unique('experience_revisions_number_unique').on(t.experienceId, t.revisionNumber),
@@ -127,6 +134,8 @@ export const experienceRevisions = pgTable(
     check('experience_revisions_schema_version_positive', sql`${t.schemaVersion} > 0`),
     check('experience_revisions_config_object', sql`jsonb_typeof(${t.config}) = 'object'`),
     check('experience_revisions_frozen_at', sql`(${t.state} = 'draft') = (${t.frozenAt} IS NULL)`),
+    check('experience_revisions_content_hash_format', sql`${t.contentHash} IS NULL OR ${SHA256(t.contentHash)}`),
+    uniqueIndex('experience_revisions_content_hash_idx').on(t.experienceId, t.contentHash).where(sql`${t.contentHash} IS NOT NULL`),
   ],
 );
 
@@ -249,11 +258,15 @@ export const generatedOutputs = pgTable(
     sha256: char('sha256', { length: 64 }),
     mimeType: varchar('mime_type', { length: 100 }),
     validation: jsonb('validation'),
+    /** Bytes of the stored object (ADR-034); required once ready. */
+    sizeBytes: bigint('size_bytes', { mode: 'number' }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
     unique('generated_outputs_revision_runtime_unique').on(t.revisionId, t.runtime),
     check('generated_outputs_ready_complete', sql`${t.state} <> 'ready' OR (${t.r2Key} IS NOT NULL AND ${t.sha256} IS NOT NULL)`),
     check('generated_outputs_sha256_format', sql`${t.sha256} IS NULL OR ${SHA256(t.sha256)}`),
+    check('generated_outputs_ready_sized', sql`${t.state} <> 'ready' OR ${t.sizeBytes} IS NOT NULL`),
+    check('generated_outputs_size_positive', sql`${t.sizeBytes} IS NULL OR ${t.sizeBytes} > 0`),
   ],
 );

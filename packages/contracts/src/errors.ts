@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { FILE_REJECTIONS } from './assets.ts';
 
 /** Machine-readable reasons for `conflict` (409) responses. */
-export const CONFLICT_REASONS = ['stale_draft', 'placement_change_unconfirmed', 'slug_taken', 'upload_not_pending', 'quota_exceeded', 'asset_in_use', 'conversion_running', 'not_convertible'] as const;
+export const CONFLICT_REASONS = ['stale_draft', 'placement_change_unconfirmed', 'slug_taken', 'upload_not_pending', 'quota_exceeded', 'asset_in_use', 'conversion_running', 'not_convertible', 'not_ready', 'build_running'] as const;
 
 /** Every API error uses this shape. `requestId` correlates with Worker logs; no stack traces or internals. */
 export const ApiError = z.object({

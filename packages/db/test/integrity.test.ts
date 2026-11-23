@@ -121,6 +121,18 @@ describe('revision immutability (trigger)', () => {
     await h.db.update(experienceRevisions).set({ state: 'published', validationReport: { ok: true } }).where(eq(experienceRevisions.id, r.id));
   });
 
+  it('builds (0006): content hash format, one build per experience × hash, immutable once frozen; ready state', async () => {
+    const e = await makeExperience(owner);
+    const [b] = await h.db
+      .insert(experienceRevisions)
+      .values({ experienceId: e.id, revisionNumber: 2, state: 'compiling', schemaVersion: 1, config: { schemaVersion: 1 }, frozenAt: new Date(), contentHash: sha('a') })
+      .returning();
+    expect(await pgCode(h.db.insert(experienceRevisions).values({ experienceId: e.id, revisionNumber: 3, state: 'snapshot', schemaVersion: 1, config: { schemaVersion: 1 }, frozenAt: new Date(), contentHash: sha('a') }))).toBe(UNIQUE);
+    expect(await pgCode(h.db.insert(experienceRevisions).values({ experienceId: e.id, revisionNumber: 4, state: 'snapshot', schemaVersion: 1, config: { schemaVersion: 1 }, frozenAt: new Date(), contentHash: 'NOT-A-HASH' }))).toBe(CHECK);
+    expect(await pgCode(h.db.update(experienceRevisions).set({ contentHash: sha('b') }).where(eq(experienceRevisions.id, b!.id)))).toBe(CHECK);
+    await h.db.update(experienceRevisions).set({ state: 'ready' }).where(eq(experienceRevisions.id, b!.id));
+  });
+
   it('frozen_at must be set exactly when the revision is not a draft', async () => {
     const e = await makeExperience(owner);
     expect(
@@ -183,7 +195,11 @@ describe('assets, derivatives, outputs, jobs', () => {
     const r = await makeRevision(e.id, 1, 'snapshot');
     const [o] = await h.db.insert(generatedOutputs).values({ revisionId: r.id, runtime: 'ios_quicklook_image' }).returning();
     expect(await pgCode(h.db.insert(generatedOutputs).values({ revisionId: r.id, runtime: 'ios_quicklook_image' }))).toBe(UNIQUE);
-    await h.db.update(generatedOutputs).set({ state: 'ready', r2Key: `experiences/${e.id}/revisions/${r.id}/ios/experience.usdz`, sha256: sha('e') }).where(eq(generatedOutputs.id, o!.id));
+    const key = `experiences/${e.id}/revisions/${r.id}/ios/experience.usdz`;
+    // Ready needs a size (0006).
+    expect(await pgCode(h.db.update(generatedOutputs).set({ state: 'ready', r2Key: key, sha256: sha('e') }).where(eq(generatedOutputs.id, o!.id)))).toBe(CHECK);
+    expect(await pgCode(h.db.update(generatedOutputs).set({ sizeBytes: 0 }).where(eq(generatedOutputs.id, o!.id)))).toBe(CHECK);
+    await h.db.update(generatedOutputs).set({ state: 'ready', r2Key: key, sha256: sha('e'), sizeBytes: 1234 }).where(eq(generatedOutputs.id, o!.id));
     expect(await pgCode(h.db.update(generatedOutputs).set({ r2Key: 'experiences/x/other.usdz' }).where(eq(generatedOutputs.id, o!.id)))).toBe(CHECK);
     expect(await pgCode(h.db.insert(generatedOutputs).values({ revisionId: r.id, runtime: 'android_scene_viewer_image' as never }))).toBe('22P02');
   });

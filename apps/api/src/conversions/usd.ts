@@ -44,6 +44,16 @@ export interface UsdConverter {
   imagePlane(image: Uint8Array, params: UsdImagePlaneParams, sourceSha256: string): Promise<UsdImagePlaneResult>;
   /** WebP → PNG/JPEG, EXIF rotation, downscale to maxEdge (server.py /v1/texture, ADR-025). */
   prepareTexture(image: Uint8Array, maxEdge: number, sourceSha256: string): Promise<PreparedTexture>;
+  /** Scene compile request (compile/sceneRequest.ts) → composed GLB or anchored USDZ (ADR-032/033). */
+  scene(format: 'glb' | 'usdz', request: Uint8Array, requestSha256: string): Promise<SceneOutput>;
+}
+
+export interface SceneOutput {
+  bytes: Uint8Array;
+  sha256: string;
+  compilerVersion: string;
+  warnings: string[];
+  meta: Record<string, unknown>;
 }
 
 /** The converter refused the input or its output failed validation: retrying will not help. */
@@ -132,6 +142,11 @@ export function httpUsdConverter(fetcher: (req: Request) => Promise<Response>, o
         hasAlpha: meta.has_alpha === true,
         converterVersion: String(meta.converter_version),
       };
+    },
+    async scene(format, request, requestSha256) {
+      const { meta, usdz: bytes } = await call(`/v1/scene/${format}`, request, requestSha256);
+      if (meta.ok !== true) throw new UsdConversionRejected('validation_failed', 'the compiled scene failed validation');
+      return { bytes, sha256: String(meta.sha256), compilerVersion: String(meta.compilerVersion), warnings: Array.isArray(meta.warnings) ? meta.warnings.map(String) : [], meta };
     },
     async imagePlane(image, params, sourceSha256) {
       const { meta, usdz } = await call(`/v1/image-plane?${imagePlaneQuery(params)}`, image, sourceSha256);

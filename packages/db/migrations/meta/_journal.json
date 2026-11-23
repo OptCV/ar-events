@@ -43,6 +43,13 @@
       "when": 1795387683252,
       "tag": "0005_texture_derivatives",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795411844014,
+      "tag": "0006_build_outputs",
+      "breakpoints": true
     }
   ]
 }

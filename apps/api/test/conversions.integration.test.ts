@@ -37,6 +37,7 @@ const usd: UsdConverter = {
     if (control.down) throw new UsdConverterUnavailable('simulated outage');
     return real.prepareTexture(...args);
   },
+  scene: (...args) => real.scene(...args),
 };
 
 const manifest = JSON.parse(readFileSync(fileURLToPath(new URL('../../../tests/fixtures/manifest.json', import.meta.url).href), 'utf8')) as { fixtures: { file: string; role: string; expectedAutoAlpha: string; sha256: string }[] };
