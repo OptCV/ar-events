@@ -2,7 +2,7 @@ import { useId, useState, type FormEvent } from 'react';
 import type { Action, SceneNode } from '@ar-creator/schema';
 import { cx } from '../components/cx.ts';
 import formStyles from '../components/form/Form.module.css';
-import { ACTION_TYPES, ACTION_TYPE_LABEL, actionTitle, canBePrimary, checkAction, describeAction, removeAction, setPrimary, upsertAction, usageOf, type ActionType, type Content } from './actions.ts';
+import { ACTION_TYPES, actionOption, actionTitle, canBePrimary, checkAction, describeAction, removeAction, setPrimary, upsertAction, usageOf, type ActionType, type Content } from './actions.ts';
 import { nodeLabel } from './sceneModel.ts';
 import styles from './Editor.module.css';
 
@@ -71,7 +71,7 @@ export function ActionsPanel(props: {
           <option value="">None</option>
           {links.map((a) => (
             <option key={a.id} value={a.id}>
-              {actionTitle(a, c.nodes)} — {describeAction(a, c.nodes)}
+              {actionOption(a, c.nodes)}
             </option>
           ))}
         </select>

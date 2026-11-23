@@ -48,7 +48,7 @@ export function buildQuickLookHref(p: QuickLookParams): string {
  * Wire the Quick Look CTA tap to a validated https URL. Returns a disposer.
  * Only works on the exact `<a rel="ar">` element used to launch Quick Look.
  */
-export function onQuickLookTap(anchor: HTMLAnchorElement, targetUrl: string, open: (url: string) => void): () => void {
+export function onQuickLookTap(anchor: EventTarget, targetUrl: string, open: (url: string) => void): () => void {
   const r = checkOutboundUrl(targetUrl, ['https:']);
   if (!r.ok) throw new LaunchParamError('targetUrl', r.reason);
   const href = r.url.href;

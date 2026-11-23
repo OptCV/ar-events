@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DraftExperienceScene, IDENTITY_TRANSFORM, type Action, type SceneNode } from '@ar-creator/schema';
-import { actionTitle, checkAction, describeAction, removeAction, removeNodeCascade, setPrimary, setTapAction, upsertAction, usageOf, type Content } from './actions.ts';
+import { actionOption, actionTitle, checkAction, describeAction, removeAction, removeNodeCascade, setPrimary, setTapAction, upsertAction, usageOf, type Content } from './actions.ts';
 
 const node = (id: string, extra: Record<string, unknown> = {}): SceneNode => ({ id, kind: 'primitive', shape: 'box', name: id, transform: IDENTITY_TRANSFORM, visible: true, locked: false, ...extra }) as SceneNode;
 const link: Action = { id: 'a-link', type: 'open-url', url: 'https://example.com/shop', label: 'Shop' };
@@ -21,6 +21,8 @@ describe('actions (M12)', () => {
     expect(describeAction({ id: 'p', type: 'play-animation', nodeId: 'gone', clip: 'Walk' }, c.nodes)).toBe('Play “Walk” on a removed object');
     expect(actionTitle(link, c.nodes)).toBe('Shop');
     expect(actionTitle({ id: 'm', type: 'mailto', address: 'a@b.co' }, c.nodes)).toBe('Send email');
+    expect(actionOption(link, c.nodes)).toBe('Shop — Open https://example.com/shop');
+    expect(actionOption(toggle, c.nodes)).toBe('Show or hide “box”'); // title = description: shown once
   });
 
   it('validates with the scene schema and explains problems', () => {
@@ -58,7 +60,7 @@ describe('actions (M12)', () => {
 
   it('removing an object removes the actions that target it and hotspots left without an action — and lists them', () => {
     const r = removeNodeCascade(content(), 'box');
-    expect(r.removed).toEqual(['the action “Show or hide “box””', 'the hotspot “pin”']);
+    expect(r.removed).toEqual(['the action Show or hide “box”', 'the hotspot “pin”']);
     expect(r.content.actions.map((a) => a.id)).toEqual(['a-link']);
     expect(r.content.nodes.map((n) => n.id)).toEqual(['lamp']);
     expect(r.content.nodes[0]).not.toHaveProperty('actionId');

@@ -4,12 +4,13 @@ import type { DraftExperienceScene, SceneNode, Transform } from '@ar-creator/sch
 import type { SceneEdit } from '../experiences/useDraftEditor.ts';
 import { cx } from '../components/cx.ts';
 import formStyles from '../components/form/Form.module.css';
-import { capability, type Feature } from '@ar-creator/capabilities';
+import { SUPPORT_LABEL, capability, type Feature } from '@ar-creator/capabilities';
 import { Thumb, describeImageObject, newNodeId } from '../experiences/ImageObjectsPanel.tsx';
 import { useAssets } from '../assets/api.ts';
 import { AddContent } from './AddContent.tsx';
 import { ActionsPanel } from './ActionsPanel.tsx';
-import { actionTitle, describeAction, removeNodeCascade, setTapAction, type Content } from './actions.ts';
+import { CompatibilityPanel } from './CompatibilityPanel.tsx';
+import { actionOption, removeNodeCascade, setTapAction, type Content } from './actions.ts';
 import { budgetIssues, sceneTotals } from './budgets.ts';
 import { ContentFields } from './ContentFields.tsx';
 import { useAsset, useImageObjects } from '../imageObjects/api.ts';
@@ -303,6 +304,7 @@ export function SceneEditor({ scene, busy, onChange }: { scene: DraftExperienceS
       </section>
     </div>
     <ActionsPanel content={content} busy={busy} clipsFor={clipsFor} onEdit={editContent} onNotice={(t, tone) => setNotice(t, tone)} />
+    <CompatibilityPanel scene={scene} blendImageObjects={scene.nodes.filter((n) => n.kind === 'image-object' && byDerivative.get(n.derivativeId)?.resolvedAlphaMode === 'BLEND').length} />
     </>
   );
 }
@@ -609,14 +611,6 @@ const RUNTIME_LABEL = [
   ['android_webxr_image', 'Android image tracking'],
   ['android_scene_viewer_floor', 'Android Scene Viewer'],
 ] as const;
-const STATUS_LABEL: Record<string, string> = {
-  native: 'Supported',
-  compiled_visual: 'As a picture',
-  fallback_page: 'On the page',
-  experimental: 'Experimental',
-  unsupported: 'Not supported',
-  verify: 'Planned, not yet device-tested',
-};
 
 /** How this kind of object is planned to appear in each AR viewer (capability registry: planning, not device-verified). */
 function InAr({ kind }: { kind: SceneNode['kind'] }) {
@@ -632,7 +626,7 @@ function InAr({ kind }: { kind: SceneNode['kind'] }) {
             <div key={runtime} className={styles.factRow}>
               <dt>{label}</dt>
               <dd>
-                {STATUS_LABEL[e.status]}: {e.message}
+                {SUPPORT_LABEL[e.status]}: {e.message}
               </dd>
             </div>
           );
@@ -654,7 +648,7 @@ function TapAction({ node, nodes, actions, disabled, onChange }: { node: SceneNo
         {!hotspot && <option value="">Nothing</option>}
         {actions.map((a) => (
           <option key={a.id} value={a.id}>
-            {actionTitle(a, nodes)} — {describeAction(a, nodes)}
+            {actionOption(a, nodes)}
           </option>
         ))}
       </select>

@@ -12,6 +12,7 @@ import {
   type ExperienceSummary,
 } from '@ar-creator/contracts';
 import { schema } from '@ar-creator/db';
+import { interactionIssues } from '@ar-creator/capabilities';
 import { DraftExperienceScene, defaultDraftScene, publishReadiness } from '@ar-creator/schema';
 import type { AppEnv } from '../app.ts';
 import { requireSession } from '../auth/middleware.ts';
@@ -191,7 +192,11 @@ export function experienceRoutes() {
   r.post('/:id/validate', async (c) => {
     const row = await load(c, c.req.param('id'));
     if (!row) return notFound(c);
-    return c.json(ReadinessResponse.parse(publishReadiness(detail(row).draft.scene)));
+    const scene = detail(row).draft.scene;
+    const base = publishReadiness(scene);
+    // Interactions that will not work as expected on a viewer (ADR-031): warnings, never silent.
+    const interactions = interactionIssues(scene).map(({ severity, code, message, path }) => ({ severity, code, message, path }));
+    return c.json(ReadinessResponse.parse({ ready: base.ready, issues: [...base.issues, ...interactions] }));
   });
 
   r.delete('/:id', async (c) => {

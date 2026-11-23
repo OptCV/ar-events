@@ -87,9 +87,9 @@ Plan and slice order: `ROADMAP.md` "Phase 1 plan".
 - [x] Scene graph, object tree and Three.js viewport. *(P3 M9, ADR-027: tree, viewport with canonical anchors, inspector, selection, show/hide, rename, remove; lost-update fix)*
 - [x] Transform inspector with canonical coordinates and snapping. *(P3 M10, ADR-028: cm/°/% fields, gizmos with explicit tools, snapping, lock/duplicate/remove, put on floor/image, flush to wall, fit to image)*
 - [x] Multiple models, image objects, panels, text and primitives. *(P3 M11, ADR-029; AR output via P4 compilers)*
-- [-] Actions, primary CTA and page-link fallbacks. *(P4 M12, ADR-030: actions, tap actions, hotspots and the main button in the editor; per-viewer mapping and page-link fallbacks: M13)*
+- [x] Actions, primary CTA and page-link fallbacks. *(P4 M12–M13, ADR-030/031: authoring, per-runtime interaction plan, page links; executed by the P5 viewers)*
 - [x] Autosave, undo/redo, reusable asset library. *(autosave M4; undo/redo M10 (ADR-028); models and image objects picked from the library or uploaded in the editor M11 (ADR-029))*
-- [-] Platform capability preview. *(registry `packages/capabilities` done; per-object "In AR" notes in the inspector (M11); the pre-publish report is P4/P5)*
+- [x] Platform capability preview. *(registry; "In AR" per object (M11); compatibility matrix, warnings and experience-page preview in the editor, warnings in the readiness API (M13, ADR-031))*
 
 ## P4: Runtimes
 

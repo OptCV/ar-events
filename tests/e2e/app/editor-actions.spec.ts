@@ -126,7 +126,7 @@ test('deleting never leaves dangling references: actions, hotspots and the objec
   // Removing the box removes the action that shows/hides it and the hotspot left without an action — and says so.
   await page.getByTestId('tree-row').getByRole('button', { name: /^Box/ }).click();
   await inspector.getByRole('button', { name: 'Remove Box' }).click();
-  await expect(page.getByTestId('editor-notice')).toHaveText('Also removed the action “Show or hide “Box”” and the hotspot “Hotspot”.');
+  await expect(page.getByTestId('editor-notice')).toHaveText('Also removed the action Show or hide “Box” and the hotspot “Hotspot”.');
   scene = await saved(page);
   expect(scene).toMatchObject({ nodes: [], actions: [] });
 

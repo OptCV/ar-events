@@ -428,3 +428,18 @@ Accepted decisions may be superseded by new numbered entries; never rewrite prev
 4. **Undo covers content:** nodes, actions and the main button are edited and undone as one unit (so one undo restores an object together with the actions removed with it). Placement, tracking image and details remain outside undo.
 5. **Animation clips** are read from the loaded model file (unnamed clips as "#index"); the play-animation action is offered only when the scene has a model.
 **Consequences:** Whether a tap or a link actually works depends on the viewer (Quick Look and Scene Viewer have no taps): M13 computes and shows that plan, and nothing is dropped from the experience page.
+
+## ADR-031 — Interaction plan per runtime and the compatibility matrix (Phase 4 Milestone 13)
+
+**Date:** 2026-11-22
+**Status:** Accepted (planning; device behaviour unverified). Meets the Phase 4 gate in code: no action silently disappears.
+**Decision:**
+1. **One pure plan per runtime** (`packages/capabilities/src/interactions.ts`), used by the editor, the API readiness check and later the P5 viewers/launchers, so the rules exist once. A placement publishes to two runtimes (image → Quick Look image + WebXR; floor/wall → Quick Look + Scene Viewer).
+2. **Routes:**
+   - **Main button** (web link): Quick Look banner (`callToAction` = button text; the page opens the URL on the banner tap) · Scene Viewer `link` · WebXR on-screen button (DOM overlay, experimental). `nativeLaunchOptions(plan)` produces exactly the launcher parameters (tested through `buildQuickLookHref` / `buildSceneViewerIntent`).
+   - **Every link** (web, email, phone) is a button on the **experience page** on every device, main button first (PLATFORM_ROUTING.md: preserve all links). In WebXR links also get on-screen buttons, and taps where assigned (experimental).
+   - **Behaviours** (show/hide, play animation) run only inside the AR view: from taps in WebXR (experimental). Quick Look and Scene Viewer cannot run them on request: show/hide is *unavailable* there; play-animation is *plays by itself* (verify). A behaviour no object or hotspot uses never runs.
+3. **Never silent:** an action that is unavailable on a runtime always produces a warning naming it and the viewers; so do taps and hotspots in Quick Look/Scene Viewer, animations that cannot be started on request, and unused behaviours. Warnings never block publishing. An exhaustive unit test over every placement × action kind × tap/hotspot use × main-button choice (192 runtime checks) asserts each action has a route or an explained unavailability, and every link is on the page — **the Phase 4 gate**.
+4. **Server readiness** (`POST /api/experiences/:id/validate`) appends these warnings to the publish check.
+5. **Editor:** a Compatibility section shows a matrix (features the scene uses from the capability registry, and every action's routes) for the placement's two viewers, the warnings, and a preview of the experience page's buttons. Status words: Supported / Experimental / Planned, not yet device-tested / Not available — nothing claims device verification.
+**Consequences:** P5 implements the routes (banner tap handler, `link`, overlay buttons, tap raycast, experience page); the plan is their contract.

@@ -229,6 +229,27 @@ describe('publish readiness', () => {
     const r2 = ReadinessResponse.parse(await (await h.req(`/api/experiences/${floor.id}/validate`, { body: {}, jar: alice })).json());
     expect(r2.ready).toBe(true);
   });
+
+  it('warns (without blocking) about interactions a viewer cannot run (ADR-031)', async () => {
+    const floor = (await create(alice)).e!;
+    const actions = [
+      { id: 'web', type: 'open-url', url: 'https://example.com/' },
+      { id: 'tog', type: 'toggle-visibility', nodeId: 'a' },
+    ];
+    const saved = await h.req(`/api/experiences/${floor.id}/draft`, {
+      method: 'PUT',
+      body: { scene: { ...floor.draft.scene, nodes: [{ ...node('a'), actionId: 'tog' }], actions, primaryActionId: 'web' }, draftVersion: 1 },
+      jar: alice,
+    });
+    expect(saved.status).toBe(200);
+    const r = ReadinessResponse.parse(await (await h.req(`/api/experiences/${floor.id}/validate`, { body: {}, jar: alice })).json());
+    expect(r.ready).toBe(true);
+    expect(r.issues.filter((i) => i.code === 'action_unavailable' || i.code === 'tap_not_supported').map((i) => [i.severity, i.path])).toEqual([
+      ['warning', ['actions', 1]],
+      ['warning', ['nodes', 0]],
+    ]);
+    expect(r.issues.map((i) => i.code)).not.toContain('no_primary_action');
+  });
 });
 
 describe('slugs', () => {

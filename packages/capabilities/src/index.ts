@@ -137,3 +137,29 @@ export function compatibilityReport(features: readonly Feature[], runtimes: read
     }
   return out;
 }
+export * from './interactions.ts';
+
+/** Plain-language names for the editor (compatibility matrix, "In AR"). */
+export const SUPPORT_LABEL: Record<Support, string> = {
+  native: 'Supported',
+  compiled_visual: 'As a picture',
+  fallback_page: 'On the experience page',
+  experimental: 'Experimental',
+  unsupported: 'Not supported',
+  verify: 'Planned, not yet device-tested',
+};
+export const FEATURE_LABEL: Record<Feature, string> = {
+  model: '3D models',
+  image_target_recognition: 'Recognising the printed image',
+  image_object_flat: 'Image objects',
+  semitransparency: 'See-through pictures (Blend)',
+  text_panel: 'Text and panels',
+  shape: 'Shapes',
+  primary_cta: 'Main button',
+  additional_links: 'Other links',
+  hotspots: 'Hotspots',
+  html_overlay: 'On-screen web content',
+  model_animation: 'Model animation',
+  video: 'Video',
+  creator_js: 'Custom scripts',
+};

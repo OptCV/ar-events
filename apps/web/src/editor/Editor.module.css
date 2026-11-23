@@ -115,3 +115,24 @@
 .danger { color: var(--ui-danger); }
 .actionForm { display: grid; gap: var(--ui-space-2); padding: var(--ui-space-3); border: 1px solid var(--ui-border); border-radius: var(--ui-radius-md); background: var(--ui-surface); }
 .addButtons > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+
+/* M13: compatibility matrix and experience-page preview */
+.compat { display: grid; gap: var(--ui-space-3); margin-top: var(--ui-space-6); padding-top: var(--ui-space-4); border-top: 1px solid var(--ui-border); }
+.tableWrap { overflow-x: auto; max-width: 100%; }
+.matrix { width: 100%; min-width: 560px; border-collapse: collapse; font-size: var(--ui-text-sm); }
+.matrix th, .matrix td { padding: var(--ui-space-2); border-bottom: 1px solid var(--ui-border); text-align: left; vertical-align: top; }
+.matrix thead th { color: var(--ui-text-secondary); font-weight: 600; }
+.matrix tbody th { font-weight: 600; width: 30%; }
+.cell { display: table-cell; }
+.cellStatus { display: block; font-weight: 600; }
+.cellNote { display: block; font-weight: 400; color: var(--ui-text-secondary); }
+.route { display: block; font-weight: 600; }
+.route .cellNote { display: inline; }
+.status_native .cellStatus, .route.status_native { color: var(--ui-success); }
+.status_experimental .cellStatus, .route.status_experimental, .status_verify .cellStatus, .route.status_verify { color: var(--ui-warning); }
+.status_unsupported .cellStatus { color: var(--ui-danger); }
+.pagePreview { display: grid; gap: var(--ui-space-2); max-width: 420px; padding: var(--ui-space-4); border: 1px dashed var(--ui-border); border-radius: var(--ui-radius-md); background: var(--ui-bg); }
+.pagePreviewTitle { margin: 0; font-size: var(--ui-text-sm); font-weight: 700; color: var(--ui-text-secondary); }
+.pageButtons { display: grid; gap: var(--ui-space-2); }
+.fakeButton { display: inline-flex; align-items: center; justify-content: center; cursor: default; }
+.compat, .compat > *, .actions, .actions > * { min-width: 0; }

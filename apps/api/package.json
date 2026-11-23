@@ -8,6 +8,7 @@
     ".": "./src/app.ts"
   },
   "dependencies": {
+    "@ar-creator/capabilities": "0.0.0",
     "@ar-creator/contracts": "0.0.0",
     "@ar-creator/db": "0.0.0",
     "@ar-creator/image-to-ar": "0.0.0",

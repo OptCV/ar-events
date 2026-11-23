@@ -47,6 +47,13 @@ export function actionTitle(a: Action, nodes: SceneNode[]): string {
   return describeAction(a, nodes);
 }
 
+/** Option text for choosers: "Title — what it does", or just what it does when the title says the same. */
+export function actionOption(a: Action, nodes: SceneNode[]): string {
+  const title = actionTitle(a, nodes);
+  const what = describeAction(a, nodes);
+  return title === what ? what : `${title} — ${what}`;
+}
+
 /** Validates a candidate action with the scene schema; returns a readable message for the first problem. */
 export function checkAction(candidate: unknown): { ok: true; action: Action } | { ok: false; field: string; message: string } {
   const r = ActionSchema.safeParse(candidate);
@@ -140,7 +147,7 @@ export function removeNodeCascade(c: Content, nodeId: string): { content: Conten
   const removed: string[] = [];
   const dangling = next.actions.filter((a) => (a.type === 'toggle-visibility' || a.type === 'play-animation') && a.nodeId === nodeId);
   for (const a of dangling) {
-    removed.push(`the action “${describeAction(a, c.nodes)}”`);
+    removed.push(`the action ${describeAction(a, c.nodes)}`);
     const hotspots = next.nodes.filter((n) => n.kind === 'hotspot' && n.actionId === a.id);
     for (const h of hotspots) {
       removed.push(`the hotspot “${nodeLabel(h)}”`);

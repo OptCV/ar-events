@@ -2,6 +2,13 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-22 — Phase 4 Milestone 13: interaction plan and compatibility matrix (local)
+
+### Added
+- Interaction plan per AR viewer (`packages/capabilities`): where the main button and every action end up; launcher parameters for Quick Look and Scene Viewer. ADR-031.
+- Editor Compatibility section: matrix per viewer, warnings, preview of the experience page's buttons.
+- Publish check warns about actions a viewer cannot run, taps and hotspots in Quick Look/Scene Viewer, animations that cannot start on request, and unused behaviours.
+
 ## 2026-11-22 — Phase 4 Milestone 12: actions in the editor (local)
 
 ### Added

@@ -131,7 +131,7 @@ Actions, the primary CTA and capability previews stay in P4 (Interactions and co
 | Milestone | Scope | Status |
 |---|---|---|
 | M12 Actions in the editor | Create/edit/delete actions (web link, email, phone, show/hide an object, play a model animation); tap action per object; hotspots; the primary button (web links only, one per experience); edits that keep the scene valid (deleting an object removes the actions that target it, with a notice); undo covers actions | **Done locally** (ADR-030); not deployed |
-| M13 Interaction plan and compatibility matrix | One pure plan per runtime: where the primary button and every action end up (Quick Look banner, Scene Viewer `link`, WebXR overlay/tap, experience page); launch builders fed from it; compatibility matrix and experience-page preview in the editor; readiness warnings; tests that every action is reachable on every runtime | Not started |
+| M13 Interaction plan and compatibility matrix | One pure plan per runtime: where the primary button and every action end up (Quick Look banner, Scene Viewer `link`, WebXR overlay/tap, experience page); launch builders fed from it; compatibility matrix and experience-page preview in the editor; readiness warnings; tests that every action is reachable on every runtime | **Done locally** (ADR-031); not deployed. **Phase 4 gate met in code** (exhaustive test); execution of the routes is P5 |
 
 The runtimes that execute the plan (USDZ/GLB exporters, WebXR viewer, public page) are P5/P6.
 

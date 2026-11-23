@@ -24,6 +24,18 @@
 | Video planes | feature-gate / fallback | conditional, future | fallback page |
 | Run creator-side JS actions inside AR | **unsupported** | controlled app actions only | **unsupported** |
 
+## Interaction routing (ADR-031)
+
+Computed by `planInteractions(scene, runtime)` in `packages/capabilities` — the single source for editor, API and viewers.
+
+| Action | iOS Quick Look | Android image WebXR | Android Scene Viewer |
+|---|---|---|---|
+| Main button (web link) | banner `callToAction`; page opens the URL on tap (verify) + experience page | on-screen button (experimental) + experience page | `link` parameter (verify) + experience page |
+| Other web/email/phone links | experience page | on-screen button (experimental), taps where assigned + experience page | experience page |
+| Show/hide an object | **unavailable** (warning) | tap on an object/hotspot (experimental) | **unavailable** (warning) |
+| Play a model animation | plays by itself, not on request (warning; verify) | tap (experimental) | usually loops the first clip by itself (warning; verify) |
+| Tap on an object / hotspot | not supported (warning; links go to the page) | experimental raycast | not supported (warning; links go to the page) |
+
 ## Rules for compiler implementation
 
 1. **`native`:** output a real target-runtime feature with tests.
