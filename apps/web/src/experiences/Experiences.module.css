@@ -70,3 +70,4 @@
 .textButton:disabled { opacity: 0.6; cursor: progress; }
 .dangerText { color: var(--ui-danger); }
 .dangerText:hover { border-color: var(--ui-danger); }
+.sceneSection { margin: var(--ui-space-6) 0; }

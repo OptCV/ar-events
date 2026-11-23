@@ -13,7 +13,7 @@ import { SubmitButton } from '../components/form/SubmitButton.tsx';
 import { experienceKeys, useDeleteExperience, useExperience, useReadiness, useUpdateExperience } from './api.ts';
 import { PlacementSelector } from './PlacementSelector.tsx';
 import { TrackingImagePicker } from './TrackingImagePicker.tsx';
-import { ImageObjectsPanel } from './ImageObjectsPanel.tsx';
+import { SceneEditor } from '../editor/SceneEditor.tsx';
 import { useDraftEditor, type SaveStatus } from './useDraftEditor.ts';
 import styles from './Experiences.module.css';
 
@@ -72,8 +72,7 @@ function Editor({ experience, onReload }: { experience: ExperienceDetail; onRelo
   };
   const confirmMode = async () => {
     if (!plan) return;
-    const next = { ...editor.scene, placement: plan.placement };
-    await editor.saveNow(next, { confirmPlacementChange: true });
+    await editor.saveNow((s) => ({ ...s, placement: plan.placement }), { confirmPlacementChange: true });
     if (plan.placement.mode === 'image') setWidthCm(String(Math.round(plan.placement.physicalWidthMeters * 1000) / 10));
     setPlan(null);
   };
@@ -88,7 +87,7 @@ function Editor({ experience, onReload }: { experience: ExperienceDetail; onRelo
       return;
     }
     setWidthError(undefined);
-    if (placement.mode === 'image') editor.update({ ...editor.scene, placement: { ...placement, physicalWidthMeters: Math.round(cm * 10) / 1000 } });
+    editor.update((s) => (s.placement.mode === 'image' ? { ...s, placement: { ...s.placement, physicalWidthMeters: Math.round(cm * 10) / 1000 } } : s));
   };
 
   return (
@@ -142,24 +141,12 @@ function Editor({ experience, onReload }: { experience: ExperienceDetail; onRelo
                   selectedId={placement.trackingTargetAssetId}
                   widthMeters={placement.physicalWidthMeters}
                   busy={editor.status === 'saving'}
-                  onSelect={(assetId) => void editor.saveNow({ ...editor.scene, placement: { ...placement, trackingTargetAssetId: assetId } })}
+                  onSelect={(assetId) => void editor.saveNow((s) => (s.placement.mode === 'image' ? { ...s, placement: { ...s.placement, trackingTargetAssetId: assetId } } : s))}
                 />
               </>
             )}
           </section>
 
-          <section className={styles.section} aria-labelledby="scene-h">
-            <h2 id="scene-h">Scene</h2>
-            <p>
-              {editor.scene.nodes.length} object{editor.scene.nodes.length === 1 ? '' : 's'} · {editor.scene.actions.length} action
-              {editor.scene.actions.length === 1 ? '' : 's'}
-            </p>
-            <ImageObjectsPanel nodes={editor.scene.nodes} busy={editor.status === 'saving'} onChange={(nodes) => void editor.saveNow({ ...editor.scene, nodes })} />
-            <p className={styles.status}>Objects are placed at the anchor point for now; moving, rotating and scaling them arrives with the visual scene editor in a later phase.</p>
-          </section>
-
-          <SettingsForm experience={experience} />
-          <DangerZone experience={experience} />
         </div>
 
         <aside className={styles.section} aria-labelledby="ready-h">
@@ -180,6 +167,19 @@ function Editor({ experience, onReload }: { experience: ExperienceDetail; onRelo
             </>
           )}
         </aside>
+      </div>
+
+      <section className={cx(styles.section, styles.sceneSection)} aria-labelledby="scene-h">
+        <h2 id="scene-h">Scene</h2>
+        {/* Edits autosave (queued while a save is in flight); only a conflict blocks further edits. */}
+        <SceneEditor scene={editor.scene} busy={editor.status === 'conflict'} onChange={editor.update} />
+      </section>
+
+      <div className={styles.layout}>
+        <div className={formStyles.form}>
+          <SettingsForm experience={experience} />
+          <DangerZone experience={experience} />
+        </div>
       </div>
 
       <ConfirmDialog

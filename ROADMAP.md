@@ -111,6 +111,19 @@ P0 device results (axes, alpha, CTA) → P2 converter adjustments → P4 compile
 | M8 Normalisation and budgets | WebP and EXIF-rotated JPEG → lossless PNG/JPEG before conversion (ADR-009); texture size limits / downscaled derivative for native viewer budgets | **Done; verified on the dev edge** (ADR-025, REMOTE-CONVERT-WEBP 2026-11-22); 2048 px budget unconfirmed on devices |
 | Gate | Native visual tests of the alpha fixtures through the product (IOS-ALPHA-01, AND-ALPHA-01 with generated files) | Needs devices |
 
+## Phase 3 plan (2026-11-22)
+
+**Gate (unchanged):** saved scene roundtrips; real-world dimensions verified. Started while the Phase 2 gate waits for devices (Android Scene Viewer issue deferred by the owner).
+
+| Milestone | Scope | Status |
+|---|---|---|
+| M9 Editor workspace and viewport | Object tree (left), three.js viewport (centre, lazy) with the anchor reference drawn per placement mode in canonical axes (floor grid, wall plane, tracking image at its printed size), image objects rendered from their GLBs with node transforms, selection from tree or viewport, show/hide, inspector (right) with real size from the loaded file; stacked on phones; labelled as a 3D preview, not AR | **Done locally** (ADR-027); not deployed |
+| M10 Transforms and history | Numeric position (cm) / rotation (degrees, quaternion stored) / scale with snapping; move/rotate/scale gizmos with an explicit tool; lock, duplicate, delete; ground-align, wall-flush, fit-to-target; undo/redo over autosave | Not started |
+| M11 More content | Uploaded GLB models, text, panels, primitives; reusable asset library in the editor; bounds, polygon and texture budgets per object | Not started |
+| Gate | Roundtrip (save → reload → identical scene, schema-validated) for every node kind; real-world dimensions shown in the editor equal the files' dimensions (tests), then on devices with the Phase 2 checklist | — |
+
+Actions, the primary CTA and capability previews stay in P4 (Interactions and compatibility).
+
 **Phase 1 risks:** Hyperdrive caching of auth reads (ADR-013 §5); request-body size limits for large model uploads; Better Auth minor-version churn (pin exact, review changelogs); `@cloudflare/vite-plugin` + monorepo layout (validated locally in M1; edge deploy pending). Client bundle is 133 KB gzip for a skeleton, mostly React + Zod 4; watch it as features land (consider `zod/mini` on the client).
 
 ### Milestone 3 findings (2026-11-14)

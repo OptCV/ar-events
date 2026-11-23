@@ -6,6 +6,11 @@ import { ApiRequestError } from '../api/client.ts';
 import { experienceKeys, experiencesApi } from './api.ts';
 
 export type SaveStatus = 'saved' | 'dirty' | 'saving' | 'conflict' | 'error';
+/**
+ * An edit: a new scene, or a function of the LATEST scene. Use the function form from anything asynchronous (an upload
+ * finishing, a dialog confirming): a scene captured earlier would silently undo edits made in the meantime.
+ */
+export type SceneEdit = DraftExperienceScene | ((latest: DraftExperienceScene) => DraftExperienceScene);
 export const AUTOSAVE_DELAY_MS = 800;
 
 /**
@@ -16,6 +21,13 @@ export const AUTOSAVE_DELAY_MS = 800;
 export function useDraftEditor(initial: ExperienceDetail) {
   const qc = useQueryClient();
   const [scene, setScene] = useState<DraftExperienceScene>(initial.draft.scene);
+  const latest = useRef(initial.draft.scene);
+  const apply = (edit: SceneEdit) => {
+    const next = typeof edit === 'function' ? edit(latest.current) : edit;
+    latest.current = next;
+    setScene(next);
+    return next;
+  };
   const [status, setStatus] = useState<SaveStatus>('saved');
   const [error, setError] = useState<string | null>(null);
   const version = useRef(initial.draftVersion);
@@ -61,8 +73,8 @@ export function useDraftEditor(initial: ExperienceDetail) {
 
   /** Local edit: autosaves after a short pause. */
   const update = useCallback(
-    (next: DraftExperienceScene) => {
-      setScene(next);
+    (edit: SceneEdit) => {
+      const next = apply(edit);
       setStatus((s) => (s === 'conflict' ? s : 'dirty'));
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => void flush(next), AUTOSAVE_DELAY_MS);
@@ -72,9 +84,9 @@ export function useDraftEditor(initial: ExperienceDetail) {
 
   /** Immediate save (e.g. a confirmed placement change). */
   const saveNow = useCallback(
-    async (next: DraftExperienceScene, opts: { confirmPlacementChange?: boolean } = {}) => {
+    async (edit: SceneEdit, opts: { confirmPlacementChange?: boolean } = {}) => {
       if (timer.current) clearTimeout(timer.current);
-      setScene(next);
+      const next = apply(edit);
       await flush(next, opts.confirmPlacementChange ?? false);
     },
     [flush],

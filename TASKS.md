@@ -73,7 +73,7 @@ Plan and slice order: `ROADMAP.md` "Phase 1 plan".
 - [x] P2 M8 remote (2026-11-22): 0005 applied to Neon development (6/6), redeployed (`4bd1bd1c…`, build `e8de023`), remote suite 19/19 incl. REMOTE-CONVERT-WEBP (Pillow in the Container, 6.5 s).
 - [x] Phase 2 device checklist (`tests/device/phase-2-checklist.md`) and "View in AR" on the Make AR object page (ADR-026); browser tests 64/64.
 - [x] Redeploy dev with ADR-026 and run the remote suite (REMOTE-VIEW-IN-AR): 20/20.
-- [ ] Scene Viewer does not open on the owner's Android phone: collect the symptom; redeploy with the cross-origin headers and retry.
+- [ ] **Deferred (owner, 2026-11-22):** Scene Viewer does not open on the owner's Android phone; owner believes it is a recently known Scene Viewer bug. Later: collect the symptom, retry with the cross-origin headers (`8e15feb`), compare with modelviewer.dev's AR example on the same phone.
 - [ ] Run the Phase 2 device checklist on one iPhone and one ARCore Android phone (gate).
 - [ ] Colour profiles: convert non-sRGB ICC to sRGB when preparing textures (prepared textures currently drop ICC data).
 - [ ] Batch alpha fixtures native device verification.
@@ -84,7 +84,7 @@ Plan and slice order: `ROADMAP.md` "Phase 1 plan".
 
 - [ ] Dashboard and creation wizard.
 - [ ] Placement mode selector and mode migration flow.
-- [ ] Scene graph, object tree and Three.js viewport.
+- [x] Scene graph, object tree and Three.js viewport. *(P3 M9, ADR-027: tree, viewport with canonical anchors, inspector, selection, show/hide, rename, remove; lost-update fix)*
 - [ ] Transform inspector with canonical coordinates and snapping.
 - [ ] Multiple models, image objects, panels, text and primitives.
 - [ ] Actions, primary CTA and page-link fallbacks.

@@ -2,6 +2,17 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-22 — Phase 3 Milestone 9: scene editor workspace (local)
+
+### Added
+- Scene editor on the experience page: object tree, 3D viewport (anchor drawn per placement mode in canonical axes, the tracking image at its printed size, image objects from their GLBs), inspector with the object's real size; select from the list or the view; show/hide, rename, remove. ADR-027.
+
+### Fixed
+- An object added while a tracking image was still uploading could disappear when the upload finished (the upload saved an older copy of the scene). Draft edits are now applied to the latest scene.
+
+### Changed
+- An image object can be placed more than once; removing it is done in the inspector.
+
 ## 2026-11-22 — Fixes from the first phone and desktop checks
 
 ### Fixed

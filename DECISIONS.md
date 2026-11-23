@@ -374,3 +374,18 @@ Accepted decisions may be superseded by new numbered entries; never rewrite prev
 4. Signed URLs are cookieless and live 15 minutes; the page refreshes them every 7.5 minutes and when the tab becomes visible again (a phone waking up).
 5. The page now shows the **newest version** when nothing was converted in this visit, so a file converted on a computer can be opened on the phone.
 **Consequences:** Placement is fixed to floor for this preview; wall/image placement belongs to experiences (P4/P5). Content scaling stays at the viewers' defaults (testers must not pinch before measuring). Device behaviour is unverified until the Phase 2 checklist (`tests/device/phase-2-checklist.md`) is run.
+
+## ADR-027 — Scene editor workspace and viewport (Phase 3 Milestone 9)
+
+**Date:** 2026-11-22
+**Status:** Accepted (browser tests; desktop only).
+**Context:** Phase 3 needs a visual editor over the canonical scene (DATA_MODEL.md) without letting the editor become a second source of truth, and edits must never be lost to autosave races.
+**Decision:**
+1. **Workspace:** object tree (left), three.js viewport (centre, lazy chunk), inspector (right); viewport first, then tree and inspector stacked below 1100 px / 640 px. Lives on the experience page under Placement; edits go through the existing debounced autosave with optimistic concurrency (ADR-021).
+2. **Canonical axes in the viewport (ADR-005):** floor = 10 cm grid on XZ; wall = grey XY plane at z = 0 with a grid, content in front (+Z); image = the tracking image itself, textured, lying in XZ at its printed size (height from the pixel aspect), top edge toward −Z; RGB axes at the anchor origin. No axis conversions in the editor — the scene's numbers are drawn as they are.
+3. **Content:** image-object nodes are drawn from their real GLB (cached by derivative id, since signed URLs change), with the node transform. Other kinds are listed but marked "not shown in the 3D view yet" until M11. Hidden nodes and their descendants are not drawn. The inspector shows the size measured from the loaded file × scale ("Size in the scene").
+4. **Selection:** tree or click in the view; a drag (> 4 px) orbits and never selects or moves anything. The camera frames content plus the tracking image, not the helper grids.
+5. **Edits are functions of the latest scene** (`SceneEdit`): anything asynchronous (uploads, dialogs) edits the latest scene instead of a copy captured earlier. This fixed a lost update found while testing: a tracking image upload finishing after an object was added saved the old scene and removed the object (regression test fails on the old code).
+6. Removing a node never removes its children (they move to its parent). The same image object may be placed more than once.
+7. The viewport flags objects whose picture failed to load ("shape only") instead of drawing them grey.
+**Consequences:** Transforms are read-only until M10. The preview is labelled "3D preview — not AR"; device rendering is unchanged and unverified.

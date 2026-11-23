@@ -130,18 +130,18 @@ test('image to AR (M7): soft-edge highlight, 3D preview of the result, place it 
   await page.mouse.up();
   await expect(preview).toHaveAttribute('data-state', 'ready');
 
-  // Place it in a wall experience.
+  // Place it in a wall experience (scene editor, Phase 3 M9).
   await createExperience(page, 'Gallery wall', 'Wall');
-  const panel = page.getByTestId('image-objects');
-  await expect(panel).toContainText('No image objects yet.');
-  await panel.getByRole('button', { name: 'Add image object' }).click();
-  await panel.getByRole('button', { name: /Add aa_disc_dark_fringe\.png \(30 cm × 30 cm · Blend · front only\)/ }).click();
+  const editor = page.getByTestId('scene-editor');
+  await expect(editor).toContainText('No objects yet.');
+  await editor.getByRole('button', { name: 'Add image object' }).click();
+  await editor.getByRole('button', { name: 'Add aa_disc_dark_fringe.png (30 cm × 30 cm · Blend · front only)' }).click();
   await expect(page.getByTestId('save-status')).toHaveText('All changes saved');
-  await expect(panel.getByTestId('placed-image-object')).toHaveCount(1);
-  await expect(panel.getByTestId('placed-image-object')).toContainText('30 cm × 30 cm · Blend · front only');
+  await expect(editor.getByTestId('tree-row')).toHaveCount(1);
+  await expect(page.getByTestId('inspector')).toContainText('aa_disc_dark_fringe.png (30 cm × 30 cm · Blend · front only)');
   const url = page.url();
   await page.reload();
-  await expect(page.getByTestId('image-objects').getByTestId('placed-image-object')).toHaveCount(1);
+  await expect(page.getByTestId('scene-editor').getByTestId('tree-row')).toHaveCount(1);
 
   // The source image is protected while the experience uses its image object.
   await page.goto('/library');
@@ -150,9 +150,10 @@ test('image to AR (M7): soft-edge highlight, 3D preview of the result, place it 
   await expect(page.getByRole('alert')).toHaveText('This asset is used by “Gallery wall”. Remove it there first.');
 
   await page.goto(url);
-  await page.getByTestId('image-objects').getByRole('button', { name: 'Remove aa_disc_dark_fringe.png' }).click();
+  await page.getByTestId('tree-row').getByRole('button', { name: /^aa_disc_dark_fringe\.png/ }).click();
+  await page.getByTestId('inspector').getByRole('button', { name: 'Remove aa_disc_dark_fringe.png' }).click();
   await expect(page.getByTestId('save-status')).toHaveText('All changes saved');
-  await expect(page.getByTestId('image-objects')).toContainText('No image objects yet.');
+  await expect(page.getByTestId('scene-editor')).toContainText('No objects yet.');
 });
 
 test('image to AR (M8): a WebP with transparency uploads as a display image and is prepared as PNG for AR', async ({ page, request }) => {

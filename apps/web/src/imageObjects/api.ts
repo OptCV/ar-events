@@ -22,8 +22,9 @@ const api = {
 const REFRESH_MS = (ASSET_LIMITS.readUrlTtlSeconds * 1000) / 2;
 const active = (c: ConversionSummary | undefined) => c?.state === 'queued' || c?.state === 'running';
 
-export function useAsset(id: string) {
-  return useQuery({ queryKey: [...assetKeys.all, 'one', id], queryFn: () => api.asset(id), staleTime: REFRESH_MS, refetchInterval: REFRESH_MS });
+/** `null` = no asset to load (e.g. an image experience without a tracking image yet). */
+export function useAsset(id: string | null) {
+  return useQuery({ queryKey: [...assetKeys.all, 'one', id ?? 'none'], queryFn: () => api.asset(id!), enabled: id !== null, staleTime: REFRESH_MS, refetchInterval: REFRESH_MS });
 }
 
 export function useConversions(assetId: string) {

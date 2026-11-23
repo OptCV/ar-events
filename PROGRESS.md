@@ -2,7 +2,7 @@
 
 **Updated:** 2026-11-22  
 **State:** P0 runtime-proof kit (incl. Android WebXR image probe) implemented and **structurally validated / desktop-tested**. **First device result: AND-IMG-01 PARTIAL** (native WebXR image tracking + DOM overlay worked on one Android/Chrome 157 device; visual/geometry checks outstanding). All other device rows NOT TESTED. **Phase 1 Milestones 1–5 done locally and verified on the isolated dev environment** (`ar-creator-dev` Worker → Hyperdrive → Neon development, R2 `ar-creator-assets-dev`): REMOTE-AUTH-01 9/9, REMOTE-CONTENT-01 8/8 (2026-11-22). Production not deployed or migrated.  
-**Current phase:** Phase 2 Milestone 8 (WebP, rotated photos, 2048 px texture budget; ADR-025) **done and verified on the dev edge** (Neon dev 6/6, remote run 19/19 incl. REMOTE-CONVERT-WEBP, 2026-11-22). Phase 2 gate (native device checks) outstanding: checklist ready (`tests/device/phase-2-checklist.md`), "View in AR" added (ADR-026, local; needs redeploy). Milestones 6–7 **done locally** (ADR-023, ADR-024); both deployed to the dev Worker; **real Cloudflare Container conversion verified 2026-11-22 (REMOTE-CONVERT-01, 18/18)**. Milestone 6 (Image-to-AR conversion pipeline): GLB in the Worker, USDZ in a Cloudflare Container (Docker locally), driven by a Workflow. Not yet on Cloudflare: Neon migration 0004 and the first Container deploy need approval. Phase 1 is complete on dev (gate met on the edge with real R2). P0 device rows still open (AND-IMG-01 re-run, AND-IMG-02, iOS, Scene Viewer).
+**Current phase:** Phase 2 Milestone 8 (WebP, rotated photos, 2048 px texture budget; ADR-025) **done and verified on the dev edge** (Neon dev 6/6, remote run 19/19 incl. REMOTE-CONVERT-WEBP, 2026-11-22). **Phase 3 M9 (scene editor workspace, ADR-027) done locally.** Phase 2 gate (native device checks) outstanding: checklist ready (`tests/device/phase-2-checklist.md`), "View in AR" added (ADR-026, local; needs redeploy). Milestones 6–7 **done locally** (ADR-023, ADR-024); both deployed to the dev Worker; **real Cloudflare Container conversion verified 2026-11-22 (REMOTE-CONVERT-01, 18/18)**. Milestone 6 (Image-to-AR conversion pipeline): GLB in the Worker, USDZ in a Cloudflare Container (Docker locally), driven by a Workflow. Not yet on Cloudflare: Neon migration 0004 and the first Container deploy need approval. Phase 1 is complete on dev (gate met on the edge with real R2). P0 device rows still open (AND-IMG-01 re-run, AND-IMG-02, iOS, Scene Viewer).
 
 ## Implemented (automated evidence)
 
@@ -231,3 +231,12 @@ Not available yet: lint (ESLint/Prettier not configured), DB migrations, `apps/w
 - Fixed grey preview (CSP `connect-src blob:`, same cause as the P0 lab); preview now flags a missing texture. Added cross-origin read headers on signed GLB/USDZ responses (suspected Scene Viewer cause, unconfirmed).
 - Verified locally: typecheck; Vitest 215; integration 96; Playwright 64 (and the texture check fails with the old CSP).
 - Next: owner redeploys and retries View in AR on Android; report what happens on tap.
+
+## Session handoff — 2026-11-22 (13) / Claude Code — Phase 3 Milestone 9 (scene editor workspace)
+
+- Owner deferred the Android Scene Viewer issue (believed to be a known Scene Viewer bug); recorded in TASKS.
+- Planned Phase 3 (ROADMAP: M9 workspace/viewport, M10 transforms + undo/redo, M11 more content; gate = roundtrip + real dimensions).
+- Built M9: `apps/web/src/editor/` (SceneEditor, Viewport, sceneModel + tests, Editor.module.css); the image-object panel became the editor's picker.
+- Found and fixed a lost update in the draft editor (async upload saving a stale scene); regression test verified to fail on the old code.
+- Verified locally: typecheck; Vitest 220; Playwright 69; screenshots at 1400/390 px; three.js still only in lazy chunks (main bundle +7 kB).
+- Not deployed. Next: M10 (transforms, gizmos, snapping, undo/redo).
