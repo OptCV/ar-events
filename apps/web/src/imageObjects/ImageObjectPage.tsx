@@ -9,6 +9,7 @@ import { SubmitButton } from '../components/form/SubmitButton.tsx';
 import { useAsset, useConversion, useConversions, useStartConversion } from './api.ts';
 import { ALPHA_LABEL } from './labels.ts';
 import styles from './ImageObjects.module.css';
+import { ViewInAr } from './ViewInAr.tsx';
 import type { Backdrop } from './ModelPreview.tsx';
 
 /** three.js is loaded only when a result is shown (keeps it out of the main bundle). */
@@ -73,8 +74,10 @@ function Converter({ asset }: { asset: AssetSummary }) {
   const [softEdges, setSoftEdges] = useState(false);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const start = useStartConversion(asset.id);
-  const current = useConversion(currentId);
   const history = useConversions(asset.id);
+  // Until something is converted here, show the newest version (e.g. made on a computer, opened on a phone).
+  const shownId = currentId ?? history.data?.conversions[0]?.id ?? null;
+  const current = useConversion(shownId);
   const widthId = useId();
 
   const img = asset.image!;
@@ -222,8 +225,8 @@ function Converter({ asset }: { asset: AssetSummary }) {
         </form>
       </div>
 
-      {currentId && <Result conversion={current.data} loading={current.isPending} backdrop={backdrop} />}
-      <History conversions={history.data?.conversions ?? []} currentId={currentId} />
+      {shownId && <Result conversion={current.data} loading={current.isPending} backdrop={backdrop} title={asset.filename ?? 'AR object'} />}
+      <History conversions={history.data?.conversions ?? []} currentId={shownId} />
     </section>
   );
 }
@@ -272,7 +275,7 @@ function Download({ out, label }: { out: DerivativeOutput | null; label: string 
   );
 }
 
-function Result({ conversion: c, loading, backdrop }: { conversion: ConversionSummary | undefined; loading: boolean; backdrop: Backdrop }) {
+function Result({ conversion: c, loading, backdrop, title }: { conversion: ConversionSummary | undefined; loading: boolean; backdrop: Backdrop; title: string }) {
   return (
     <section className={styles.result} aria-labelledby="io-result" data-testid="io-result">
       <h2 id="io-result">Result</h2>
@@ -293,6 +296,7 @@ function Result({ conversion: c, loading, backdrop }: { conversion: ConversionSu
               {Math.round(((c.alpha.transparentPixels + c.alpha.fractionalPixels) / c.alpha.pixels) * 100)}% of the pixels are transparent or partly transparent.
             </p>
           )}
+          <ViewInAr conversion={c} title={title} />
           {c.outputs.glb?.contentUrl && (
             <Suspense fallback={<p role="status">Loading 3D preview…</p>}>
               <ModelPreview url={c.outputs.glb.contentUrl} backdrop={backdrop} label={`3D preview of the AR object: ${describe(c)}. Drag to rotate, scroll to zoom.`} />

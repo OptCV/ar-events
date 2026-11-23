@@ -2,6 +2,16 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-22 — Phase 2 device checklist and "View in AR"
+
+### Added
+- `tests/device/phase-2-checklist.md`: the Phase 2 gate session (transparency, orientation, size, Milestone 8 inputs, fallbacks, recording); P2-* rows in the device matrix.
+- Device-test inputs `normalize/orientation_probe_exif6.jpg` (EXIF 6) and `normalize/ring_4096.png` (4096 px), generated reproducibly with the WebP fixtures.
+- "View in AR" on the Make AR object page: Quick Look on iPhone/iPad, Scene Viewer (floor) on Android, explained fallbacks (ADR-026). Remote check REMOTE-VIEW-IN-AR.
+
+### Changed
+- The Make AR object page shows the newest version on load (previously only after converting in the same visit); conversion links refresh when the tab becomes visible.
+
 ## 2026-11-22 — Remote verification of Phase 2 Milestone 8
 
 ### Verified

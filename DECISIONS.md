@@ -361,3 +361,16 @@ Accepted decisions may be superseded by new numbered entries; never rewrite prev
 
 **Why 2048:** a conservative common budget for mobile AR viewers; it is an engineering choice, **not yet confirmed on devices** — revisit with the device matrix.
 **Consequences:** Pillow's decoders are new attack surface inside the network-less, credential-free container (SECURITY.md). Colour profiles are not converted (prepared textures drop ICC data; originals keep theirs) — pending. Tracking-image WebP remains unsupported.
+
+## ADR-026 — "View in AR" for a single image object (Phase 2 device testing)
+
+**Date:** 2026-11-22
+**Status:** Accepted (verified in browser tests; device behaviour NOT TESTED).
+**Context:** The Phase 2 gate needs product-generated files opened in the native viewers on phones. The "Make AR object" page only had downloads: workable on iPhone (Downloads → Quick Look), but Android has no reliable way to hand a downloaded GLB to Scene Viewer.
+**Decision:**
+1. The result shows **View in AR**, built only by `packages/platform-launch` (`viewInAr`), following the central routing for a floor placement: iOS → AR Quick Look `<a rel="ar">` on the signed USDZ URL (first child an `<img>`, as Quick Look requires); Android → Scene Viewer intent, `placement: 'floor'`, `mode=ar_preferred`, Google app package, `file` = signed GLB URL, title = file name. Never WebXR image tracking (that needs an experience with a tracking image).
+2. Shown only when it can work: not on desktop (the page says to open it on a phone), not in iOS browsers without Quick Look (`relList.supports('ar')`), and not when the file or fallback URL is not HTTPS (local dev).
+3. Scene Viewer's `browser_fallback_url` is the same page with `?ar=unavailable`, which explains that the Google app and ARCore are needed.
+4. Signed URLs are cookieless and live 15 minutes; the page refreshes them every 7.5 minutes and when the tab becomes visible again (a phone waking up).
+5. The page now shows the **newest version** when nothing was converted in this visit, so a file converted on a computer can be opened on the phone.
+**Consequences:** Placement is fixed to floor for this preview; wall/image placement belongs to experiences (P4/P5). Content scaling stays at the viewers' defaults (testers must not pinch before measuring). Device behaviour is unverified until the Phase 2 checklist (`tests/device/phase-2-checklist.md`) is run.

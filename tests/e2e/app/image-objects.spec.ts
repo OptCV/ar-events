@@ -45,6 +45,9 @@ test('image to AR: settings → convert → status → downloads (GLB + USDZ) �
   await expect(page.getByTestId('io-status')).toHaveText('Your AR object is ready.', { timeout: 30_000 });
   const result = page.getByTestId('io-result');
   await expect(result).toContainText('40 cm × 40 cm · Cutout (auto) · standing · front only');
+  // Desktop: no AR viewer, the page says where to open it (ADR-026).
+  await expect(page.getByTestId('view-in-ar-unavailable')).toHaveAttribute('data-reason', 'desktop');
+  await expect(result.getByRole('link', { name: 'View in AR' })).toHaveCount(0);
 
   // Downloads come from signed, cookieless URLs with the right types.
   const usdzLink = result.getByRole('link', { name: /Download USDZ/ });
@@ -176,4 +179,55 @@ test('image to AR (M8): a WebP with transparency uploads as a display image and 
   await page.goto('/library');
   await page.getByTestId('uploader-tracking-image').locator('input[type=file]').setInputFiles(webp);
   await expect(page.getByRole('alert')).toHaveText('Tracking images must be PNG or JPEG.');
+});
+
+const PHONES = {
+  ios: 'Mozilla/5.0 (iPhone; CPU iPhone OS 19_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/19.1 Mobile/15E148 Safari/604.1',
+  android: 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Mobile Safari/537.36',
+};
+
+test('image to AR: "View in AR" on phones: Quick Look link on iPhone, HTTPS required, Scene Viewer fallback message (ADR-026)', async ({ browser, request }) => {
+  test.setTimeout(120_000);
+  for (const os of ['ios', 'android'] as const) {
+    const ctx = await browser.newContext({ userAgent: PHONES[os], viewport: { width: 390, height: 844 } });
+    const page = await ctx.newPage();
+    // Chromium has no Quick Look: pretend rel="ar" is supported, as in Safari.
+    if (os === 'ios') await page.addInitScript(() => { const s = DOMTokenList.prototype.supports; DOMTokenList.prototype.supports = function (t: string) { return t === 'ar' || s.call(this, t); }; });
+    await verifiedSignedIn(page, request, `p2ar-${os}`);
+    await uploadDisplay(page, 'ring_inner_hole.png');
+    await page.getByRole('link', { name: 'Make an AR object from ring_inner_hole.png' }).click();
+    await page.getByRole('button', { name: 'Create AR object' }).click();
+    await expect(page.getByTestId('io-status')).toHaveText('Your AR object is ready.', { timeout: 30_000 });
+
+    // Over local http the native viewers cannot fetch the files: explained, no button.
+    await expect(page.getByTestId('view-in-ar-unavailable')).toHaveAttribute('data-reason', 'needs-https');
+    const local = (await page.getByRole('link', { name: /Download (USDZ|GLB)/ }).first().getAttribute('href'))!;
+
+    // Served over HTTPS (the dev Worker), the signed URLs are handed to the native viewer unchanged.
+    await page.route('**/api/conversions/*', async (route) => {
+      const res = await route.fetch();
+      const body = (await res.text()).replaceAll(new URL(local).origin, 'https://ar.example.test');
+      await route.fulfill({ response: res, body });
+    });
+    await page.reload();
+    if (os === 'ios') {
+      const btn = page.getByRole('link', { name: 'View in AR' });
+      await expect(btn).toBeVisible();
+      await expect(btn).toHaveAttribute('rel', 'ar');
+      expect(await btn.evaluate((a) => a.firstElementChild?.tagName)).toBe('IMG'); // Quick Look needs an <img> first child
+      const href = (await btn.getAttribute('href'))!;
+      expect(href).toMatch(/^https:\/\/ar\.example\.test\/api\/derivatives\/[0-9a-f-]{36}\/content\?/);
+      const usdz = await page.request.fetch(href.replace('https://ar.example.test', new URL(local).origin), { headers: { cookie: '' } });
+      expect(usdz.headers()['content-type']).toBe('model/vnd.usdz+zip'); // the signed USDZ URL, cookieless
+    } else {
+      // Scene Viewer also needs an HTTPS fallback page, and this test page is http: still no intent (the intent itself
+      // is covered by viewInAr.test.ts). On the dev Worker both are HTTPS.
+      await expect(page.getByTestId('io-status')).toHaveText('Your AR object is ready.');
+      await expect(page.getByTestId('view-in-ar-unavailable')).toHaveAttribute('data-reason', 'needs-https');
+      // The fallback page explains why Scene Viewer did not start.
+      await page.goto(page.url() + '?ar=unavailable');
+      await expect(page.getByRole('alert')).toContainText('Scene Viewer could not start on this phone');
+    }
+    await ctx.close();
+  }
 });

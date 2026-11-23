@@ -13,6 +13,7 @@ import { readFileSync } from 'node:fs';
 import { PNG } from 'pngjs';
 import { expect, request as pwRequest, test, type APIRequestContext } from '@playwright/test';
 import { ApiError, AssetListResponse, AssetSummary, ConversionSummary, CreateUploadResponse, ExperienceDetail } from '@ar-creator/contracts';
+import { parseSceneViewerIntent } from '@ar-creator/platform-launch';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -263,6 +264,43 @@ test('REMOTE-BROWSER-LIBRARY: real browser over HTTPS renders private previews f
     .poll(() => imgs.evaluateAll((els) => (els as HTMLImageElement[]).filter((i) => i.complete && i.naturalWidth > 0).length), { timeout: 30_000 })
     .toBe(4); // poster + noise + ring + disc.webp; the GLB has a text tile
   await context.close();
+});
+
+test('REMOTE-VIEW-IN-AR: on HTTPS the page hands the signed files to Quick Look (iPhone) and Scene Viewer (Android, floor) (ADR-026)', async ({ browser }) => {
+  const ring = AssetListResponse.parse(await (await api.get('/api/assets')).json()).assets.find((a) => a.filename === 'ring.png')!;
+  const anon = await pwRequest.newContext();
+  const phones = {
+    ios: 'Mozilla/5.0 (iPhone; CPU iPhone OS 19_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/19.1 Mobile/15E148 Safari/604.1',
+    android: 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Mobile Safari/537.36',
+  };
+  for (const os of ['ios', 'android'] as const) {
+    const context = await browser.newContext({ storageState: await api.storageState(), userAgent: phones[os], viewport: { width: 390, height: 844 } });
+    const page = await context.newPage();
+    // The test browser has no Quick Look; pretend rel="ar" is supported, as in Safari.
+    if (os === 'ios') await page.addInitScript(() => { const s = DOMTokenList.prototype.supports; DOMTokenList.prototype.supports = function (t: string) { return t === 'ar' || s.call(this, t); }; });
+    await page.goto(`/library/${ring.id}/ar-object`); // opened on the phone: the newest version is shown
+    const btn = page.getByRole('link', { name: 'View in AR' });
+    await expect(btn).toBeVisible({ timeout: 20_000 });
+    const href = (await btn.getAttribute('href'))!;
+    let file: string;
+    if (os === 'ios') {
+      await expect(btn).toHaveAttribute('rel', 'ar');
+      file = href;
+    } else {
+      const { query, extras } = parseSceneViewerIntent(href);
+      expect(query).toMatchObject({ mode: 'ar_preferred', title: 'ring.png' });
+      expect(query.enable_vertical_placement).toBeUndefined();
+      expect(extras).toMatchObject({ package: 'com.google.android.googlequicksearchbox', 'S.browser_fallback_url': `${BASE}/library/${ring.id}/ar-object?ar=unavailable` });
+      file = query.file!;
+    }
+    // What the native viewer will fetch: HTTPS, cookieless, the right type.
+    expect(file.startsWith('https://')).toBe(true);
+    const r = await anon.get(file);
+    expect(r.status()).toBe(200);
+    expect(r.headers()['content-type']).toBe(os === 'ios' ? 'model/vnd.usdz+zip' : 'model/gltf-binary');
+    await context.close();
+  }
+  await anon.dispose();
 });
 
 test('REMOTE-CLEANUP: deleting removes the R2 object and the row; nothing is left behind', async () => {

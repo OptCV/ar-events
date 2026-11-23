@@ -42,6 +42,8 @@ export function useConversion(id: string | null) {
     queryFn: () => api.get(id!),
     enabled: id !== null,
     refetchInterval: (q) => (active(q.state.data) ? 1000 : REFRESH_MS),
+    // A phone that slept past the signed-URL lifetime gets fresh "View in AR" links when the tab is shown again.
+    refetchOnWindowFocus: true,
   });
 }
 

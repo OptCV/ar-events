@@ -134,6 +134,8 @@ Local alternative to hosting: `npm run p0:build && npm run p0:webxr:dev`, `adb r
 
 ## Physical-device matrix (fill after execution)
 
+Phase 2 (Image-to-AR) device session: follow [`tests/device/phase-2-checklist.md`](tests/device/phase-2-checklist.md). Its P2-* cases use files **made by the product** on the dev environment and complete IOS-ALPHA-01 / AND-ALPHA-01. Phones open the files with the page's **View in AR** button (ADR-026).
+
 | ID | Device/OS | Browser/viewer | Scenario | Expected | Result | Evidence |
 |---|---|---|---|---|---|---|
 | IOS-IMG-01 | TBD | Safari + Quick Look | recognize 20cm image | USDZ scene anchored | NOT TESTED | — |
@@ -145,6 +147,16 @@ Local alternative to hosting: `npm run p0:build && npm run p0:webxr:dev`, `adb r
 | AND-FLR-01 | TBD | Scene Viewer | horizontal model | native Scene Viewer AR | NOT TESTED | — |
 | AND-WAL-01 | TBD | Scene Viewer | vertical option | wall placement | NOT TESTED | — |
 | AND-ALPHA-01 | TBD | Scene Viewer | transparent GLB | see-through pixels | NOT TESTED | — |
+| P2-STEPS / P2-HOLE / P2-FRINGE / P2-BORDER / P2-OPAQUE / P2-WEBP (iOS) | TBD | Quick Look | transparency of product-generated files | see checklist | NOT TESTED | — |
+| P2-STEPS / P2-HOLE / P2-FRINGE / P2-BORDER / P2-OPAQUE / P2-WEBP (Android) | TBD | Scene Viewer | transparency of product-generated files | see checklist | NOT TESTED | — |
+| P2-ORIENT / P2-SIDES / P2-FLAT / P2-NPOT (iOS) | TBD | Quick Look | orientation, sides, aspect | see checklist | NOT TESTED | — |
+| P2-ORIENT / P2-SIDES / P2-FLAT / P2-NPOT (Android) | TBD | Scene Viewer | orientation, sides, aspect | see checklist | NOT TESTED | — |
+| P2-SIZE (iOS) | TBD | Quick Look | 60 × 40 cm with a tape measure | see checklist | NOT TESTED | — |
+| P2-SIZE (Android) | TBD | Scene Viewer | 60 × 40 cm with a tape measure | see checklist | NOT TESTED | — |
+| P2-ROTATED (iOS) | TBD | Quick Look | EXIF-rotated JPEG shown upright | see checklist | NOT TESTED | — |
+| P2-ROTATED (Android) | TBD | Scene Viewer | EXIF-rotated JPEG shown upright | see checklist | NOT TESTED | — |
+| P2-BUDGET (iOS) | TBD | Quick Look | 4096 px source scaled to 2048 px opens and stays sharp | see checklist | NOT TESTED | — |
+| P2-BUDGET (Android) | TBD | Scene Viewer | 4096 px source scaled to 2048 px opens and stays sharp | see checklist | NOT TESTED | — |
 | AND-LINK-01 | TBD | Scene Viewer | `link` parameter | native CTA | NOT TESTED | — |
 | IOS-LINK-01 | TBD | Safari + Quick Look | `callToAction` banner | banner tap posts message; page opens link | NOT TESTED | — |
 
@@ -231,6 +243,10 @@ Target: Worker `ar-creator-dev` version `4bd1bd1c-5382-4d48-911c-46c4e919f4b0` (
 REMOTE-CONVERT took 17.9 s (was 8.7 s with a pool of 3): with one instance the texture, the USDZ and the cold start share one container; acceptable for dev, not a production figure. After the run `wrangler containers list` (read-only) showed the application `active` with 1 live instance.
 
 **Not covered remotely:** EXIF-rotated and > 2048 px images on the edge (local integration only); `basic` instance memory with a 64 MP decode.
+
+### REMOTE-VIEW-IN-AR — pending
+
+Added with ADR-026 (`tests/remote/content.remote.spec.ts`): on the HTTPS dev Worker, an iPhone browser gets `<a rel="ar">` to the signed USDZ and an Android browser a Scene Viewer floor intent whose `file` is the signed GLB (both fetched cookieless with the right type). Needs a redeploy and the owner's remote run. Locally (http) the browser tests assert the button is withheld and the fallback message (64/64).
 
 ## Device results
 
