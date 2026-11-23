@@ -2,7 +2,7 @@
 
 **Updated:** 2026-11-22  
 **State:** P0 runtime-proof kit (incl. Android WebXR image probe) implemented and **structurally validated / desktop-tested**. **First device result: AND-IMG-01 PARTIAL** (native WebXR image tracking + DOM overlay worked on one Android/Chrome 157 device; visual/geometry checks outstanding). All other device rows NOT TESTED. **Phase 1 Milestones 1–5 done locally and verified on the isolated dev environment** (`ar-creator-dev` Worker → Hyperdrive → Neon development, R2 `ar-creator-assets-dev`): REMOTE-AUTH-01 9/9, REMOTE-CONTENT-01 8/8 (2026-11-22). Production not deployed or migrated.  
-**Current phase:** Phase 2 Milestone 8 (WebP, rotated photos, 2048 px texture budget; ADR-025) **done locally**, needs Neon migration 0005 + redeploy. Milestones 6–7 **done locally** (ADR-023, ADR-024); both deployed to the dev Worker; **real Cloudflare Container conversion verified 2026-11-22 (REMOTE-CONVERT-01, 18/18)**. Milestone 6 (Image-to-AR conversion pipeline): GLB in the Worker, USDZ in a Cloudflare Container (Docker locally), driven by a Workflow. Not yet on Cloudflare: Neon migration 0004 and the first Container deploy need approval. Phase 1 is complete on dev (gate met on the edge with real R2). P0 device rows still open (AND-IMG-01 re-run, AND-IMG-02, iOS, Scene Viewer).
+**Current phase:** Phase 2 Milestone 8 (WebP, rotated photos, 2048 px texture budget; ADR-025) **done and verified on the dev edge** (Neon dev 6/6, remote run 19/19 incl. REMOTE-CONVERT-WEBP, 2026-11-22). Phase 2 gate (native device checks) outstanding. Milestones 6–7 **done locally** (ADR-023, ADR-024); both deployed to the dev Worker; **real Cloudflare Container conversion verified 2026-11-22 (REMOTE-CONVERT-01, 18/18)**. Milestone 6 (Image-to-AR conversion pipeline): GLB in the Worker, USDZ in a Cloudflare Container (Docker locally), driven by a Workflow. Not yet on Cloudflare: Neon migration 0004 and the first Container deploy need approval. Phase 1 is complete on dev (gate met on the edge with real R2). P0 device rows still open (AND-IMG-01 re-run, AND-IMG-02, iOS, Scene Viewer).
 
 ## Implemented (automated evidence)
 
@@ -210,3 +210,9 @@ Not available yet: lint (ESLint/Prettier not configured), DB migrations, `apps/w
 - Found and fixed while testing: the conversion route still refused WebP sources; a test fixture (not the converter) had dark edge pixels; Pillow premultiplies RGBA on resize by itself (documented; the fringe test cannot tell the two apart).
 - **Needs approval/owner:** apply 0005 to Neon development **before** redeploying (otherwise health reports migrations behind), then `deploy:dev` and the remote suite.
 - Open: 2048 px budget unconfirmed on devices; colour profiles not converted; tracking-image WebP unsupported; device rendering NOT TESTED.
+
+## Session handoff — 2026-11-22 (10) / Claude Code — Milestone 8 on the dev edge
+
+- Owner applied 0005 to Neon development (6/6), redeployed (`ar-creator-dev` version `4bd1bd1c…`, build `e8de023`) and ran the remote suite: **19/19**. REMOTE-CONVERT-WEBP passed (Pillow in the Cloudflare Container, 6.5 s); REMOTE-CONVERT 17.9 s with the 1-instance pool.
+- Read-only check afterwards: container application active, 1 live instance.
+- Open: Phase 2 gate needs devices (alpha fixtures through the product on iPhone and Android); 2048 px budget; ICC profiles; tracking-image WebP; production roles/migrations and `neondb_owner` rotation (approval).

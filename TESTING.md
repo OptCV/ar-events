@@ -219,6 +219,19 @@ After the run `wrangler containers list` (read-only) showed the application `act
 
 **Not covered remotely:** the Milestone 7 UI on the edge (3D preview, image objects in experiences) beyond the shared API; converter outage and retry behaviour (tested locally); `basic` instance memory headroom with the largest (15 MB) images.
 
+### REMOTE-CONVERT-WEBP — texture preparation in the Cloudflare Container — 2026-11-22 — PASS (full remote run 19/19 in 1.8 min)
+
+Target: Worker `ar-creator-dev` version `4bd1bd1c-5382-4d48-911c-46c4e919f4b0` (build `e8de023`), container application `ar-creator-dev-usdconvertercontainer-dev` (`basic`, max 1, internet disabled), Neon development `ep-dark-butterfly-bctzb64e` (migrations **6/6**, 0005 applied by the owner). Run by the owner: `npm run db:remote -- remote-auth-test …`; temporary user removed afterwards.
+
+| Check | Result |
+|---|---|
+| REMOTE-AUTH-01 (9) + REMOTE-CONTENT-01 (9, incl. REMOTE-CONVERT 17.9 s) re-run | all pass on the Milestone 8 build |
+| REMOTE-CONVERT-WEBP | still WebP with soft alpha uploaded as a display image → `/v1/texture` (**Pillow inside the Cloudflare Container**, first time) → PNG texture → GLB + USDZ; **6.5 s** |
+
+REMOTE-CONVERT took 17.9 s (was 8.7 s with a pool of 3): with one instance the texture, the USDZ and the cold start share one container; acceptable for dev, not a production figure. After the run `wrangler containers list` (read-only) showed the application `active` with 1 live instance.
+
+**Not covered remotely:** EXIF-rotated and > 2048 px images on the edge (local integration only); `basic` instance memory with a 64 MP decode.
+
 ## Device results
 
 ### AND-IMG-01 — 2026-11-14 (probe 0.1.0) — PARTIAL

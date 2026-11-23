@@ -2,6 +2,11 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-22 — Remote verification of Phase 2 Milestone 8
+
+### Verified
+- Neon development at 6/6 migrations; dev Worker build `e8de023`. REMOTE-CONVERT-WEBP: a soft-alpha WebP prepared as PNG by Pillow inside the Cloudflare Container and converted, 6.5 s. Full remote run 19/19.
+
 ## 2026-11-22 — Phase 2 Milestone 8: WebP, rotated photos and a texture budget (local)
 
 ### Added
