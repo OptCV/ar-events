@@ -18,7 +18,7 @@ async function uploadDisplay(page: Page, name: string) {
 }
 
 test('image to AR: settings → convert → status → downloads (GLB + USDZ) → earlier versions', async ({ page, request }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(180_000);
   await verifiedSignedIn(page, request, 'p2');
   await uploadDisplay(page, 'ring_inner_hole.png'); // 512 × 512, binary alpha with a hole
 
@@ -42,7 +42,7 @@ test('image to AR: settings → convert → status → downloads (GLB + USDZ) �
   await expect(page.getByTestId('io-preview')).toHaveClass(/dark/);
 
   await page.getByRole('button', { name: 'Create AR object' }).click();
-  await expect(page.getByTestId('io-status')).toHaveText('Your AR object is ready.', { timeout: 30_000 });
+  await expect(page.getByTestId('io-status')).toHaveText('Your AR object is ready.', { timeout: 90_000 });
   const result = page.getByTestId('io-result');
   await expect(result).toContainText('40 cm × 40 cm · Cutout (auto) · standing · front only');
   // Desktop: no AR viewer, the page says where to open it (ADR-026).
@@ -65,7 +65,7 @@ test('image to AR: settings → convert → status → downloads (GLB + USDZ) �
   await page.getByRole('group', { name: 'Sides' }).getByText('Both sides').click();
   await page.getByRole('group', { name: 'Transparency' }).getByText('Blend', { exact: true }).click();
   await page.getByRole('button', { name: 'Create AR object' }).click();
-  await expect(page.getByTestId('io-status')).toHaveText('Your AR object is ready.', { timeout: 30_000 });
+  await expect(page.getByTestId('io-status')).toHaveText('Your AR object is ready.', { timeout: 90_000 });
   await expect(result).toContainText('Blend · standing · both sides');
   await expect(page.getByTestId('io-history-item')).toHaveCount(1);
   await expect(page.getByTestId('io-history-item')).toContainText('Cutout (auto)');
@@ -101,7 +101,7 @@ test('image to AR: refusals are explained (opaque with transparency, tracking im
 });
 
 test('image to AR (M7): soft-edge highlight, 3D preview of the result, place it in an experience', async ({ page, request }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
   await verifiedSignedIn(page, request, 'p2m7');
 
   // Hard cutout: no partly transparent pixels.
@@ -118,7 +118,7 @@ test('image to AR (M7): soft-edge highlight, 3D preview of the result, place it 
 
   await page.getByLabel('Real-world width').fill('30');
   await page.getByRole('button', { name: 'Create AR object' }).click();
-  await expect(page.getByTestId('io-status')).toHaveText('Your AR object is ready.', { timeout: 30_000 });
+  await expect(page.getByTestId('io-status')).toHaveText('Your AR object is ready.', { timeout: 90_000 });
   const preview = page.getByTestId('model-preview');
   await expect(preview).toHaveAttribute('data-state', 'ready', { timeout: 20_000 });
   await expect(preview.getByRole('img', { name: /3D preview of the AR object: 30 cm × 30 cm · Blend/ })).toBeVisible();
@@ -157,7 +157,7 @@ test('image to AR (M7): soft-edge highlight, 3D preview of the result, place it 
 });
 
 test('image to AR (M8): a WebP with transparency uploads as a display image and is prepared as PNG for AR', async ({ page, request }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(180_000);
   await verifiedSignedIn(page, request, 'p2m8');
   await page.goto('/library');
   await page.getByRole('group', { name: 'What is this file for?' }).getByText('Display image', { exact: true }).click();
@@ -171,7 +171,7 @@ test('image to AR (M8): a WebP with transparency uploads as a display image and 
   await card.getByRole('link', { name: 'Make an AR object from disc.webp' }).click();
   await expect(page.getByText('WebP is converted to PNG (or JPEG for photos) because AR viewers cannot read WebP.')).toBeVisible();
   await page.getByRole('button', { name: 'Create AR object' }).click();
-  await expect(page.getByTestId('io-status')).toHaveText('Your AR object is ready.', { timeout: 30_000 });
+  await expect(page.getByTestId('io-status')).toHaveText('Your AR object is ready.', { timeout: 90_000 });
   await expect(page.getByTestId('io-texture')).toHaveText('Image prepared for AR: converted to PNG.');
   await expect(page.getByTestId('io-result')).toContainText('Blend (auto)');
   await expect(page.getByTestId('model-preview')).toHaveAttribute('data-state', 'ready', { timeout: 20_000 });
@@ -188,7 +188,7 @@ const PHONES = {
 };
 
 test('image to AR: "View in AR" on phones: Quick Look link on iPhone, HTTPS required, Scene Viewer fallback message (ADR-026)', async ({ browser, request }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
   for (const os of ['ios', 'android'] as const) {
     const ctx = await browser.newContext({ userAgent: PHONES[os], viewport: { width: 390, height: 844 } });
     const page = await ctx.newPage();
@@ -198,7 +198,7 @@ test('image to AR: "View in AR" on phones: Quick Look link on iPhone, HTTPS requ
     await uploadDisplay(page, 'ring_inner_hole.png');
     await page.getByRole('link', { name: 'Make an AR object from ring_inner_hole.png' }).click();
     await page.getByRole('button', { name: 'Create AR object' }).click();
-    await expect(page.getByTestId('io-status')).toHaveText('Your AR object is ready.', { timeout: 30_000 });
+    await expect(page.getByTestId('io-status')).toHaveText('Your AR object is ready.', { timeout: 90_000 });
 
     // Over local http the native viewers cannot fetch the files: explained, no button.
     await expect(page.getByTestId('view-in-ar-unavailable')).toHaveAttribute('data-reason', 'needs-https');

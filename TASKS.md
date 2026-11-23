@@ -93,12 +93,12 @@ Plan and slice order: `ROADMAP.md` "Phase 1 plan".
 
 ## P4: Runtimes
 
-- [-] Compile iOS image/floor/wall USDZ with validation (multi-node scenes). *(P5 M15, ADR-033: compiler + structural validation done; compile pipeline M16; Quick Look device check pending)*
+- [x] Compile iOS image/floor/wall USDZ with validation (multi-node scenes). *(P5 M15 compiler, M16 pipeline; Quick Look device check pending)*
 - [-] Implement Android image WebXR viewer, capability detection and state lifecycle. *(runtime logic in `packages/webxr-image` done; public viewer UI in `apps/web` pending)*
-- [-] Compose hosted Scene Viewer GLB from all eligible scene nodes. *(P5 M14, ADR-032: compiler in the container, validated; compile pipeline and hosting: M16)*
+- [x] Compose hosted Scene Viewer GLB from all eligible scene nodes. *(P5 M14 compiler, M16 pipeline + signed hosting; device check pending)*
 - [x] Generate separate Scene Viewer floor/wall intent params (`buildSceneViewerIntent`; device check pending).
 - [ ] Validate Quick Look CTA and Scene Viewer link mappings on device.
-- [ ] Public landing page, desktop 3D preview, supported fallbacks.
+- [-] Public landing page, desktop 3D preview, supported fallbacks. *(P5 M16, ADR-034: signed test page with per-platform launch, page links, QR and 3D preview; the published public page is P6)*
 
 ## P5: Publishing and QA
 

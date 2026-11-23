@@ -14,6 +14,7 @@ import { experienceKeys, useDeleteExperience, useExperience, useReadiness, useUp
 import { PlacementSelector } from './PlacementSelector.tsx';
 import { TrackingImagePicker } from './TrackingImagePicker.tsx';
 import { SceneEditor } from '../editor/SceneEditor.tsx';
+import { TestOnDevice } from '../builds/TestOnDevice.tsx';
 import { useDraftEditor, type SaveStatus } from './useDraftEditor.ts';
 import styles from './Experiences.module.css';
 
@@ -167,6 +168,10 @@ function Editor({ experience, onReload }: { experience: ExperienceDetail; onRelo
             </>
           )}
         </aside>
+      </div>
+
+      <div className={cx(styles.section, styles.sceneSection)}>
+        <TestOnDevice experienceId={experience.id} saved={editor.status === 'saved'} />
       </div>
 
       <section className={cx(styles.section, styles.sceneSection)} aria-labelledby="scene-h">

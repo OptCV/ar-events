@@ -2,6 +2,17 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-23 — Phase 5 Milestone 16: test builds and device test links (local)
+
+### Added
+- "Test on device" in the editor: builds the saved draft into the real Android GLB and iPhone USDZ (through the Workflow and the converter container), with a 24-hour signed link and QR code. ADR-034.
+- Public test page `/test/:id`: Quick Look (main button as the banner) on iPhone, Scene Viewer (main button as `link`) on Android floor/wall, QR code and 3D preview on desktop, every link on all devices.
+- Migration `0006_build_outputs`; API for builds, test pages and compiled files; remote check REMOTE-BUILD.
+
+### Changed
+- Assets used only by test builds can be deleted (builds keep their own copies); deleting an experience removes its build files; only the latest test build per experience is kept.
+- The 3D preview no longer calls files without pictures "shape only".
+
 ## 2026-11-23 — Phase 5 Milestone 15: scene USDZ for Quick Look (local)
 
 ### Added

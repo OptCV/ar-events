@@ -14,6 +14,7 @@ import { SignUpPage } from './pages/auth/SignUpPage.tsx';
 import { HomePage } from './pages/HomePage.tsx';
 import { NotFoundPage } from './pages/NotFoundPage.tsx';
 import { RouteErrorPage } from './pages/RouteErrorPage.tsx';
+import { TestBuildPage } from './builds/TestBuildPage.tsx';
 
 export const router = createBrowserRouter([
   {
@@ -27,6 +28,8 @@ export const router = createBrowserRouter([
       { path: 'email-verified', element: <EmailVerifiedPage /> },
       { path: 'forgot-password', element: <ForgotPasswordPage /> },
       { path: 'reset-password', element: <ResetPasswordPage /> },
+      // Public device test page: the signed link in the URL is the credential (ADR-034).
+      { path: 'test/:id', element: <TestBuildPage /> },
       // Protected routes: everything under RequireAuth needs a valid server-side session.
       {
         element: <RequireAuth />,

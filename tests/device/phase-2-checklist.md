@@ -123,3 +123,11 @@ A failure needs: the case, what was seen, a screenshot, and whether it reproduce
 
 **Gate passes** when sections 1–3 pass on at least one iPhone (Quick Look) and one ARCore Android phone (Scene Viewer),
 and section 4 passes on both or has a recorded budget decision. Everything else is informative.
+
+## Phase 5 — compiled scenes (test builds, ADR-034)
+
+1. In the editor, **Test on device → Make a test build**; wait for "Ready to test on your phones."
+2. Scan the QR code with the phone camera (or open the link). No sign-in is needed; the link works for 24 hours.
+3. iPhone (Safari): **View in AR** → Quick Look. Check anchoring (floor: horizontal; wall: vertical; image: on the printed tracking image at the printed width shown on the page), every object at its editor position and size, text/panels readable, and the main button as Quick Look's banner — tapping it opens the link.
+4. Android floor/wall (Chrome): **View in AR** → Scene Viewer. Same checks; the main button is Scene Viewer's link button. Image placement on Android waits for M17.
+5. Record per case: device, OS, viewer, build id (in the URL), what was seen, screenshots.

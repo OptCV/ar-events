@@ -12,7 +12,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { PNG } from 'pngjs';
 import { expect, request as pwRequest, test, type APIRequestContext } from '@playwright/test';
-import { ApiError, AssetListResponse, AssetSummary, ConversionSummary, CreateUploadResponse, ExperienceDetail } from '@ar-creator/contracts';
+import { ApiError, AssetListResponse, AssetSummary, BuildSummary, ConversionSummary, CreateUploadResponse, ExperienceDetail, TestBuildResponse } from '@ar-creator/contracts';
 import { parseSceneViewerIntent } from '@ar-creator/platform-launch';
 
 test.describe.configure({ mode: 'serial' });
@@ -300,6 +300,57 @@ test('REMOTE-VIEW-IN-AR: on HTTPS the page hands the signed files to Quick Look 
     expect(r.headers()['content-type']).toBe(os === 'ios' ? 'model/vnd.usdz+zip' : 'model/gltf-binary');
     await context.close();
   }
+  await anon.dispose();
+});
+
+test('REMOTE-BUILD: a draft compiles through the Workflow and the Container into a GLB + USDZ; the signed test link works without a session (Phase 5, ADR-034)', async () => {
+  test.setTimeout(420_000); // includes a possible container cold start
+  const cr = await api.post('/api/experiences', { headers: json, data: { name: 'Remote build', placementMode: 'floor' } });
+  expect(cr.status()).toBe(201);
+  const e = ExperienceDetail.parse(await cr.json());
+  created.experiences.add(e.id);
+  const t = { position: [0, 0.1, 0], rotation: [0, 0, 0, 1], scale: [0.2, 0.2, 0.2] };
+  const scene = {
+    ...e.draft.scene,
+    nodes: [
+      { id: 'box', kind: 'primitive', shape: 'box', color: '#215cc5', transform: t, visible: true, locked: false },
+      { id: 'hello', kind: 'text', text: 'Hello AR', style: { color: '#17202a', sizeMeters: 0.05 }, transform: { ...t, position: [0, 0.3, 0], scale: [1, 1, 1] }, visible: true, locked: false },
+    ],
+    actions: [{ id: 'shop', type: 'open-url', url: 'https://example.com/shop', label: 'Shop now' }],
+    primaryActionId: 'shop',
+  };
+  expect((await api.put(`/api/experiences/${e.id}/draft`, { headers: json, data: { draftVersion: e.draftVersion, scene } })).status()).toBe(200);
+  const t0 = Date.now();
+  expect((await api.post(`/api/experiences/${e.id}/builds`, { headers: json, data: {} })).status()).toBe(202);
+  let b = BuildSummary.parse(await (await api.get(`/api/experiences/${e.id}/builds/latest`)).json());
+  while (b.state === 'queued' || b.state === 'compiling') {
+    expect(Date.now() - t0, 'build did not finish in 6 minutes').toBeLessThan(360_000);
+    await new Promise((r) => setTimeout(r, 3000));
+    b = BuildSummary.parse(await (await api.get(`/api/experiences/${e.id}/builds/latest`)).json());
+  }
+  test.info().annotations.push({ type: 'build-ms', description: String(Date.now() - t0) });
+  expect(b, JSON.stringify(b)).toMatchObject({ state: 'ready', current: true });
+  const anon = await pwRequest.newContext();
+  const u = new URL(b.testUrl!);
+  expect(u.origin).toBe(new URL(BASE).origin);
+  const page = await anon.get(`${BASE}/api/test-builds/${u.pathname.split('/').pop()}${u.search}`);
+  expect(page.status()).toBe(200);
+  const tb = TestBuildResponse.parse(await page.json());
+  expect(tb).toMatchObject({ name: 'Remote build', placementMode: 'floor', primary: { label: 'Shop now', url: 'https://example.com/shop' } });
+  for (const [url, type, magic, expected] of [
+    [tb.glbUrl!, 'model/gltf-binary', 'glTF', b.outputs.find((o) => o.platform === 'android')!.sha256],
+    [tb.usdzUrl!, 'model/vnd.usdz+zip', 'PK', b.outputs.find((o) => o.platform === 'ios')!.sha256],
+  ] as const) {
+    const r = await anon.get(url);
+    expect(r.status()).toBe(200);
+    expect(r.headers()['content-type']).toBe(type);
+    expect(r.headers()['cross-origin-resource-policy']).toBe('cross-origin');
+    const body = await r.body();
+    expect(body.subarray(0, magic.length).toString('latin1')).toBe(magic);
+    expect(sha(body)).toBe(expected);
+  }
+  // The SPA serves the test page route itself (no session needed).
+  expect((await anon.get(b.testUrl!)).status()).toBe(200);
   await anon.dispose();
 });
 

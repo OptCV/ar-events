@@ -92,7 +92,9 @@ export default function ModelPreview({ url, backdrop, label }: { url: string; ba
           const m = (o as Mesh).material as (Material & { map?: Texture | null }) | undefined;
           if (m?.map?.image) textured = true;
         });
-        setState(textured ? 'ready' : 'no-texture');
+        // Only a file that defines pictures can be missing them (scenes with plain shapes have none).
+        const definesPictures = ((gltf.parser.json as { images?: unknown[] }).images?.length ?? 0) > 0;
+        setState(textured || !definesPictures ? 'ready' : 'no-texture');
       },
       undefined,
       () => {

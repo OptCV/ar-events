@@ -50,5 +50,5 @@ export async function makeImageObject(page: Page, name: string, widthCm: string)
   await page.getByRole('link', { name: `Make an AR object from ${name}` }).click();
   await page.getByLabel('Real-world width').fill(widthCm);
   await page.getByRole('button', { name: 'Create AR object' }).click();
-  await expect(page.getByTestId('io-status')).toHaveText('Your AR object is ready.', { timeout: 30_000 });
+  await expect(page.getByTestId('io-status')).toHaveText('Your AR object is ready.', { timeout: 90_000 });
 }

@@ -1,0 +1,32 @@
+/* Test on device (editor panel) and the public test page (Phase 5 M16). */
+.panel { display: grid; gap: var(--ui-space-3); }
+.panel h2 { font-size: var(--ui-text-lg); margin: 0; }
+.status { display: grid; gap: var(--ui-space-2); }
+.stateLine { margin: 0; font-weight: 600; }
+.stale { font-weight: 400; color: var(--ui-warning); }
+.outputs { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--ui-space-1); font-size: var(--ui-text-sm); }
+.outputs li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--ui-space-2); align-items: baseline; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ui-text-secondary); }
+.dot_ready { background: var(--ui-success); }
+.dot_failed { background: var(--ui-danger); }
+.warning { display: block; color: var(--ui-text-secondary); }
+.link { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--ui-space-3); align-items: start; }
+@media (max-width: 480px) { .link { grid-template-columns: 1fr; } }
+.linkText { display: grid; gap: var(--ui-space-2); justify-items: start; min-width: 0; }
+.linkText a { overflow-wrap: anywhere; }
+.textButton { min-height: 40px; padding: 0 var(--ui-space-3); font: inherit; font-weight: 600; color: var(--ui-accent); background: none; border: 1px solid var(--ui-border); border-radius: var(--ui-radius-sm); cursor: pointer; }
+
+.page { display: grid; gap: var(--ui-space-4); max-width: 720px; margin: 0 auto; }
+.page h1 { margin: 0; }
+.badge { justify-self: start; margin: 0; padding: 2px var(--ui-space-2); font-size: var(--ui-text-sm); font-weight: 600; color: var(--ui-warning); background: #fff1c2; border-radius: 999px; }
+.launch { display: inline-flex; align-items: center; justify-content: center; gap: var(--ui-space-2); text-decoration: none; justify-self: start; min-width: 200px; }
+.launch img { width: 1px; height: 1px; }
+.desktop { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--ui-space-4); align-items: start; }
+@media (max-width: 640px) { .desktop { grid-template-columns: 1fr; } }
+.preview { min-height: 280px; }
+.tracking { display: grid; gap: var(--ui-space-2); }
+.tracking h2 { font-size: var(--ui-text-md); margin: 0; }
+.tracking p { margin: 0; }
+.trackingImage { max-width: 100%; max-height: 240px; border: 1px solid var(--ui-border); }
+.links { display: grid; gap: var(--ui-space-2); }
+.linkButton { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }

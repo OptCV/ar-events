@@ -12,6 +12,7 @@ import { experienceRoutes } from './experiences/routes.ts';
 import { StorageUnavailableError, assetRoutes } from './assets/routes.ts';
 import { r2Store, type ObjectStore } from './assets/store.ts';
 import { conversionRoutes } from './conversions/routes.ts';
+import { buildRoutes } from './compile/routes.ts';
 import { workflowRunner, type ConversionRunner } from './conversions/runner.ts';
 
 export interface BuildInfo {
@@ -113,13 +114,15 @@ export function createApp(info: BuildInfo, deps: AppDeps = {}) {
   // Generated AR files are fetched by native viewers (Scene Viewer, Quick Look) from another origin. The signed,
   // cookieless URL is the only credential, so allowing cross-origin reads exposes nothing a URL holder cannot already
   // fetch. Registered before secureHeaders so its post-processing runs last and replaces the same-origin default.
-  app.use('/derivatives/:id/content', async (c, next) => {
+  const crossOriginRead = async (c: { res: Response }, next: () => Promise<void>) => {
     await next();
     if (c.res.status === 200) {
       c.res.headers.set('Cross-Origin-Resource-Policy', 'cross-origin');
       c.res.headers.set('Access-Control-Allow-Origin', '*');
     }
-  });
+  };
+  app.use('/derivatives/:id/content', crossOriginRead);
+  app.use('/outputs/:id/content', crossOriginRead);
   app.use(
     '*',
     secureHeaders({
@@ -189,6 +192,7 @@ export function createApp(info: BuildInfo, deps: AppDeps = {}) {
   // Asset storage (Milestone 5, ADR-022): uploads, listing, deletion (session) and signed private reads.
   app.route('/assets', assetRoutes());
   app.route('/', conversionRoutes());
+  app.route('/', buildRoutes());
 
   /** Public session probe for the UI: 200 with the user or null (no 401 noise for signed-out visitors). */
   app.get('/session', async (c) => {

@@ -1,6 +1,6 @@
 import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, sql } from 'drizzle-orm';
 import {
   CreateExperienceInput,
   ExperienceDetail,
@@ -18,8 +18,9 @@ import type { AppEnv } from '../app.ts';
 import { requireSession } from '../auth/middleware.ts';
 import { err, parseJson } from '../http.ts';
 import { assetReferenceIssues } from '../assets/references.ts';
+import { logError } from '../db.ts';
 
-const { experiences, experienceRevisions } = schema;
+const { experiences, experienceRevisions, generatedOutputs } = schema;
 export const MAX_BODY_BYTES = 256 * 1024;
 
 const notFound = (c: Context<AppEnv>) => err(c, 404, 'not_found', 'Experience not found.');
@@ -203,11 +204,23 @@ export function experienceRoutes() {
     const id = c.req.param('id');
     if (!ExperienceId.safeParse(id).success) return notFound(c);
     const { db } = await c.get('db')();
+    // Stored files of its test builds (ADR-034) go too: rows cascade, objects are removed after.
+    const keys = (
+      await db
+        .select({ key: generatedOutputs.r2Key })
+        .from(generatedOutputs)
+        .innerJoin(experienceRevisions, eq(experienceRevisions.id, generatedOutputs.revisionId))
+        .innerJoin(experiences, eq(experiences.id, experienceRevisions.experienceId))
+        .where(and(eq(experiences.id, id), eq(experiences.ownerId, c.get('user').id), isNotNull(generatedOutputs.r2Key)))
+    ).flatMap((r) => (r.key ? [r.key] : []));
     const deleted = await db
       .delete(experiences)
       .where(and(eq(experiences.id, id), eq(experiences.ownerId, c.get('user').id)))
       .returning({ id: experiences.id });
-    return deleted.length ? c.body(null, 204) : notFound(c);
+    if (!deleted.length) return notFound(c);
+    const store = c.get('assetStore')();
+    for (const k of keys) await store.delete(k).catch((e: unknown) => logError(c, 'experiences.delete-object', `${k}: ${String(e)}`));
+    return c.body(null, 204);
   });
 
   return r;

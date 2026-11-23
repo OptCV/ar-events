@@ -184,6 +184,18 @@ describe('signed read URLs', () => {
     const long = q((await signAssetUrl(key, 'https://a', asset, MAX_TTL_SECONDS + 60)).url);
     expect(await verifyAssetUrl(key, asset, long)).toEqual({ ok: false, reason: 'malformed' });
   });
+
+  it('kinds are separated: an output or test-link signature never opens anything else (ADR-034)', async () => {
+    const key = await assetSigningKey('x'.repeat(40));
+    const out = await signAssetUrl(key, 'https://a', asset, 900, Date.now(), 'output');
+    expect(out.url).toMatch(/^https:\/\/a\/api\/outputs\/6f1c1d39-[^?]+\/content\?/);
+    const test = await signAssetUrl(key, 'https://a', asset, 900, Date.now(), 'build');
+    expect(test.url).toMatch(/^https:\/\/a\/test\/6f1c1d39-[0-9a-f-]+\?v=/);
+    for (const [url, kind] of [[out.url, 'output'], [test.url, 'build']] as const) {
+      expect((await verifyAssetUrl(key, asset, q(url), Date.now(), kind)).ok).toBe(true);
+      for (const other of ['asset', 'derivative', 'output', 'build'] as const) if (other !== kind) expect((await verifyAssetUrl(key, asset, q(url), Date.now(), other)).ok).toBe(false);
+    }
+  });
 });
 
 describe('names and keys', () => {

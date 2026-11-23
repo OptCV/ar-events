@@ -177,9 +177,12 @@ test('gizmo: dragging with the Move tool moves by whole centimetres (snap), as o
   const viewport = page.getByTestId('viewport');
   await viewport.scrollIntoViewIfNeeded();
   const box = (await viewport.boundingBox())!;
+  // Measured at the moment of use: content above the editor (e.g. the test-build panel) can still change height.
   const origin = async () => {
+    await viewport.scrollIntoViewIfNeeded();
+    const b = (await viewport.boundingBox())!;
     const [x, y] = (await viewport.getAttribute('data-selected-screen'))!.split(',').map(Number);
-    return { x: box.x + x!, y: box.y + y! };
+    return { x: b.x + x!, y: b.y + y! };
   };
 
   // Select tool: a drag from the object orbits the camera; the object stays where it is.

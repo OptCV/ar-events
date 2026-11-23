@@ -17,6 +17,7 @@ import { hyperdriveConnector } from '../db.ts';
 import { asFailure, buildGlbStep, buildUsdzStep, failJob, finishJob, prepareTextureStep, startJob, type GlbStepResult, type JobContext, type PipelineDeps, type TextureRef, type UsdzStepResult } from './pipeline.ts';
 import type { ImageToArParams } from './runner.ts';
 import { converterPool, httpUsdConverter, type UsdConverter } from './usd.ts';
+import { asBuildFailure, compileOutputStep, failBuild, finishBuild, isBuildError, startBuild, type BuildContext, type OutputResult } from '../compile/pipeline.ts';
 
 export class UsdConverterContainer extends Container<Env> {
   override defaultPort = 8080;
@@ -71,8 +72,36 @@ export class ImageToArWorkflow extends WorkflowEntrypoint<Env, ImageToArParams> 
     }
   }
 
+  /** Test builds (ADR-034): start → android (GLB) → ios (USDZ) → finish; same retry and failure handling. */
+  private async runBuild(jobId: string, step: WorkflowStep): Promise<void> {
+    const quick = { retries: { limit: 3, delay: '2 seconds', backoff: 'exponential' }, timeout: '1 minute' } as const;
+    const container = { retries: { limit: 4, delay: '10 seconds', backoff: 'exponential' }, timeout: '10 minutes' } as const;
+    const guarded = async <T,>(fn: (d: PipelineDeps) => Promise<T>): Promise<T> => {
+      try {
+        return await this.withDeps(fn);
+      } catch (e) {
+        const f = asBuildFailure(e);
+        if (f.code === 'internal') console.error(JSON.stringify({ level: 'error', event: 'build.step', detail: String((e as Error)?.stack ?? e) }));
+        if (!f.retryable) throw new NonRetryableError(`build:${f.code}:${f.message}`);
+        throw new Error(`build:${f.code}:${f.message}`);
+      }
+    };
+    try {
+      const ctx = (await step.do('start', quick, () => guarded((d) => startBuild(d, jobId)) as never)) as BuildContext;
+      const android = (await step.do('android', container, () => guarded((d) => compileOutputStep(d, ctx, 'android')) as never)) as OutputResult;
+      const ios = (await step.do('ios', container, () => guarded((d) => compileOutputStep(d, ctx, 'ios')) as never)) as OutputResult;
+      await step.do('finish', quick, () => guarded((d) => finishBuild(d, ctx, [android, ios])) as never);
+    } catch (e) {
+      const m = /^(?:[A-Za-z]*Error: )?build:([a-z_]+):([sS]*)$/.exec(String((e as Error)?.message ?? e));
+      const code = m && isBuildError(m[1]!) ? m[1]! : 'internal';
+      const message = m && isBuildError(m[1]!) ? m[2]! : 'Something went wrong while building. Try again.';
+      await step.do('fail', quick, () => this.withDeps((d) => failBuild(d, jobId, code as never, message)) as never);
+    }
+  }
+
   override async run(event: Readonly<WorkflowEvent<ImageToArParams>>, step: WorkflowStep): Promise<void> {
     const { jobId } = event.payload;
+    if (event.payload.kind === 'build') return this.runBuild(jobId, step);
     const quick = { retries: { limit: 3, delay: '2 seconds', backoff: 'exponential' }, timeout: '1 minute' } as const;
     try {
       const ctx = (await step.do('start', quick, () => this.guarded((d) => startJob(d, jobId)) as never)) as JobContext;

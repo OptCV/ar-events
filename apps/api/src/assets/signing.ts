@@ -30,9 +30,14 @@ export function assetSigningKey(secret: string): Promise<CryptoKey> {
 }
 
 /** What a signature authorises. The kind is part of the signed message and of the path, so a derivative signature can never open an original (or vice versa). */
-export type SignedKind = 'asset' | 'derivative';
-const PREFIX: Record<SignedKind, string> = { asset: 'asset-read/v1', derivative: 'derivative-read/v1' };
-const PATH: Record<SignedKind, string> = { asset: '/api/assets/', derivative: '/api/derivatives/' };
+export type SignedKind = 'asset' | 'derivative' | 'output' | 'build';
+const PREFIX: Record<SignedKind, string> = { asset: 'asset-read/v1', derivative: 'derivative-read/v1', output: 'output-read/v1', build: 'build-test/v1' };
+/**
+ * `output`: a compiled scene file (ADR-034). `build`: the public test page of a build — its id plus the build's
+ * immutable content hash, so a link opens exactly the build it was made for.
+ */
+const PATH: Record<SignedKind, string> = { asset: '/api/assets/', derivative: '/api/derivatives/', output: '/api/outputs/', build: '/test/' };
+const SUFFIX: Record<SignedKind, string> = { asset: '/content', derivative: '/content', output: '/content', build: '' };
 const message = (kind: SignedKind, id: string, sha256: string, exp: number) => new TextEncoder().encode(`${PREFIX[kind]}\n${id}\n${sha256}\n${exp}`);
 
 const b64url = (buf: ArrayBuffer) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -52,7 +57,7 @@ export async function signAssetUrl(key: CryptoKey, origin: string, a: { id: stri
   const exp = Math.floor(now / 1000) + ttlSeconds;
   const sig = b64url(await crypto.subtle.sign('HMAC', key, message(kind, a.id, a.sha256, exp)));
   const qs = new URLSearchParams({ v: a.sha256.slice(0, 16), exp: String(exp), sig });
-  return { url: `${origin}${PATH[kind]}${a.id}/content?${qs}`, expiresAt: new Date(exp * 1000) };
+  return { url: `${origin}${PATH[kind]}${a.id}${SUFFIX[kind]}?${qs}`, expiresAt: new Date(exp * 1000) };
 }
 
 export type VerifyResult = { ok: true; expiresInSeconds: number } | { ok: false; reason: 'malformed' | 'expired' | 'bad_signature' };
