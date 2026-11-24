@@ -2,6 +2,11 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-23 — Remote verification of Phase 5 Milestones 14–16
+
+### Verified
+- Neon development 7/7 migrations; REMOTE-BUILD on the dev Worker: a draft compiled through the Workflow and the Container into GLB + USDZ in 6.3 s; signed test link without a session. Full remote run 21/21.
+
 ## 2026-11-23 — Phase 5 Milestone 16: test builds and device test links (local)
 
 ### Added

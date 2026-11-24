@@ -279,6 +279,12 @@ Original description of the check: added with ADR-026 (`tests/remote/content.rem
 
 Added with ADR-026 (`tests/remote/content.remote.spec.ts`): on the HTTPS dev Worker, an iPhone browser gets `<a rel="ar">` to the signed USDZ and an Android browser a Scene Viewer floor intent whose `file` is the signed GLB (both fetched cookieless with the right type). Needs a redeploy and the owner's remote run. Locally (http) the browser tests assert the button is withheld and the fallback message (64/64).
 
+### REMOTE-BUILD — test builds on the dev edge — 2026-11-23 — PASS (full remote run 21/21 in 2.1 min)
+
+Neon development at 7/7 migrations (0006 applied by the owner); dev Worker redeployed with M14–M16. A floor draft (box, text, main button) compiled **through the Workflow and the Cloudflare Container into a GLB and a USDZ in 6.3 s**; the signed test link served the build without a session; both files cookieless with the right types, CORP cross-origin and recorded checksums. All earlier checks still pass (REMOTE-CONVERT 16.2 s, REMOTE-CONVERT-WEBP 7.0 s).
+
+**Not covered remotely:** image-placement builds, partially-ready builds, Quick Look / Scene Viewer rendering (devices).
+
 ## Device results
 
 ### AND-IMG-01 — 2026-11-14 (probe 0.1.0) — PARTIAL
