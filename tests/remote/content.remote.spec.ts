@@ -371,6 +371,10 @@ test('REMOTE-PUBLISH: the built draft publishes at its stable URL; a visitor wit
   expect(v).toMatchObject({ mode: 'public', name: 'Remote build', linkExpiresAt: null, id: st.live!.buildId });
   expect((await anon.get(v.glbUrl!)).status()).toBe(200);
   expect((await anon.get(st.url)).status()).toBe(200); // the SPA serves /x/{slug}
+  // Anonymous counts (ADR-037): a visitor's view is counted for the published experience.
+  expect((await anon.post(`${BASE}/api/public/${slug}/events`, { headers: { 'content-type': 'application/json', origin: BASE }, data: { event: 'view', detail: 'desktop' } })).status()).toBe(204);
+  const stats = (await (await api.get(`/api/experiences/${e.id}/analytics?days=1`)).json()) as { totals: { views: number } };
+  expect(stats.totals.views).toBe(1);
   expect((await api.post(`/api/experiences/${e.id}/unpublish`, { headers: json, data: {} })).status()).toBe(200);
   expect((await anon.get(`${BASE}/api/public/${slug}`)).status()).toBe(404);
   await anon.dispose();
