@@ -2,6 +2,11 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-23 — Remote verification of Phase 6 Milestone 18
+
+### Verified
+- REMOTE-PUBLISH on the dev Worker: publish at the stable URL, visitor without a session, unpublish. Full remote run 22/22.
+
 ## 2026-11-23 — Phase 6 Milestone 18: publishing at a stable URL (local)
 
 ### Added

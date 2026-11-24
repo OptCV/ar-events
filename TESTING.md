@@ -288,6 +288,10 @@ Neon development at 7/7 migrations (0006 applied by the owner); dev Worker redep
 
 **Not covered remotely:** image-placement builds, partially-ready builds, Quick Look / Scene Viewer rendering (devices).
 
+### REMOTE-PUBLISH — publishing on the dev edge — 2026-11-23 — PASS (full remote run 22/22 in 2.0 min)
+
+The REMOTE-BUILD draft published at once (its build was complete), the status reported published and up to date; a visitor without a session got the public page (mode public, no expiry, the live build) and the live GLB; the SPA served `/x/{slug}`; unpublish → 404. The failure paths of the Phase 6 gate are covered by local integration tests (not reproducible on demand on the edge).
+
 ## Device results
 
 ### AND-IMG-01 — 2026-11-14 (probe 0.1.0) — PARTIAL

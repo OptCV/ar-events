@@ -315,3 +315,7 @@ Not available yet: lint (ESLint/Prettier not configured), DB migrations, `apps/w
 - Built M18: `promoteBuild` + publish-on-ready in the build pipeline; routes publish/unpublish/publication/public; shared `viewerBody`/`ensureBuild`; `/x/:slug` page (shared viewer with the test page); Publish panel.
 - Verified locally: typecheck; Vitest 251; DB 47; integration 109 (incl. the Phase 6 gate); Playwright 100; deploy dry run. No migration.
 - Next: redeploy (no migration) + remote suite; then M19.
+
+## Session handoff — 2026-11-23 (25) / Claude Code — M18 on the dev edge
+
+- Owner redeployed M18; remote suite 22/22 incl. REMOTE-PUBLISH. Next: M19 (public page + analytics).
