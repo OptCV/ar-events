@@ -17,7 +17,7 @@ import { UsdConversionRejected, UsdConverterUnavailable, type UsdConverter } fro
 import { MIME_GLB, MIME_USDZ, sha256Hex } from '../conversions/pipeline.ts';
 import { frameSceneRequest, sceneManifest } from './sceneRequest.ts';
 
-const { assets, assetDerivatives, experienceRevisions, generatedOutputs, processingJobs } = schema;
+const { assets, assetDerivatives, experienceRevisions, experiences, generatedOutputs, processingJobs } = schema;
 
 export interface BuildDeps {
   db: Database;
@@ -240,10 +240,46 @@ export async function compileOutputStep(deps: BuildDeps, ctx: BuildContext, plat
   return { platform, state: 'ready' };
 }
 
+// ---------------------------------------------------------------- publishing (Phase 6 M18, ADR-036)
+
+/** A publish request waiting for its build, kept on the build's lifecycle field (the scene itself is frozen). */
+export interface PublishIntent {
+  publishRequested?: boolean;
+  publishFailed?: { message: string; at: string };
+}
+
+/**
+ * Make a READY build the live version: the previous live build becomes `superseded`, this one `published`, and the
+ * experience points at it — in one transaction, so visitors always get one complete version. Anything that is not a
+ * ready build of this experience is refused (returns false): the live version stays as it was.
+ */
+export async function promoteBuild(db: Database, experienceId: string, revisionId: string): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    const [rev] = await tx.select().from(experienceRevisions).where(and(eq(experienceRevisions.id, revisionId), eq(experienceRevisions.experienceId, experienceId))).limit(1);
+    if (!rev?.contentHash || (rev.state !== 'ready' && rev.state !== 'published')) return false;
+    const [e] = await tx.select({ live: experiences.publishedRevisionId }).from(experiences).where(eq(experiences.id, experienceId)).for('update').limit(1);
+    if (!e) return false;
+    if (e.live && e.live !== revisionId) await tx.update(experienceRevisions).set({ state: 'superseded' }).where(eq(experienceRevisions.id, e.live));
+    await tx.update(experienceRevisions).set({ state: 'published', validationReport: { publishRequested: false } }).where(eq(experienceRevisions.id, revisionId));
+    await tx.update(experiences).set({ publishedRevisionId: revisionId, visibility: 'public', updatedAt: new Date() }).where(eq(experiences.id, experienceId));
+    return true;
+  });
+}
+
 export async function finishBuild(deps: Pick<BuildDeps, 'db'>, ctx: BuildContext, results: OutputResult[]): Promise<void> {
   const ready = results.filter((r) => r.state === 'ready').length;
   const state = ready === results.length ? 'ready' : ready > 0 ? 'partially_ready' : 'failed';
   await deps.db.update(experienceRevisions).set({ state }).where(eq(experienceRevisions.id, ctx.revisionId));
+  // Publish requested while building: promote only a complete build; otherwise the live version stays (gate).
+  const [rev] = await deps.db.select({ report: experienceRevisions.validationReport }).from(experienceRevisions).where(eq(experienceRevisions.id, ctx.revisionId)).limit(1);
+  if ((rev?.report as PublishIntent | null)?.publishRequested) {
+    if (state === 'ready') await promoteBuild(deps.db, ctx.experienceId, ctx.revisionId);
+    else {
+      const failed = results.find((r) => r.state === 'failed');
+      const intent: PublishIntent = { publishRequested: false, publishFailed: { message: `Not published: the ${failed?.platform === 'ios' ? 'iPhone' : 'Android'} file could not be made. The live version is unchanged.`, at: new Date().toISOString() } };
+      await deps.db.update(experienceRevisions).set({ validationReport: intent }).where(eq(experienceRevisions.id, ctx.revisionId));
+    }
+  }
   const failed = results.find((r) => r.state === 'failed');
   await deps.db
     .update(processingJobs)
@@ -260,6 +296,13 @@ export async function finishBuild(deps: Pick<BuildDeps, 'db'>, ctx: BuildContext
 export async function failBuild(deps: Pick<BuildDeps, 'db'>, jobId: string, code: BuildErrorCode, message: string): Promise<void> {
   const [job] = await deps.db.select({ revisionId: processingJobs.revisionId }).from(processingJobs).where(eq(processingJobs.id, jobId)).limit(1);
   if (job?.revisionId) {
+    const [rev] = await deps.db.select({ report: experienceRevisions.validationReport }).from(experienceRevisions).where(eq(experienceRevisions.id, job.revisionId)).limit(1);
+    if ((rev?.report as PublishIntent | null)?.publishRequested) {
+      await deps.db
+        .update(experienceRevisions)
+        .set({ validationReport: { publishRequested: false, publishFailed: { message: `Not published: ${message} The live version is unchanged.`, at: new Date().toISOString() } } satisfies PublishIntent })
+        .where(eq(experienceRevisions.id, job.revisionId));
+    }
     await deps.db
       .update(generatedOutputs)
       .set({ state: 'failed', validation: { error: { code, message } } })

@@ -147,6 +147,16 @@ The runtimes that execute the plan (USDZ/GLB exporters, WebXR viewer, public pag
 | M17 Android WebXR image viewer | Hosted viewer for image placement: feature detection, start UI after a gesture, tracking states, the composed GLB on the tracked image, overlay buttons and taps per the interaction plan (ADR-031), error and unsupported states with 3D fallback | **Done locally** (ADR-035); AR session not device-tested |
 | Gate | Device acceptance cases for all six runtimes (checklist extends the Phase 2 one) | Needs devices |
 
+## Phase 6 plan (2026-11-23)
+
+**Gate (unchanged):** edit/republish retains the last-good URL and output during errors.
+
+| Milestone | Scope | Status |
+|---|---|---|
+| M18 Publish and stable URL | Publish promotes a ready build atomically (draft unchanged → its build; otherwise build first, promote only when every file is ready — a failed build never replaces the live one); stable public page `/x/{slug}` (same routing as the test page, no expiry); unpublish; superseded builds pruned, the published one kept; publishing status in the editor and dashboard | **Done locally** (ADR-036); **Phase 6 gate met in tests**; not deployed |
+| M19 Public page and analytics | Landing page polish (description, share QR, print sheet for image targets), anonymous aggregate analytics (views, AR launches per runtime; no personal data) | Not started |
+| M20 Hardening | Security review of public endpoints (rate limits), performance (lazy routes, bundle budget), accessibility audit, load check | Not started |
+
 **Phase 1 risks:** Hyperdrive caching of auth reads (ADR-013 §5); request-body size limits for large model uploads; Better Auth minor-version churn (pin exact, review changelogs); `@cloudflare/vite-plugin` + monorepo layout (validated locally in M1; edge deploy pending). Client bundle is 133 KB gzip for a skeleton, mostly React + Zod 4; watch it as features land (consider `zod/mini` on the client).
 
 ### Milestone 3 findings (2026-11-14)

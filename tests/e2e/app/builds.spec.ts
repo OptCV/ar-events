@@ -153,3 +153,45 @@ test('Android image placement: the WebXR viewer checks AR support, explains when
   await expect(v2.getByTestId('xr-start')).toBeEnabled();
   await b.ctx.close();
 });
+
+test('publish: the editor publishes the draft; visitors open the stable URL without signing in; changes keep the same URL; unpublish', async ({ page, request, browser }) => {
+  test.setTimeout(180_000);
+  await verifiedSignedIn(page, request, 'p6pub');
+  await createExperience(page, 'Live display', 'Floor');
+  await page.getByTestId('add-content').getByRole('button', { name: 'Add shape' }).click();
+  await addAction(page, 'Open a web page', { 'Web address': 'https://example.com/shop', 'Button text (optional)': 'Shop now' });
+  await expect(page.getByTestId('save-status')).toHaveText('All changes saved');
+  const pub = page.getByTestId('publish');
+  await expect(pub).toHaveAttribute('data-state', 'unpublished');
+  await expect(pub).toContainText('Not published. Visitors cannot open it yet.');
+  await pub.getByRole('button', { name: 'Publish', exact: true }).click();
+  await expect(pub).toHaveAttribute('data-state', 'published', { timeout: 90_000 });
+  await expect(pub).toContainText('Published and up to date.');
+  const url = (await pub.getByTestId('public-link').getAttribute('href'))!;
+  expect(url).toMatch(/\/x\/live-display-[a-z0-9]{6}$/);
+  await expect(pub.getByTestId('qr-code')).toBeVisible();
+
+  const visitor = await browser.newContext();
+  const v = await visitor.newPage();
+  await v.goto(url);
+  const pp = v.getByTestId('public-page');
+  await expect(pp.getByRole('heading', { level: 1, name: 'Live display' })).toBeVisible();
+  await expect(pp).not.toContainText('Test build');
+  await expect(pp.getByTestId('model-preview')).toHaveAttribute('data-state', 'ready', { timeout: 20_000 });
+  await expect(pp.getByTestId('page-link')).toHaveText(['Shop now']);
+
+  // A change is not live until published again — at the same address.
+  await page.getByTestId('add-content').getByRole('button', { name: 'Add text' }).click();
+  await expect(page.getByTestId('save-status')).toHaveText('All changes saved');
+  await page.reload();
+  await expect(page.getByTestId('publish')).toContainText('The draft has changes that are not published yet.');
+  await page.getByTestId('publish').getByRole('button', { name: 'Publish changes' }).click();
+  await expect(page.getByTestId('publish')).toContainText('Published and up to date.', { timeout: 90_000 });
+  expect(await page.getByTestId('publish').getByTestId('public-link').getAttribute('href')).toBe(url);
+
+  await page.getByTestId('publish').getByRole('button', { name: 'Unpublish' }).click();
+  await expect(page.getByTestId('publish')).toHaveAttribute('data-state', 'unpublished');
+  await v.reload();
+  await expect(v.getByRole('heading', { level: 1 })).toHaveText('Experience not available');
+  await visitor.close();
+});

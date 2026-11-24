@@ -71,3 +71,4 @@
 .dangerText { color: var(--ui-danger); }
 .dangerText:hover { border-color: var(--ui-danger); }
 .sceneSection { margin: var(--ui-space-6) 0; }
+.shipping { display: grid; gap: var(--ui-space-4); grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); align-items: start; }

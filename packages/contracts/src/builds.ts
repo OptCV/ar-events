@@ -56,6 +56,8 @@ export const BuildSummary = z.object({
   testUrlExpiresAt: z.string().nullable(),
   /** True when the current draft is exactly what this build compiled. */
   current: z.boolean(),
+  /** This build is the live, published version (Phase 6, ADR-036). */
+  published: z.boolean(),
   createdAt: z.string(),
   finishedAt: z.string().nullable(),
 });
@@ -82,10 +84,15 @@ export const XrInteractions = z.object({
 });
 export type XrInteractions = z.infer<typeof XrInteractions>;
 
-/** What the public test page gets (no session; authorised by the signed test link). */
+/**
+ * What a viewer page gets: the device test page (signed test link, expires) and the published public page
+ * (`/x/{slug}`, no expiry) share this shape and the same device routing.
+ */
 export const TestBuildResponse = z.object({
   id: z.string(),
+  mode: z.enum(['test', 'public']),
   name: z.string(),
+  description: z.string().nullable(),
   placementMode: z.enum(['image', 'floor', 'wall']),
   /** Image placement: the printed width (meters) and the tracking image to print. */
   tracking: z.object({ widthMeters: z.number(), imageUrl: z.string() }).nullable(),
@@ -101,6 +108,22 @@ export const TestBuildResponse = z.object({
   xr: XrInteractions,
   /** File URLs expire sooner than the link; the page refetches. */
   filesExpireAt: z.string(),
-  linkExpiresAt: z.string(),
+  /** Test links only. */
+  linkExpiresAt: z.string().nullable(),
 });
 export type TestBuildResponse = z.infer<typeof TestBuildResponse>;
+
+/** Publishing (Phase 6 M18, ADR-036). */
+export const PublicationStatus = z.object({
+  state: z.enum(['unpublished', 'publishing', 'published']),
+  /** Stable public URL (`/x/{slug}`), known before the first publish. */
+  url: z.string(),
+  live: z.object({ buildId: z.string(), revisionNumber: z.number().int(), publishedAt: z.string().nullable() }).nullable(),
+  /** The live version is exactly the current draft. */
+  upToDate: z.boolean(),
+  /** A publish waiting for its build. */
+  pending: z.object({ buildId: z.string(), state: BuildState }).nullable(),
+  /** The last publish attempt failed; the live version (if any) is unchanged. */
+  lastFailure: z.object({ message: z.string(), at: z.string() }).nullable(),
+});
+export type PublicationStatus = z.infer<typeof PublicationStatus>;

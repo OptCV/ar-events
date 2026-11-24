@@ -2,6 +2,12 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-23 — Phase 6 Milestone 18: publishing at a stable URL (local)
+
+### Added
+- Publish / Publish changes / Unpublish in the editor; the live version is promoted atomically and only when every file is ready, so a failed build never replaces it. ADR-036.
+- Public experience page at `/x/{slug}` (same device routing as the test page, no expiry); `GET /api/public/:slug`, `POST /api/experiences/:id/publish|unpublish`, `GET /api/experiences/:id/publication`.
+
 ## 2026-11-23 — Phase 5 Milestone 17: Android WebXR image viewer (local)
 
 ### Added

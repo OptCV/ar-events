@@ -6,7 +6,7 @@ import { ApiRequestError } from '../api/client.ts';
 import { cx } from '../components/cx.ts';
 import { Alert } from '../components/form/Alert.tsx';
 import formStyles from '../components/form/Form.module.css';
-import { useTestBuild } from './api.ts';
+import { usePublicExperience, useTestBuild } from './api.ts';
 import { QrCode } from './QrCode.tsx';
 import styles from './Builds.module.css';
 
@@ -48,12 +48,34 @@ export function TestBuildPage() {
       </section>
     );
   }
-  const t = q.data;
+  return <ExperienceViewer t={q.data} env={env} fallbackParam={params.get('ar')} />;
+}
+
+/** Published experience at its stable URL (Phase 6 M18, ADR-036): the same viewer, no expiry, no test badge. */
+export function PublicExperiencePage() {
+  const { slug = '' } = useParams();
+  const { search } = useLocation();
+  const q = usePublicExperience(slug);
+  const env = useMemo(deviceEnv, []);
+  if (q.isPending) return <p role="status">Loading…</p>;
+  if (q.isError) {
+    return (
+      <section className={styles.page}>
+        <h1>Experience not available</h1>
+        <p>It may have been unpublished, or the link is wrong.</p>
+      </section>
+    );
+  }
+  return <ExperienceViewer t={q.data} env={env} fallbackParam={new URLSearchParams(search).get('ar')} />;
+}
+
+function ExperienceViewer({ t, env, fallbackParam }: { t: TestBuildResponse; env: DeviceEnv; fallbackParam: string | null }) {
   return (
-    <section className={styles.page} data-testid="test-page" data-os={env.os}>
-      <p className={styles.badge}>Test build — not published</p>
+    <section className={styles.page} data-testid={t.mode === 'test' ? 'test-page' : 'public-page'} data-os={env.os}>
+      {t.mode === 'test' && <p className={styles.badge}>Test build — not published</p>}
       <h1>{t.name}</h1>
-      {params.get('ar') === 'unavailable' && <Alert tone="error">Scene Viewer could not start on this phone. It needs the Google app and Google Play Services for AR (ARCore).</Alert>}
+      {t.description && <p className={styles.description}>{t.description}</p>}
+      {fallbackParam === 'unavailable' && <Alert tone="error">Scene Viewer could not start on this phone. It needs the Google app and Google Play Services for AR (ARCore).</Alert>}
       <Launch t={t} env={env} />
       {t.tracking && (
         <div className={styles.tracking} data-testid="tracking-print">
@@ -75,7 +97,9 @@ export function TestBuildPage() {
           ))}
         </nav>
       )}
-      <p className={formStyles.hint}>This link works until {new Date(t.linkExpiresAt).toLocaleString()}. How the files look in AR is what this test is for: nothing here has been confirmed on a device yet.</p>
+      {t.mode === 'test' && t.linkExpiresAt && (
+        <p className={formStyles.hint}>This link works until {new Date(t.linkExpiresAt).toLocaleString()}. How the files look in AR is what this test is for: nothing here has been confirmed on a device yet.</p>
+      )}
     </section>
   );
 }
