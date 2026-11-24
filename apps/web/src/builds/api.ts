@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BuildSummary, PublicationStatus, TestBuildResponse } from '@ar-creator/contracts';
+import { AnalyticsSummary, BuildSummary, PublicationStatus, TestBuildResponse } from '@ar-creator/contracts';
 import { ApiRequestError, getJson, sendJson } from '../api/client.ts';
 
 /** Test builds (Phase 5 M16, ADR-034). */
@@ -76,5 +76,15 @@ export function usePublish(experienceId: string, action: 'publish' | 'unpublish'
       void qc.invalidateQueries({ queryKey: buildKeys.latest(experienceId) });
       void qc.invalidateQueries({ queryKey: ['experiences'] });
     },
+  });
+}
+
+/** Anonymous visit counts of the last 30 days (ADR-037). */
+export function useAnalytics(experienceId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['builds', 'analytics', experienceId],
+    queryFn: () => getJson(`/api/experiences/${encodeURIComponent(experienceId)}/analytics?days=30`, AnalyticsSummary),
+    enabled,
+    staleTime: 60_000,
   });
 }

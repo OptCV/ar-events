@@ -10,6 +10,8 @@ import {
   bigint,
   char,
   check,
+  date,
+  primaryKey,
   foreignKey,
   index,
   integer,
@@ -268,5 +270,31 @@ export const generatedOutputs = pgTable(
     check('generated_outputs_sha256_format', sql`${t.sha256} IS NULL OR ${SHA256(t.sha256)}`),
     check('generated_outputs_ready_sized', sql`${t.state} <> 'ready' OR ${t.sizeBytes} IS NOT NULL`),
     check('generated_outputs_size_positive', sql`${t.sizeBytes} IS NULL OR ${t.sizeBytes} > 0`),
+  ],
+);
+
+// ---------- analytics (Phase 6 M19, ADR-037): anonymous daily counts per published experience
+/**
+ * view: the public page was opened (detail = ios | android | desktop);
+ * ar_tap: a visitor tapped the AR button — an observable INTENT, not proof that AR started (detail = runtime);
+ * link_tap: a visitor tapped one of the experience's links (detail = web | email | phone).
+ * Only counts: no IP address, user agent, cookie or other per-visitor data is stored.
+ */
+export const analyticsEventEnum = pgEnum('analytics_event', ['view', 'ar_tap', 'link_tap']);
+export const analyticsDaily = pgTable(
+  'analytics_daily',
+  {
+    experienceId: uuid('experience_id')
+      .notNull()
+      .references(() => experiences.id, { onDelete: 'cascade' }),
+    day: date('day', { mode: 'string' }).notNull(),
+    event: analyticsEventEnum('event').notNull(),
+    detail: varchar('detail', { length: 40 }).notNull().default(''),
+    count: integer('count').notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.experienceId, t.day, t.event, t.detail] }),
+    check('analytics_daily_count_nonnegative', sql`${t.count} >= 0`),
+    check('analytics_daily_detail_format', sql`${t.detail} ~ '^[a-z_]{0,40}$'`),
   ],
 );

@@ -5,3 +5,4 @@ export * from './experiences.ts';
 export * from './assets.ts';
 export * from './conversions.ts';
 export * from './builds.ts';
+export * from './analytics.ts';

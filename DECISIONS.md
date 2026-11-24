@@ -507,3 +507,15 @@ Accepted decisions may be superseded by new numbered entries; never rewrite prev
 5. **Retention:** the live build is never pruned; superseded builds are pruned with other old builds; assets used by the published revision stay "in use" (only draft and published revisions block deletion).
 6. **Editor:** a Publish panel next to Test on device (status, "Publish" / "Publish changes" / "Unpublish", the public URL with QR, last failure); the dashboard shows "Published".
 **Gate (Phase 6):** proven by the integration test — after v2 is live, (a) a version whose iPhone file cannot be made and (b) a version built while the compiler is down are **not** published; the public page keeps serving v2's build and byte-identical files; once the compiler is back the same draft publishes.
+
+## ADR-037 — Anonymous aggregate analytics and public page sharing (Phase 6 Milestone 19)
+
+**Date:** 2026-11-23
+**Status:** Accepted (local evidence). Migration 0007 needs the owner's approval for Neon development.
+**Decision:**
+1. **Counts only.** Migration `0007_analytics_daily`: `analytics_daily(experience_id, day, event, detail, count)` with a composite key, `count ≥ 0`, `detail` in `^[a-z_]{0,40}$`, cascade-deleted with the experience. Events: `view` (detail ios / android / desktop), `ar_tap` (detail = runtime), `link_tap` (web / email / phone). **No IP address, user agent, cookie, identifier or timestamp finer than the day is stored**; the client sends only the event and its detail.
+2. **`ar_tap` is an intent**, not proof that AR started (PLATFORM_ROUTING.md: "capture only observable launch intent"): Quick Look / Scene Viewer button taps and the WebXR "Start AR" tap. The editor says so next to the numbers.
+3. `POST /api/public/:slug/events`: counts only for published experiences; unknown or unpublished slugs get the same 204 (no probing); invalid events 400; the same-origin rule for POSTs applies, so other sites' pages cannot count through visitors' browsers (scripts can still forge counts — they are indicative; rate limiting is M20). Test pages never count. A visit is counted once per browser tab (`sessionStorage` flag, local only).
+4. `GET /api/experiences/:id/analytics?days=30` (owner, ≤ 90 days): totals, views by device kind, AR taps by viewer, per day. Shown as text in the Publish panel.
+5. **Public page:** document title = experience name; **Share** (Web Share API, else copy link); for image placement a **print sheet** (`/x/{slug}/print`) with the tracking image sized in CSS centimetres (exact when printed at 100 % / "Actual size"), instructions to check with a ruler, page chrome hidden in print.
+**Consequences:** No consent banner is needed for these counts (no personal data, no cookies, no device storage beyond a per-tab flag); revisit if analytics ever go beyond aggregates.

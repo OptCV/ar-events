@@ -10,6 +10,7 @@ import { createTempDatabase, migrateDatabase } from './helpers.ts';
 
 const TABLES = [
   'account',
+  'analytics_daily',
   'asset_derivatives',
   'assets',
   'experience_revisions',

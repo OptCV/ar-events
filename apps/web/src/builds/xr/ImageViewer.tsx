@@ -7,6 +7,7 @@ import { Alert } from '../../components/form/Alert.tsx';
 import formStyles from '../../components/form/Form.module.css';
 import { cx } from '../../components/cx.ts';
 import { effectOf, findClip, overlayButtons, tapTarget } from './interactions.ts';
+import { linkKind, type Track } from '../track.ts';
 import styles from './ImageViewer.module.css';
 
 const ModelPreview = lazy(() => import('../../imageObjects/ModelPreview.tsx'));
@@ -26,7 +27,7 @@ const STATUS_TEXT: Record<TrackingStatus, string> = {
  * Interactions follow the plan (ADR-031): links as on-screen buttons (DOM overlay), taps on objects and hotspots,
  * show/hide, play animation. When image tracking is not available, it says why and shows the 3D preview instead.
  */
-export default function ImageViewer({ t }: { t: TestBuildResponse }) {
+export default function ImageViewer({ t, track }: { t: TestBuildResponse; track?: Track }) {
   const overlay = useRef<HTMLDivElement>(null);
   const bitmap = useRef<ImageBitmap | null>(null);
   const gltf = useRef<GLTF | null>(null);
@@ -81,6 +82,7 @@ export default function ImageViewer({ t }: { t: TestBuildResponse }) {
     if (!navigator.xr || !bitmap.current || !t.tracking || !overlay.current) return;
     setPhase('starting');
     setMessage(null);
+    track?.({ event: 'ar_tap', detail: 'android_webxr_image' });
     const init = buildSessionInit([{ image: bitmap.current, widthInMeters: t.tracking.widthMeters }], overlay.current);
     // Called synchronously inside the tap handler: WebXR requires transient user activation.
     navigator.xr.requestSession('immersive-ar', init).then(
@@ -155,6 +157,7 @@ export default function ImageViewer({ t }: { t: TestBuildResponse }) {
       const fx = effectOf(actionId, t.xr);
       if (!fx) return;
       if (fx.kind === 'navigate') {
+        track?.({ event: 'link_tap', detail: linkKind(fx.href) });
         navigateTo = fx.href;
         return end(null);
       }

@@ -3,7 +3,8 @@ import { ApiRequestError } from '../api/client.ts';
 import { cx } from '../components/cx.ts';
 import { Alert } from '../components/form/Alert.tsx';
 import formStyles from '../components/form/Form.module.css';
-import { usePublication, usePublish } from './api.ts';
+import { useAnalytics, usePublication, usePublish } from './api.ts';
+import type { AnalyticsSummary } from '@ar-creator/contracts';
 import { QrCode } from './QrCode.tsx';
 import styles from './Builds.module.css';
 
@@ -18,6 +19,7 @@ export function PublishPanel({ experienceId, saved }: { experienceId: string; sa
   const unpublish = usePublish(experienceId, 'unpublish');
   const [copied, setCopied] = useState(false);
   const p = q.data;
+  const stats = useAnalytics(experienceId, !!p?.live);
   const error = (publish.error ?? unpublish.error) instanceof ApiRequestError ? ((publish.error ?? unpublish.error) as ApiRequestError) : null;
   const busy = publish.isPending || unpublish.isPending || p?.state === 'publishing';
 
@@ -76,9 +78,28 @@ export function PublishPanel({ experienceId, saved }: { experienceId: string; sa
               </button>
             )}
           </div>
+          {p.live && stats.data && <Visits a={stats.data} />}
           {!saved && <p className={formStyles.hint}>Publishing uses the saved draft; wait until your changes are saved.</p>}
         </>
       )}
     </section>
+  );
+}
+
+const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
+
+/** Last 30 days, anonymous counts only. AR taps are taps on the AR button, not confirmed AR sessions. */
+function Visits({ a }: { a: AnalyticsSummary }) {
+  return (
+    <div className={styles.visits} data-testid="visits">
+      <h3 className={styles.visitsTitle}>Last {a.days} days</h3>
+      <p>
+        {plural(a.totals.views, 'visit', 'visits')} ({a.views.ios} iPhone/iPad · {a.views.android} Android · {a.views.desktop} computer)
+      </p>
+      <p>
+        {plural(a.totals.arTaps, 'AR button tap', 'AR button taps')} ({a.arTaps.quickLook} Quick Look · {a.arTaps.sceneViewer} Scene Viewer · {a.arTaps.webxr} image tracking) · {plural(a.totals.linkTaps, 'link tap', 'link taps')}
+      </p>
+      <p className={formStyles.hint}>Anonymous counts only; nothing about visitors is stored. A tap on the AR button does not confirm that AR started.</p>
+    </div>
   );
 }

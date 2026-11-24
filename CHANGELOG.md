@@ -2,6 +2,12 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-23 — Phase 6 Milestone 19: public page sharing and anonymous analytics (local)
+
+### Added
+- Anonymous daily counts of visits, AR button taps (per viewer) and link taps for published experiences; "Last 30 days" in the Publish panel. Migration `0007_analytics_daily`. ADR-037.
+- Public page: Share button, page title, and an exact-size print sheet for image experiences (`/x/{slug}/print`).
+
 ## 2026-11-23 — Remote verification of Phase 6 Milestone 18
 
 ### Verified

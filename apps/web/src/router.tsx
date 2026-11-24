@@ -15,6 +15,7 @@ import { HomePage } from './pages/HomePage.tsx';
 import { NotFoundPage } from './pages/NotFoundPage.tsx';
 import { RouteErrorPage } from './pages/RouteErrorPage.tsx';
 import { PublicExperiencePage, TestBuildPage } from './builds/TestBuildPage.tsx';
+import { PrintSheet } from './builds/PrintSheet.tsx';
 
 export const router = createBrowserRouter([
   {
@@ -32,6 +33,7 @@ export const router = createBrowserRouter([
       { path: 'test/:id', element: <TestBuildPage /> },
       // Published experiences at their stable public URL (ADR-036).
       { path: 'x/:slug', element: <PublicExperiencePage /> },
+      { path: 'x/:slug/print', element: <PrintSheet /> },
       // Protected routes: everything under RequireAuth needs a valid server-side session.
       {
         element: <RequireAuth />,

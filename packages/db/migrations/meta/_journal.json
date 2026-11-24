@@ -50,6 +50,13 @@
       "when": 1795411844014,
       "tag": "0006_build_outputs",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1795487072071,
+      "tag": "0007_analytics_daily",
+      "breakpoints": true
     }
   ]
 }

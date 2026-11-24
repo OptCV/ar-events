@@ -13,6 +13,7 @@ import { StorageUnavailableError, assetRoutes } from './assets/routes.ts';
 import { r2Store, type ObjectStore } from './assets/store.ts';
 import { conversionRoutes } from './conversions/routes.ts';
 import { buildRoutes } from './compile/routes.ts';
+import { analyticsRoutes } from './analytics/routes.ts';
 import { workflowRunner, type ConversionRunner } from './conversions/runner.ts';
 
 export interface BuildInfo {
@@ -193,6 +194,7 @@ export function createApp(info: BuildInfo, deps: AppDeps = {}) {
   app.route('/assets', assetRoutes());
   app.route('/', conversionRoutes());
   app.route('/', buildRoutes());
+  app.route('/', analyticsRoutes());
 
   /** Public session probe for the UI: 200 with the user or null (no 401 noise for signed-out visitors). */
   app.get('/session', async (c) => {

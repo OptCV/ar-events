@@ -104,7 +104,8 @@ Plan and slice order: `ROADMAP.md` "Phase 1 plan".
 
 - [ ] Workflows/Queues job orchestration with idempotent steps.
 - [x] Immutable revisions and atomic publish promotion. *(P6 M18, ADR-036)*
-- [-] Stable public URL, QR and share/download actions. *(P6 M18: `/x/{slug}` + QR in the editor; share/print sheet M19)*
+- [x] Stable public URL, QR and share/download actions. *(P6 M18 URL + QR; M19 Share and exact-size print sheet)*
+- [x] Anonymous aggregate analytics (views, AR button taps per viewer, link taps). *(P6 M19, ADR-037)*
 - [x] Retry/error reporting and partial readiness. *(builds: bounded retries, per-platform failures, partially ready; publishing reports failures and keeps the live version — ADR-034/036)*
 - [ ] Full device matrix, accessibility, security and load checks.
 - [ ] Documentation and changelog updated with verified evidence.

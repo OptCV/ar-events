@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { connectDb, type DbHandle } from '../src/client.ts';
-import { assetDerivatives, assets, experienceRevisions, experiences, generatedOutputs, processingJobs, user } from '../src/schema/index.ts';
+import { analyticsDaily, assetDerivatives, assets, experienceRevisions, experiences, generatedOutputs, processingJobs, user } from '../src/schema/index.ts';
 import { createTempDatabase, migrateDatabase } from './helpers.ts';
 
 let temp: Awaited<ReturnType<typeof createTempDatabase>>;
@@ -202,6 +202,17 @@ describe('assets, derivatives, outputs, jobs', () => {
     await h.db.update(generatedOutputs).set({ state: 'ready', r2Key: key, sha256: sha('e'), sizeBytes: 1234 }).where(eq(generatedOutputs.id, o!.id));
     expect(await pgCode(h.db.update(generatedOutputs).set({ r2Key: 'experiences/x/other.usdz' }).where(eq(generatedOutputs.id, o!.id)))).toBe(CHECK);
     expect(await pgCode(h.db.insert(generatedOutputs).values({ revisionId: r.id, runtime: 'android_scene_viewer_image' as never }))).toBe('22P02');
+  });
+
+  it('analytics (0007): one row per experience × day × event × detail; counts never negative; detail format; deleted with the experience', async () => {
+    const e = await makeExperience(owner);
+    const row = { experienceId: e.id, day: '2026-11-23', event: 'view' as const, detail: 'ios', count: 1 };
+    await h.db.insert(analyticsDaily).values(row);
+    expect(await pgCode(h.db.insert(analyticsDaily).values(row))).toBe(UNIQUE);
+    expect(await pgCode(h.db.insert(analyticsDaily).values({ ...row, detail: 'android', count: -1 }))).toBe(CHECK);
+    expect(await pgCode(h.db.insert(analyticsDaily).values({ ...row, detail: 'Not Valid!' }))).toBe(CHECK);
+    await h.db.delete(experiences).where(eq(experiences.id, e.id));
+    expect(await h.db.select().from(analyticsDaily).where(eq(analyticsDaily.experienceId, e.id))).toEqual([]);
   });
 
   it('jobs: need a target, bounded attempts, unique idempotency keys', async () => {

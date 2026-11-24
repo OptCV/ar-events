@@ -32,3 +32,17 @@
 .linkButton { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 .description { margin: 0; color: var(--ui-text-secondary); white-space: pre-line; }
 .actionsRow { display: flex; flex-wrap: wrap; gap: var(--ui-space-2); }
+.share { display: flex; align-items: center; gap: var(--ui-space-3); }
+/* Print sheet (M19): exact-size tracking image; page chrome hidden when printing. */
+.sheet { display: grid; gap: var(--ui-space-4); max-width: 900px; margin: 0 auto; }
+.printFigure { margin: 0; display: grid; gap: var(--ui-space-2); justify-items: start; }
+.printFigure img { max-width: none; height: auto; }
+.printFigure figcaption { font-size: var(--ui-text-sm); color: var(--ui-text-secondary); }
+@media print {
+  :global(body) { background: #fff; }
+  :global(header), :global(nav), .noPrint { display: none !important; }
+  .printFigure figcaption { color: #000; }
+}
+.visits { display: grid; gap: var(--ui-space-1); font-size: var(--ui-text-sm); padding-top: var(--ui-space-2); border-top: 1px solid var(--ui-border); }
+.visits p { margin: 0; }
+.visitsTitle { margin: 0; font-size: var(--ui-text-sm); font-weight: 700; }

@@ -195,3 +195,56 @@ test('publish: the editor publishes the draft; visitors open the stable URL with
   await expect(v.getByRole('heading', { level: 1 })).toHaveText('Experience not available');
   await visitor.close();
 });
+
+test('public page: visits and link taps are counted anonymously (test pages are not); Share copies the link; the print sheet sizes the tracking image in centimetres', async ({ page, request, browser }) => {
+  test.setTimeout(180_000);
+  const { readFileSync } = await import('node:fs');
+  await verifiedSignedIn(page, request, 'p6stats');
+  await createExperience(page, 'Poster live', 'Image anchored');
+  await page.getByTestId('tracking-image').locator('input[type=file]').setInputFiles({ name: 'poster.png', mimeType: 'image/png', buffer: readFileSync('tests/fixtures/images/tracking_target_20cm.png') });
+  await expect(page.getByTestId('tracking-image').getByTestId('printed-size')).toHaveText('Printed size: 20 × 13.3 cm');
+  await page.getByTestId('add-content').getByRole('button', { name: 'Add shape' }).click();
+  await addAction(page, 'Open a web page', { 'Web address': 'https://example.com/shop', 'Button text (optional)': 'Shop now' });
+  await expect(page.getByTestId('save-status')).toHaveText('All changes saved');
+  await page.getByTestId('publish').getByRole('button', { name: 'Publish', exact: true }).click();
+  await expect(page.getByTestId('publish')).toHaveAttribute('data-state', 'published', { timeout: 90_000 });
+  const url = (await page.getByTestId('publish').getByTestId('public-link').getAttribute('href'))!;
+  await expect(page.getByTestId('visits')).toContainText('0 visits');
+
+  // A visitor on a computer: one view, one link tap; Share copies the address.
+  const visitor = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
+  await visitor.addInitScript(() => Object.defineProperty(navigator, 'share', { value: undefined, configurable: true }));
+  await visitor.route('https://example.com/**', (r) => r.fulfill({ status: 200, contentType: 'text/html', body: '<h1>Shop</h1>' }));
+  const v = await visitor.newPage();
+  await v.goto(url);
+  await expect(v).toHaveTitle('Poster live');
+  await v.getByTestId('share').click();
+  await expect(v.getByRole('status').filter({ hasText: 'Link copied.' })).toBeVisible();
+  expect(await v.evaluate(() => navigator.clipboard.readText())).toBe(url);
+
+  // Print sheet: the image is 20 cm wide in CSS (= 20 / 2.54 × 96 px), so printing at 100 % gives 20 cm.
+  await v.getByTestId('print-sheet').click();
+  await expect(v).toHaveURL(`${url}/print`);
+  const img = v.getByTestId('print-image');
+  await expect(img).toHaveAttribute('data-width-cm', '20');
+  expect(Math.abs((await img.evaluate((el) => el.getBoundingClientRect().width)) - (20 / 2.54) * 96)).toBeLessThan(1);
+  await expect(v.getByTestId('print-page')).toContainText('it must be 20 cm wide');
+  await v.goBack();
+  await v.getByTestId('page-link').click();
+  await expect(v).toHaveURL('https://example.com/shop');
+  await visitor.close();
+
+  // The creator's test link (the published build's) is not counted.
+  await page.reload();
+  const testLink = (await page.getByTestId('test-on-device').getByTestId('test-link').getAttribute('href'))!;
+  const t = await browser.newContext();
+  const tp = await t.newPage();
+  await tp.goto(testLink);
+  await expect(tp.getByTestId('test-page')).toBeVisible();
+  await t.close();
+  await page.reload();
+  const visits = page.getByTestId('visits');
+  await expect(visits).toContainText('1 visit (0 iPhone/iPad · 0 Android · 1 computer)'); // returning from the print sheet is the same visit
+  await expect(visits).toContainText('1 link tap');
+  await expect(visits).toContainText('0 AR button taps');
+});

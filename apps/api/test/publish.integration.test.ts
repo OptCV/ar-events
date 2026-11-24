@@ -3,7 +3,7 @@
  * keeps the last-good URL and files live while a new version fails. Real converter image (Docker), inline runner.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { ApiError, AssetSummary, CreateUploadResponse, ExperienceDetail, ExperienceListResponse, PublicationStatus, TestBuildResponse, type UploadableRole } from '@ar-creator/contracts';
+import { AnalyticsSummary, ApiError, AssetSummary, CreateUploadResponse, ExperienceDetail, ExperienceListResponse, PublicationStatus, TestBuildResponse, type UploadableRole } from '@ar-creator/contracts';
 import { IDENTITY_TRANSFORM, type SceneNode } from '@ar-creator/schema';
 import { createTempDatabase, migrateDatabase } from '../../../packages/db/test/helpers.ts';
 import { cubeGlb } from '../../../tests/e2e/app/glb.ts';
@@ -192,5 +192,39 @@ describe('publishing (ADR-036)', () => {
     expect((await publicPage(e.slug)).status).toBe(404);
     expect((await publicPage('NOT A SLUG')).status).toBe(404);
     expect(slugOf(`https://x/x/${e.slug}`)).toBe(e.slug);
+  });
+});
+
+describe('anonymous analytics (ADR-037)', () => {
+  it('counts views, AR taps and link taps of a published experience per day; nothing for unpublished ones; owner-only summary', async () => {
+    const e = ExperienceDetail.parse(await (await h.req('/api/experiences', { body: { name: 'Counted', placementMode: 'floor' }, jar: alice })).json());
+    await setNodes(alice, e.id, [node('b', { kind: 'primitive', shape: 'box' })]);
+    const ev = (body: unknown, origin?: string | null) => h.req(`/api/public/${e.slug}/events`, { body, ...(origin !== undefined ? { origin } : {}) });
+    // Not published yet: accepted, not counted.
+    expect((await ev({ event: 'view', detail: 'ios' })).status).toBe(204);
+    await publish(alice, e.id);
+    await h.conversions.idle();
+    for (const body of [
+      { event: 'view', detail: 'ios' },
+      { event: 'view', detail: 'ios' },
+      { event: 'view', detail: 'android' },
+      { event: 'view', detail: 'desktop' },
+      { event: 'ar_tap', detail: 'ios_quicklook_floor' },
+      { event: 'ar_tap', detail: 'android_scene_viewer_floor' },
+      { event: 'link_tap', detail: 'web' },
+    ]) expect((await ev(body)).status).toBe(204);
+    // Invalid events are refused; other sites cannot count (same-origin POST rule); unknown slugs look the same.
+    expect((await ev({ event: 'view', detail: 'tv' })).status).toBe(400);
+    expect((await ev({ event: 'purchase', detail: 'x' })).status).toBe(400);
+    expect((await ev({ event: 'view', detail: 'ios' }, 'https://evil.example')).status).toBe(403);
+    expect((await h.req('/api/public/no-such-experience/events', { body: { event: 'view', detail: 'ios' } })).status).toBe(204);
+
+    const a = AnalyticsSummary.parse(await (await h.req(`/api/experiences/${e.id}/analytics?days=7`, { jar: alice })).json());
+    expect(a).toMatchObject({ days: 7, totals: { views: 4, arTaps: 2, linkTaps: 1 }, views: { ios: 2, android: 1, desktop: 1 }, arTaps: { quickLook: 1, sceneViewer: 1, webxr: 0 } });
+    expect(a.perDay).toEqual([{ day: new Date().toISOString().slice(0, 10), views: 4, arTaps: 2, linkTaps: 1 }]);
+    const bob = await signedIn();
+    expect((await h.req(`/api/experiences/${e.id}/analytics`, { jar: bob })).status).toBe(404);
+    // Deleting the experience deletes its counts (cascade): nothing left to read.
+    expect((await h.req(`/api/experiences/${e.id}`, { method: 'DELETE', jar: alice })).status).toBe(204);
   });
 });
