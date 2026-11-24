@@ -27,6 +27,7 @@ import { logError } from '../db.ts';
 import { UUID, err, parseJson } from '../http.ts';
 import { assetSigningKey, signAssetUrl, verifyAssetUrl } from '../assets/signing.ts';
 import { derivativeBytes } from '../assets/usage.ts';
+import { serveObject } from '../assets/serve.ts';
 import { GLB_CONVERTER_VERSION, MIME_GLB, MIME_USDZ, USDZ_CONVERTER_VERSION, failJob, imageObjectJobKey, settingsHash, type ImageObjectJobInput } from './pipeline.ts';
 
 const { assets, assetDerivatives, processingJobs } = schema;
@@ -256,23 +257,19 @@ export function conversionRoutes() {
     if (!d?.sha256 || !d.r2Key || (d.outputType !== 'image_object_glb' && d.outputType !== 'image_object_usdz')) return notFound(); // textures and thumbnails are internal
     const v = await verifyAssetUrl(await assetSigningKey(secret), { id: d.id, sha256: d.sha256 }, { v: c.req.query('v'), exp: c.req.query('exp'), sig: c.req.query('sig') }, Date.now(), 'derivative');
     if (!v.ok) return err(c, 403, 'forbidden', v.reason === 'expired' ? 'This link has expired.' : 'This link is not valid.');
-    const obj = await c.get('assetStore')().get(d.r2Key);
-    if (!obj) {
+    const format = d.outputType === 'image_object_glb' ? 'glb' : 'usdz';
+    const disposition = c.req.query('download') === '1' ? 'attachment' : 'inline';
+    const res = await serveObject(c, c.get('assetStore')(), d.r2Key, `"${d.sha256}"`, {
+      // Quick Look and Scene Viewer rely on these exact types.
+      'content-type': format === 'glb' ? MIME_GLB : MIME_USDZ,
+      'cache-control': `private, max-age=${Math.min(v.expiresInSeconds, ASSET_LIMITS.readUrlTtlSeconds)}`,
+      'content-disposition': `${disposition}; filename="${downloadName(d.filename, format)}"`,
+    });
+    if (!res) {
       logError(c, 'derivatives.object-missing', d.id);
       return notFound();
     }
-    const format = d.outputType === 'image_object_glb' ? 'glb' : 'usdz';
-    const disposition = c.req.query('download') === '1' ? 'attachment' : 'inline';
-    return new Response(obj.body, {
-      headers: {
-        // Quick Look and Scene Viewer rely on these exact types.
-        'content-type': format === 'glb' ? MIME_GLB : MIME_USDZ,
-        'content-length': String(obj.size),
-        etag: `"${d.sha256}"`,
-        'cache-control': `private, max-age=${Math.min(v.expiresInSeconds, ASSET_LIMITS.readUrlTtlSeconds)}`,
-        'content-disposition': `${disposition}; filename="${downloadName(d.filename, format)}"`,
-      },
-    });
+    return res;
   });
 
   return r;

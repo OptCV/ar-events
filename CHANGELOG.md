@@ -2,6 +2,13 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-24 — Phase 7 Milestone 21: asset robustness (local)
+
+### Added
+- Range requests (206/416) on signed file links. ADR-039.
+- Daily cleanup of abandoned uploads, old rejected uploads and idle rate-limit rows (cron trigger).
+- Images with a non-sRGB colour profile (e.g. Display P3 photos) are converted to sRGB for AR (converter `texture@0.2.0`).
+
 ## 2026-11-24 — Remote verification of Phase 6 Milestone 20
 
 ### Verified

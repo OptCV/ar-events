@@ -18,6 +18,7 @@ import { logError } from '../db.ts';
 import { UUID, err, parseJson } from '../http.ts';
 import { UploadRejected, createUploadPipeline } from './pipeline.ts';
 import { assetSigningKey, signAssetUrl, verifyAssetUrl } from './signing.ts';
+import { serveObject } from './serve.ts';
 import { derivativeBytes } from './usage.ts';
 
 const { assets, assetDerivatives, experiences, experienceRevisions, processingJobs } = schema;
@@ -129,21 +130,17 @@ export function assetRoutes() {
     if (!a?.sha256 || !a.mimeType) return notFound(c);
     const v = await verifyAssetUrl(await assetSigningKey(secret), { id: a.id, sha256: a.sha256 }, { v: c.req.query('v'), exp: c.req.query('exp'), sig: c.req.query('sig') });
     if (!v.ok) return err(c, 403, 'forbidden', v.reason === 'expired' ? 'This link has expired.' : 'This link is not valid.');
-    const obj = await c.get('assetStore')().get(a.r2Key);
-    if (!obj) {
+    const res = await serveObject(c, c.get('assetStore')(), a.r2Key, `"${a.sha256}"`, {
+      'content-type': a.mimeType,
+      // Private: never cached by shared caches; browser may reuse it until the link expires.
+      'cache-control': `private, max-age=${Math.min(v.expiresInSeconds, ASSET_LIMITS.readUrlTtlSeconds)}`,
+      'content-disposition': `inline; filename="asset.${EXT[a.mimeType] ?? 'bin'}"`,
+    });
+    if (!res) {
       logError(c, 'assets.object-missing', a.id);
       return notFound(c);
     }
-    return new Response(obj.body, {
-      headers: {
-        'content-type': a.mimeType,
-        'content-length': String(obj.size),
-        etag: `"${a.sha256}"`,
-        // Private: never cached by shared caches; browser may reuse it until the link expires.
-        'cache-control': `private, max-age=${Math.min(v.expiresInSeconds, ASSET_LIMITS.readUrlTtlSeconds)}`,
-        'content-disposition': `inline; filename="asset.${EXT[a.mimeType] ?? 'bin'}"`,
-      },
-    });
+    return res;
   });
 
   // ---------- reserve an upload slot

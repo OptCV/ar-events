@@ -11,7 +11,9 @@ export interface StoredObject {
 export interface ObjectStore {
   /** Atomic write: if `body` errors, nothing is stored (and any existing object at `key` is untouched). */
   put(key: string, body: ReadableStream<Uint8Array>, opts: { size: number; contentType: string; sha256Hex?: string }): Promise<void>;
-  get(key: string): Promise<StoredObject | null>;
+  /** `range` reads `length` bytes from `offset` (validated against the size by the caller); `size` is always the full size. */
+  get(key: string, range?: { offset: number; length: number }): Promise<StoredObject | null>;
+  head(key: string): Promise<{ size: number } | null>;
   /** Idempotent. */
   delete(key: string): Promise<void>;
 }
@@ -32,9 +34,13 @@ export function r2Store(bucket: R2Bucket): ObjectStore {
       if (p.status === 'rejected') throw p.reason;
       if (w.status === 'rejected') throw w.reason;
     },
-    async get(key) {
-      const obj = await bucket.get(key);
+    async get(key, range) {
+      const obj = await bucket.get(key, range ? { range } : {});
       return obj ? { body: obj.body, size: obj.size } : null;
+    },
+    async head(key) {
+      const obj = await bucket.head(key);
+      return obj ? { size: obj.size } : null;
     },
     async delete(key) {
       await bucket.delete(key);
@@ -66,11 +72,15 @@ export function memoryStore(): ObjectStore & { objects: Map<string, { bytes: Uin
       }
       objects.set(key, { bytes, contentType: opts.contentType });
     },
-    async get(key) {
+    async get(key, range) {
       const o = objects.get(key);
       if (!o) return null;
-      const bytes = o.bytes;
-      return { size: bytes.length, body: new ReadableStream({ start: (c) => (c.enqueue(bytes), c.close()) }) };
+      const bytes = range ? o.bytes.slice(range.offset, range.offset + range.length) : o.bytes;
+      return { size: o.bytes.length, body: new ReadableStream({ start: (c) => (c.enqueue(bytes), c.close()) }) };
+    },
+    async head(key) {
+      const o = objects.get(key);
+      return o ? { size: o.bytes.length } : null;
     },
     async delete(key) {
       objects.delete(key);

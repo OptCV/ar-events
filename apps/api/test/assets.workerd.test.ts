@@ -94,3 +94,15 @@ describe('R2 adapter + upload pipeline in workerd', () => {
     expect(await head('keep.png')).toEqual(before);
   });
 });
+
+describe('R2 adapter ranges in workerd (ADR-039)', () => {
+  it('reads an exact byte range; size and head report the full object size', async () => {
+    const glb = makeGlb({ asset: { version: '2.0' }, buffers: [{ byteLength: 64 * 1024 }] }, Uint8Array.from({ length: 64 * 1024 }, (_, i) => i % 251));
+    expect((await put(glb, { key: 'range.glb', role: 'model', type: 'model/gltf-binary' })).ok).toBe(true);
+    const r = await mf.dispatchFetch('http://test/range?key=range.glb&offset=1000&length=300');
+    const j = (await r.json()) as { headSize: number; size: number; bytes: number[] };
+    expect(j.headSize).toBe(glb.length);
+    expect(j.size).toBe(glb.length);
+    expect(j.bytes).toEqual([...glb.slice(1000, 1300)]);
+  });
+});

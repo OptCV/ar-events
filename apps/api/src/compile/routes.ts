@@ -30,6 +30,7 @@ import { err } from '../http.ts';
 import { rateLimit } from '../ratelimit.ts';
 import { logError } from '../db.ts';
 import { MIME_GLB, MIME_USDZ } from '../conversions/pipeline.ts';
+import { serveObject } from '../assets/serve.ts';
 import { isBuildError, planBuild, platformOf, promoteBuild, runtimeFor, type BuildJobInput, type PublishIntent } from './pipeline.ts';
 
 const { assets, experienceRevisions, experiences, generatedOutputs, processingJobs } = schema;
@@ -405,21 +406,17 @@ export function buildRoutes() {
     if (!o || o.state !== 'ready' || !o.sha256 || !o.r2Key) return notFound(c);
     const v = await verifyAssetUrl(await assetSigningKey(secret), { id: o.id, sha256: o.sha256 }, { v: c.req.query('v'), exp: c.req.query('exp'), sig: c.req.query('sig') }, Date.now(), 'output');
     if (!v.ok) return err(c, 403, 'forbidden', v.reason === 'expired' ? 'This link has expired.' : 'This link is not valid.');
-    const obj = await c.get('assetStore')().get(o.r2Key);
-    if (!obj) {
+    const glb = platformOf(o.runtime) === 'android';
+    const res = await serveObject(c, c.get('assetStore')(), o.r2Key, `"${o.sha256}"`, {
+      'content-type': glb ? MIME_GLB : MIME_USDZ,
+      'cache-control': `private, max-age=${Math.min(v.expiresInSeconds, ASSET_LIMITS.readUrlTtlSeconds)}`,
+      'content-disposition': `inline; filename="experience.${glb ? 'glb' : 'usdz'}"`,
+    });
+    if (!res) {
       logError(c, 'outputs.object-missing', o.id);
       return notFound(c);
     }
-    const glb = platformOf(o.runtime) === 'android';
-    return new Response(obj.body, {
-      headers: {
-        'content-type': glb ? MIME_GLB : MIME_USDZ,
-        'content-length': String(obj.size),
-        etag: `"${o.sha256}"`,
-        'cache-control': `private, max-age=${Math.min(v.expiresInSeconds, ASSET_LIMITS.readUrlTtlSeconds)}`,
-        'content-disposition': `inline; filename="experience.${glb ? 'glb' : 'usdz'}"`,
-      },
-    });
+    return res;
   });
 
   return r;

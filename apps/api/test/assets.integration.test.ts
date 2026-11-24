@@ -7,6 +7,8 @@ import { ApiError, AssetListResponse, AssetSummary, CreateUploadResponse, Experi
 import { createTempDatabase, migrateDatabase } from '../../../packages/db/test/helpers.ts';
 import { hugePng, makeGlb, photoJpeg, sha256Hex, trackingPng } from './files.ts';
 import { Jar, PASSWORD, linkIn, makeHarness, uniqueEmail, type Harness } from './harness.ts';
+import { connectDb } from '@ar-creator/db';
+import { SWEEP, sweep } from '../src/maintenance.ts';
 
 let temp: Awaited<ReturnType<typeof createTempDatabase>>;
 let h: Harness;
@@ -305,5 +307,77 @@ describe('experience drafts reference assets', () => {
     expect((await h.req(`/api/assets/${tracking.id}`, { method: 'DELETE', jar: alice })).status).toBe(204);
     expect(h.store.objects.has(row!.r2_key as string)).toBe(false);
     expect((await h.sql('SELECT 1 FROM assets WHERE id = $1', [tracking.id])).rowCount).toBe(0);
+  });
+});
+
+const keyOf = async (id: string) => ((await h.sql('SELECT r2_key FROM assets WHERE id = $1', [id])).rows[0] as { r2_key: string }).r2_key;
+
+describe('maintenance sweep (ADR-039)', () => {
+  it('deletes long-expired slots and week-old rejected uploads (rows and objects), keeps everything else, and is idempotent', async () => {
+    const png = trackingPng();
+    // 1. a slot never used, expired 2 h ago (with a stray object at its key, e.g. a crashed upload);
+    const { slot: old } = await reserve(alice, 'display-image', png, TYPE.png);
+    await h.sql("UPDATE assets SET upload_expires_at = now() - interval '2 hours' WHERE id = $1", [old!.asset.id]);
+    const oldKey = await keyOf(old!.asset.id);
+    await h.store.put(oldKey, new Blob([png]).stream(), { size: png.length, contentType: TYPE.png });
+    // 2. a slot expired only 10 minutes ago (inside the grace period) — kept;
+    const { slot: recent } = await reserve(alice, 'display-image', png, TYPE.png);
+    await h.sql("UPDATE assets SET upload_expires_at = now() - interval '10 minutes' WHERE id = $1", [recent!.asset.id]);
+    // 3. a rejected upload from 8 days ago — deleted; 4. one rejected today — kept;
+    const rejectOne = async () => {
+      const { slot } = await reserve(alice, 'display-image', png, TYPE.png);
+      expect((await put(alice, slot!.upload.url, png, 'image/jpeg')).status).toBe(422);
+      return slot!.asset.id;
+    };
+    const oldRejected = await rejectOne();
+    await h.sql("UPDATE assets SET created_at = now() - interval '8 days' WHERE id = $1", [oldRejected]);
+    const newRejected = await rejectOne();
+    // 5. a validated asset created long ago — kept with its object; 6. an idle and an active rate-limit row.
+    const kept = await upload(alice, 'display-image', png, TYPE.png);
+    await h.sql("UPDATE assets SET created_at = now() - interval '30 days' WHERE id = $1", [kept.id]);
+    await h.sql("INSERT INTO rate_limit (id, key, count, last_request) VALUES ('app:public-read:idle', 'app:public-read:idle', 3, $1), ('app:public-read:busy', 'app:public-read:busy', 3, $2)", [Date.now() - 2 * 3600_000, Date.now()]);
+
+    const handle = await connectDb(temp.url);
+    try {
+      const r = await sweep(handle.db, h.store);
+      expect(r.expiredSlots).toBeGreaterThanOrEqual(1);
+      expect(r.rejected).toBeGreaterThanOrEqual(1);
+      expect(r.objectDeleteFailures).toBe(0);
+      expect(r.rateLimitRows).toBeGreaterThanOrEqual(1);
+      const left = new Set(((await h.sql('SELECT id FROM assets')).rows as { id: string }[]).map((x) => x.id));
+      expect(left.has(old!.asset.id)).toBe(false);
+      expect(left.has(oldRejected)).toBe(false);
+      expect(left.has(recent!.asset.id)).toBe(true);
+      expect(left.has(newRejected)).toBe(true);
+      expect(left.has(kept.id)).toBe(true);
+      expect(h.store.objects.has(oldKey)).toBe(false);
+      const keptKey = await keyOf(kept.id);
+      expect(h.store.objects.has(keptKey)).toBe(true);
+      const keys = ((await h.sql("SELECT key FROM rate_limit WHERE key LIKE 'app:public-read:%'")).rows as { key: string }[]).map((x) => x.key);
+      expect(keys).toEqual(['app:public-read:busy']);
+      // The kept asset still downloads; a second run finds nothing to do.
+      expect((await h.req(pathOf(kept.contentUrl!))).status).toBe(200);
+      expect(await sweep(handle.db, h.store)).toEqual({ expiredSlots: 0, rejected: 0, objectDeleteFailures: 0, rateLimitRows: 0 });
+      // An object that cannot be deleted is reported, and its row is still removed.
+      const { slot: broken } = await reserve(alice, 'display-image', png, TYPE.png);
+      await h.sql("UPDATE assets SET upload_expires_at = now() - $2::interval WHERE id = $1", [broken!.asset.id, `${SWEEP.pendingGraceMs / 1000 + 60} seconds`]);
+      const failing = { ...h.store, delete: async () => Promise.reject(new Error('R2 down')) };
+      const logs: string[] = [];
+      expect(await sweep(handle.db, failing, new Date(), (d) => logs.push(d))).toMatchObject({ expiredSlots: 1, objectDeleteFailures: 1 });
+      expect(logs[0]).toContain('R2 down');
+    } finally {
+      await handle.close();
+    }
+  });
+
+  it('an upload finishing after its slot was swept is cancelled and leaves no object behind', async () => {
+    const png = trackingPng();
+    const { slot } = await reserve(alice, 'display-image', png, TYPE.png);
+    // Simulate: the upload claimed the slot before expiry, then the sweep deleted the row while bytes were streaming.
+    const key = await keyOf(slot!.asset.id);
+    await h.sql('DELETE FROM assets WHERE id = $1', [slot!.asset.id]);
+    const r = await put(alice, slot!.upload.url, png, TYPE.png);
+    expect([404, 409]).toContain(r.status);
+    expect(h.store.objects.has(key)).toBe(false);
   });
 });

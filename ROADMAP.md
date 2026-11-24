@@ -157,6 +157,18 @@ The runtimes that execute the plan (USDZ/GLB exporters, WebXR viewer, public pag
 | M19 Public page and analytics | Landing page polish (description, share QR, print sheet for image targets), anonymous aggregate analytics (views, AR launches per runtime; no personal data) | **Done; on the dev edge** (ADR-037, migration 0007 applied, REMOTE-PUBLISH 2026-11-23) |
 | M20 Hardening | Security review of public endpoints (rate limits), performance (lazy routes, bundle budget), accessibility audit, load check | **Done; on the dev edge** (ADR-038, REMOTE-PUBLIC-RATE-LIMIT 2026-11-24); edge load test and screen-reader passes pending |
 
+## Phase 7 plan (2026-11-24) — launch readiness without devices or production changes
+
+Phases 0–6 are built and on the dev edge. Phase 7 hardens what visitors and creators touch most, using only local work and the dev environment; device runs, Resend and every production step stay owner-gated (TASKS).
+
+**Gate:** large published files stream correctly to native viewers (range requests), storage does not accumulate abandoned uploads, colours survive preparation, and `npm run check` (lint + format + typecheck) is clean.
+
+| Milestone | Scope | Status |
+|---|---|---|
+| M21 Asset robustness | HTTP `Range` on signed reads (outputs, assets, derivatives: 206 / 416, `Accept-Ranges`); scheduled sweep of expired/rejected upload slots and their R2 objects; ICC → sRGB when preparing textures | **Done locally** (ADR-039); deploy pending |
+| M22 Experience management | Duplicate an experience; delete with a published guard (unpublish first) and full cleanup of builds/outputs; dashboard sort/search | Not started |
+| M23 Code quality | ESLint (typescript-eslint, react-hooks) + Prettier with the repo's style; `npm run check`; fix findings | Not started |
+
 **Phase 1 risks:** Hyperdrive caching of auth reads (ADR-013 §5); request-body size limits for large model uploads; Better Auth minor-version churn (pin exact, review changelogs); `@cloudflare/vite-plugin` + monorepo layout (validated locally in M1; edge deploy pending). Client bundle is 133 KB gzip for a skeleton, mostly React + Zod 4; watch it as features land (consider `zod/mini` on the client).
 
 ### Milestone 3 findings (2026-11-14)

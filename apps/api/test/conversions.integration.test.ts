@@ -11,6 +11,7 @@ import { ApiError, AssetListResponse, AssetSummary, ConversionListResponse, Conv
 import { IDENTITY_TRANSFORM } from '@ar-creator/schema';
 import { PNG } from 'pngjs';
 import { physicalSize, readGlb } from '@ar-creator/image-to-ar';
+import { iccProfile, taggedPng } from '../../../packages/image-to-ar/src/iccFixture.ts';
 import { createTempDatabase, migrateDatabase } from '../../../packages/db/test/helpers.ts';
 import { fixture, makeGlb, photoJpeg, sha256Hex, trackingPng } from './files.ts';
 import { Jar, LOCAL_USD_URL, PASSWORD, linkIn, makeHarness, uniqueEmail, type Harness } from './harness.ts';
@@ -272,6 +273,23 @@ describe('refusals and failures', () => {
     expect(conv.texture).toEqual({ mimeType: 'image/jpeg', width: h, height: w, sourceWidth: w, sourceHeight: h, changes: ['rotated'] });
     expect(conv).toMatchObject({ resolvedAlphaMode: 'OPAQUE', heightMeters: physicalSize(h, w, 0.5).heightMeters });
     await expectSameTexture(conv, false);
+  });
+
+  it('a non-sRGB colour profile is converted to sRGB once; sRGB-tagged images keep their original bytes (ADR-039)', async () => {
+    const linear = await upload(alice, 'display-image', taggedPng(256, 128, [128, 128, 128], iccProfile('Linear RGB (test)', 1)), 'image/png', 'linear.png');
+    const conv = await convert(alice, linear.id);
+    expect(conv.state, JSON.stringify(conv.error)).toBe('succeeded');
+    expect(conv.texture).toEqual({ mimeType: 'image/png', width: 256, height: 128, sourceWidth: 256, sourceHeight: 128, changes: ['color-converted'] });
+    await expectSameTexture(conv, false, linear.sha256!);
+    const { json, bin } = readGlb(new Uint8Array(await (await anon(conv.outputs.glb!.contentUrl!)).arrayBuffer()));
+    const view = json.bufferViews[json.images[0].bufferView];
+    const png = PNG.sync.read(Buffer.from(bin.subarray(view.byteOffset, view.byteOffset + view.byteLength)));
+    expect(Math.abs(png.data[0]! - 188)).toBeLessThanOrEqual(2); // linear 128 → sRGB ≈ 188
+
+    const srgb = await upload(alice, 'display-image', taggedPng(256, 128, [128, 128, 128], iccProfile('sRGB IEC61966-2.1', 2.2)), 'image/png', 'srgb.png');
+    const kept = await convert(alice, srgb.id);
+    expect(kept.state).toBe('succeeded');
+    expect(kept.texture).toMatchObject({ changes: [] });
   });
 
   it('WebP: lossless with transparency → PNG texture (alpha kept, Cutout/Blend as before); lossy photo → JPEG', async () => {

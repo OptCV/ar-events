@@ -296,3 +296,38 @@ describe('health rate limit (ADR-038)', () => {
     expect((await h.req('/api/health', { ip })).status).toBe(429);
   });
 });
+
+describe('range requests on signed files (ADR-039)', () => {
+  it('serves 206 partial content, 416 for unsatisfiable ranges, and the whole file for a stale If-Range', async () => {
+    const e = ExperienceDetail.parse(await (await h.req('/api/experiences', { body: { name: 'Ranged', placementMode: 'floor' }, jar: alice })).json());
+    await setNodes(alice, e.id, [node('b', { kind: 'primitive', shape: 'box' })]);
+    await publish(alice, e.id);
+    await h.conversions.idle();
+    const pub = TestBuildResponse.parse(await (await h.req(`/api/public/${e.slug}`)).json());
+    const path = new URL(pub.glbUrl!).pathname + new URL(pub.glbUrl!).search;
+    const full = await h.req(path);
+    expect(full.status).toBe(200);
+    expect(full.headers.get('accept-ranges')).toBe('bytes');
+    const bytes = new Uint8Array(await full.arrayBuffer());
+    const etag = full.headers.get('etag')!;
+
+    const part = await h.req(path, { headers: { range: 'bytes=0-11' } });
+    expect(part.status).toBe(206);
+    expect(part.headers.get('content-range')).toBe(`bytes 0-11/${bytes.length}`);
+    expect(part.headers.get('content-length')).toBe('12');
+    expect(part.headers.get('content-type')).toBe('model/gltf-binary');
+    expect([...new Uint8Array(await part.arrayBuffer())]).toEqual([...bytes.slice(0, 12)]);
+
+    const tail = await h.req(path, { headers: { range: 'bytes=-20', 'if-range': etag } });
+    expect(tail.status).toBe(206);
+    expect([...new Uint8Array(await tail.arrayBuffer())]).toEqual([...bytes.slice(-20)]);
+
+    const bad = await h.req(path, { headers: { range: `bytes=${bytes.length}-` } });
+    expect(bad.status).toBe(416);
+    expect(bad.headers.get('content-range')).toBe(`bytes */${bytes.length}`);
+
+    const stale = await h.req(path, { headers: { range: 'bytes=0-11', 'if-range': '"something-else"' } });
+    expect(stale.status).toBe(200);
+    expect((await stale.arrayBuffer()).byteLength).toBe(bytes.length);
+  });
+});

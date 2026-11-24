@@ -4,7 +4,10 @@
  * tests, to the converter image run by Docker. The Worker streams the source bytes in and stores the result;
  * the converter has no storage access and no credentials.
  */
+import { TEXTURE_CHANGES } from '@ar-creator/contracts';
 import type { ResolvedAlphaMode } from '@ar-creator/schema';
+
+type TextureChange = (typeof TEXTURE_CHANGES)[number];
 
 export interface UsdImagePlaneParams {
   widthMeters: number;
@@ -35,7 +38,7 @@ export interface PreparedTexture {
   height: number;
   sourceWidth: number;
   sourceHeight: number;
-  changes: ('converted' | 'rotated' | 'resized')[];
+  changes: TextureChange[];
   hasAlpha: boolean;
   converterVersion: string;
 }
@@ -138,7 +141,7 @@ export function httpUsdConverter(fetcher: (req: Request) => Promise<Response>, o
         height: Number(meta.height),
         sourceWidth: Number(meta.source_width),
         sourceHeight: Number(meta.source_height),
-        changes: (Array.isArray(meta.changes) ? meta.changes : []).filter((c): c is 'converted' | 'rotated' | 'resized' => c === 'converted' || c === 'rotated' || c === 'resized'),
+        changes: (Array.isArray(meta.changes) ? meta.changes : []).filter((c): c is TextureChange => (TEXTURE_CHANGES as readonly unknown[]).includes(c)),
         hasAlpha: meta.has_alpha === true,
         converterVersion: String(meta.converter_version),
       };

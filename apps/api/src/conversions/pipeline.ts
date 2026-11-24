@@ -21,7 +21,7 @@ import {
   type TextureInfo,
 } from '@ar-creator/contracts';
 import { schema, type Database } from '@ar-creator/db';
-import { ImageFormatError, buildImagePlaneGlb, jpegOrientation, readImageInfo, resolveAlphaMode, scanPngAlpha, type AlphaStats } from '@ar-creator/image-to-ar';
+import { ImageFormatError, buildImagePlaneGlb, jpegOrientation, needsColorConversion, readImageInfo, resolveAlphaMode, scanPngAlpha, type AlphaStats } from '@ar-creator/image-to-ar';
 import { CONVERTER_VERSION as GLB_BUILDER_VERSION, type ResolvedAlphaMode } from '@ar-creator/schema';
 import type { ObjectStore } from '../assets/store.ts';
 import { UsdConversionRejected, UsdConverterUnavailable, type UsdConverter } from './usd.ts';
@@ -257,7 +257,8 @@ export async function prepareTextureStep(deps: PipelineDeps, ctx: JobContext): P
     throw e;
   }
   const rotated = info.mime === 'image/jpeg' && jpegOrientation(bytes) !== 1;
-  const needs = info.mime === 'image/webp' || rotated || Math.max(info.width, info.height) > TEXTURE_MAX_EDGE;
+  // ADR-039: a non-sRGB colour profile would be ignored by the viewers, so such images are converted to sRGB.
+  const needs = info.mime === 'image/webp' || rotated || Math.max(info.width, info.height) > TEXTURE_MAX_EDGE || (await needsColorConversion(bytes));
   if (!needs) {
     // ADR-009: embed the uploaded bytes unmodified.
     return {

@@ -6,6 +6,8 @@ embedded as-is (ADR-009):
   * WebP (not core glTF, not allowed in USDZ)          -> PNG (alpha kept) or JPEG (opaque, lossy source)
   * JPEG with EXIF orientation != 1                     -> pixels rotated upright, orientation removed
   * longest edge above ``max_edge`` (viewer budget)     -> downscaled with Lanczos in PREMULTIPLIED alpha
+  * an embedded ICC profile other than sRGB (Display P3, Adobe RGB, ...) -> converted to sRGB with LittleCMS
+    (relative colorimetric + black point compensation); glTF/USDZ viewers assume sRGB and ignore profiles (ADR-039)
 
 Rules: anything with transparency is written as PNG (lossless). Opaque images from a lossy source (JPEG, lossy
 WebP) are written as JPEG quality 92 with 4:4:4 chroma; other opaque images as PNG. Metadata is not copied. The
@@ -18,9 +20,9 @@ from __future__ import annotations
 import io
 from dataclasses import asdict, dataclass, field
 
-from PIL import Image, ImageOps
+from PIL import Image, ImageCms, ImageOps
 
-TEXTURE_CONVERTER_VERSION = "texture@0.1.0"
+TEXTURE_CONVERTER_VERSION = "texture@0.2.0"
 MAX_PIXELS = 8192 * 8192  # same bomb limit as the upload checks
 MAX_EDGE = 8192
 JPEG_QUALITY = 92
@@ -41,7 +43,7 @@ class TextureResult:
     source_mime: str
     source_width: int
     source_height: int
-    changes: list[str] = field(default_factory=list)  # "converted", "rotated", "resized"
+    changes: list[str] = field(default_factory=list)  # "converted", "rotated", "resized", "color-converted"
     has_alpha: bool = False
     converter_version: str = TEXTURE_CONVERTER_VERSION
 
@@ -56,6 +58,48 @@ def _has_alpha(im: Image.Image) -> bool:
     if im.mode in ("RGBA", "LA", "PA", "RGBa", "La"):
         return True
     return "transparency" in im.info
+
+
+_SRGB = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB"))
+
+
+def _to_srgb(im: Image.Image) -> Image.Image | None:
+    """The image converted to sRGB when it carries a non-sRGB ICC profile; None when nothing needs to change."""
+    icc = im.info.get("icc_profile")
+    if not icc:
+        return None
+    try:
+        src = ImageCms.ImageCmsProfile(io.BytesIO(icc))
+    except (ImageCms.PyCMSError, OSError):
+        return None  # unreadable profile: viewers ignore it too, so keep the pixels as they are
+    if src.profile.xcolor_space.strip() == "RGB" and "srgb" in (ImageCms.getProfileDescription(src) or "").lower():
+        return None
+    alpha = None
+    if im.mode in ("LA", "La", "PA", "RGBA", "RGBa") or "transparency" in im.info:
+        rgba = im.convert("LA" if im.mode in ("LA", "La") else "RGBA")
+        alpha = rgba.getchannel("A")
+        base = rgba.convert("L" if rgba.mode == "LA" else "RGB")
+    else:
+        base = im if im.mode in ("L", "RGB", "CMYK") else im.convert("RGB")
+    try:
+        out = ImageCms.profileToProfile(
+            base,
+            src,
+            _SRGB,
+            renderingIntent=ImageCms.Intent.RELATIVE_COLORIMETRIC,
+            outputMode="RGB",
+            flags=ImageCms.Flags.BLACKPOINTCOMPENSATION,
+        )
+    except ImageCms.PyCMSError:
+        return None  # profile does not match the pixel format: keep the pixels as they are
+    if alpha is not None:
+        out.putalpha(alpha)
+    return out
+
+
+def needs_color_conversion(data: bytes) -> bool:
+    im = Image.open(io.BytesIO(data))
+    return _to_srgb(im) is not None if im.info.get("icc_profile") else False
 
 
 def prepare_texture(data: bytes, max_edge: int) -> tuple[bytes, TextureResult]:
@@ -90,6 +134,11 @@ def prepare_texture(data: bytes, max_edge: int) -> tuple[bytes, TextureResult]:
         im = ImageOps.exif_transpose(im)
         changes.append("rotated")
 
+    srgb = _to_srgb(im)
+    if srgb is not None:
+        im = srgb
+        changes.append("color-converted")
+
     alpha = _has_alpha(im)
     im = im.convert("RGBA" if alpha else "RGB")
     if alpha and im.getextrema()[3][0] == 255:
@@ -110,6 +159,9 @@ def prepare_texture(data: bytes, max_edge: int) -> tuple[bytes, TextureResult]:
             im = im.resize((nw, nh), Image.Resampling.LANCZOS)
         changes.append("resized")
 
+    # Untagged output = sRGB for every viewer. LittleCMS attaches a fresh sRGB profile (with today's date) to converted
+    # images, and re-encoded sources may carry theirs: neither is written, which also keeps the output deterministic.
+    im.info.pop("icc_profile", None)
     out = io.BytesIO()
     if not alpha and lossy:
         im.save(out, format="JPEG", quality=JPEG_QUALITY, subsampling=0, optimize=False, progressive=False)

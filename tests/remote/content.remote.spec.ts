@@ -370,6 +370,11 @@ test('REMOTE-PUBLISH: the built draft publishes at its stable URL; a visitor wit
   const v = TestBuildResponse.parse(await page.json());
   expect(v).toMatchObject({ mode: 'public', name: 'Remote build', linkExpiresAt: null, id: st.live!.buildId });
   expect((await anon.get(v.glbUrl!)).status()).toBe(200);
+  // Range requests on the live file (ADR-039): 206 with the first 12 bytes (the GLB header).
+  const part = await anon.get(v.glbUrl!, { headers: { range: 'bytes=0-11' } });
+  expect(part.status()).toBe(206);
+  expect(part.headers()['content-range']).toMatch(/^bytes 0-11\/\d+$/);
+  expect((await part.body()).subarray(0, 4).toString('ascii')).toBe('glTF');
   expect((await anon.get(st.url)).status()).toBe(200); // the SPA serves /x/{slug}
   // Anonymous counts (ADR-037): a visitor's view is counted for the published experience.
   expect((await anon.post(`${BASE}/api/public/${slug}/events`, { headers: { 'content-type': 'application/json', origin: BASE }, data: { event: 'view', detail: 'desktop' } })).status()).toBe(204);

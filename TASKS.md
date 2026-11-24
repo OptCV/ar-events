@@ -50,7 +50,7 @@ Plan and slice order: `ROADMAP.md` "Phase 1 plan".
 - [x] Remote verification of M4 + M5 (2026-11-22): owner created `ar-creator-assets-dev` (+ `ar-creator-assets`), applied 0002 + 0003 to Neon development (new endpoint `ep-dark-butterfly-bctzb64e`) and redeployed `ar-creator-dev`; remote suite extended (`tests/remote/content.remote.spec.ts`); REMOTE-CONTENT-01 8/8, full run 17/17; both buckets confirmed private.
 - [ ] Production: create/verify `ar-creator-assets` binding in a production deploy, apply 0000–0003 to production Neon — **approval each**.
 - [x] **Milestone 5 / P1-5 (local):** R2 asset storage: upload slots (`POST /api/assets/uploads`, single-use, expiring), Worker-streamed upload validated before commit (magic bytes vs declared type, header-only dimension/bomb limits, self-contained GLB only, exact size, SHA-256, PNG end marker), explicit roles, per-user slot cap + quota, HMAC-signed cookieless private reads, ownership in SQL, draft asset-reference checks, delete blocked while in use; `ObjectStore` interface ready for presigned/multipart; migration `0003_asset_uploads` (ADR-022). R2 adapter verified in workerd against the local simulator only.
-- [ ] Asset follow-ups: thumbnails/derivatives, HTTP range requests for signed reads, sweep expired/rejected upload slots, presigned-put and multipart strategies, rendered model previews.
+- [-] Asset follow-ups: thumbnails/derivatives, HTTP range requests for signed reads, sweep expired/rejected upload slots, presigned-put and multipart strategies, rendered model previews. *(range requests and the daily sweep done — P7 M21, ADR-039; the rest open)*
 - [x] P1-6 Dashboard UI: login, experience list, create draft (Milestone 4); asset library with upload progress/errors/previews and the tracking-image picker (Milestone 5). Verified locally (Playwright).
 - [x] Email verification + password reset flows (dev mailbox locally).
 - [ ] Resend: API key secret, verified sending domain, `EMAIL_FROM`; then real-delivery test. Public sign-up stays off until done.
@@ -75,15 +75,15 @@ Plan and slice order: `ROADMAP.md` "Phase 1 plan".
 - [x] Redeploy dev with ADR-026 and run the remote suite (REMOTE-VIEW-IN-AR): 20/20.
 - [ ] **Deferred (owner, 2026-11-22):** Scene Viewer does not open on the owner's Android phone; owner believes it is a recently known Scene Viewer bug. Later: collect the symptom, retry with the cross-origin headers (`8e15feb`), compare with modelviewer.dev's AR example on the same phone.
 - [ ] Run the Phase 2 device checklist on one iPhone and one ARCore Android phone (gate).
-- [ ] Colour profiles: convert non-sRGB ICC to sRGB when preparing textures (prepared textures currently drop ICC data).
+- [x] Colour profiles: convert non-sRGB ICC to sRGB when preparing textures. *(P7 M21, ADR-039: detection in the API, LittleCMS conversion in `texture@0.2.0`)*
 - [ ] Batch alpha fixtures native device verification.
 - [x] Persist GLB+USDZ derivatives and conversion provenance. *(asset_derivatives unique per source × type × settings hash × converter version; job input + diagnostics (ADR-023))*
 - [ ] Optional: alpha contour/cutout geometry, behind feature gate.
 
 ## P3: Editor
 
-- [ ] Dashboard and creation wizard.
-- [ ] Placement mode selector and mode migration flow.
+- [x] Dashboard and creation wizard. *(P1 M4 dashboard; new-experience page with placement selector)*
+- [x] Placement mode selector and mode migration flow. *(selector on create; changing mode on a draft needs confirmation — `confirmPlacementChange`)*
 - [x] Scene graph, object tree and Three.js viewport. *(P3 M9, ADR-027: tree, viewport with canonical anchors, inspector, selection, show/hide, rename, remove; lost-update fix)*
 - [x] Transform inspector with canonical coordinates and snapping. *(P3 M10, ADR-028: cm/°/% fields, gizmos with explicit tools, snapping, lock/duplicate/remove, put on floor/image, flush to wall, fit to image)*
 - [x] Multiple models, image objects, panels, text and primitives. *(P3 M11, ADR-029; AR output via P4 compilers)*
@@ -102,7 +102,7 @@ Plan and slice order: `ROADMAP.md` "Phase 1 plan".
 
 ## P5: Publishing and QA
 
-- [ ] Workflows/Queues job orchestration with idempotent steps.
+- [x] Workflows/Queues job orchestration with idempotent steps. *(ImageToArWorkflow for conversions and builds, idempotency keys, bounded retries — ADR-023/034)*
 - [x] Immutable revisions and atomic publish promotion. *(P6 M18, ADR-036)*
 - [x] Stable public URL, QR and share/download actions. *(P6 M18 URL + QR; M19 Share and exact-size print sheet)*
 - [x] Anonymous aggregate analytics (views, AR button taps per viewer, link taps). *(P6 M19, ADR-037)*

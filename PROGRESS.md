@@ -339,3 +339,11 @@ Not available yet: lint (ESLint/Prettier not configured), DB migrations, `apps/w
 ## Session handoff — 2026-11-24 (29) / Claude Code — M20 on the dev edge
 
 - Owner redeployed M20; remote suite 23/23 incl. REMOTE-PUBLIC-RATE-LIMIT. Phase 6 complete on the dev edge (device and screen-reader passes pending).
+
+## Session handoff — 2026-11-24 (30) / Claude Code — Phase 7 planned; Milestone 21 (asset robustness)
+
+- Owner set aside the direct-to-AR link request ("disregard for now"). Phase 7 planned (ROADMAP): M21 asset robustness, M22 experience management, M23 code quality. Stale TASKS items closed (dashboard/wizard, placement change, Workflows).
+- Built M21: `assets/serve.ts` (ranges) on three signed reads; `maintenance.ts` + `scheduled` handler + cron in `apps/web/wrangler.jsonc`; `image-to-ar/src/icc.ts` + converter `texture@0.2.0` (LittleCMS); REMOTE-PUBLISH now also checks a 206.
+- Local environment: Docker Desktop had stopped (restarted); the local Postgres volume's role password no longer matched `.env` — reset the LOCAL Docker role to the `.env` value (no remote resource touched).
+- Verified locally: typecheck; Vitest 255; usd:test 102; DB 48; integration 118; Playwright 106 (after one run with 3 transient failures); check:bundle within budgets; deploy dry run. No migration.
+- Next: owner redeploys (Worker + converter image + cron) and runs the remote suite; then M22.

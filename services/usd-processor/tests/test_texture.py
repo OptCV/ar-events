@@ -137,3 +137,54 @@ def test_refuses_decompression_bombs_from_the_header():
 def test_max_edge_bounds():
     with pytest.raises(TextureError, match="max_edge"):
         prepare_texture(encode(Image.new("RGB", (10, 10)), "PNG"), 10)
+
+
+# ---------- colour profiles (ADR-039)
+from tests.icc_fixture import icc_profile  # noqa: E402
+
+LINEAR = icc_profile("Linear RGB (test)", 1.0)
+SRGB_NAMED = icc_profile("sRGB IEC61966-2.1", 2.2)
+
+
+def test_non_srgb_profile_is_converted_to_untagged_srgb():
+    # Linear-light mid grey 128 is about 188 in sRGB (same primaries, different tone curve).
+    src = encode(Image.new("RGB", (32, 32), (128, 128, 128)), "PNG", icc_profile=LINEAR)
+    out, r = prepare_texture(src, 4096)
+    im = decode(out)
+    assert "color-converted" in r.changes
+    assert r.converter_version == "texture@0.2.0"
+    assert "icc_profile" not in im.info
+    assert all(abs(c - 188) <= 2 for c in im.getpixel((5, 5))), im.getpixel((5, 5))
+
+
+def test_alpha_survives_colour_conversion():
+    im = Image.new("RGBA", (16, 16), (128, 128, 128, 255))
+    im.putpixel((0, 0), (128, 128, 128, 0))
+    im.putpixel((1, 0), (128, 128, 128, 100))
+    out, r = prepare_texture(encode(im, "PNG", icc_profile=LINEAR), 4096)
+    o = decode(out)
+    assert r.has_alpha and r.mime == "image/png" and "color-converted" in r.changes
+    assert o.getpixel((0, 0))[3] == 0 and o.getpixel((1, 0))[3] == 100 and o.getpixel((5, 5))[3] == 255
+
+
+def test_jpeg_with_profile_stays_jpeg():
+    src = encode(Image.new("RGB", (32, 32), (128, 128, 128)), "JPEG", quality=95, icc_profile=LINEAR)
+    out, r = prepare_texture(src, 4096)
+    assert r.mime == "image/jpeg" and "color-converted" in r.changes
+    assert all(abs(c - 188) <= 3 for c in decode(out).getpixel((5, 5)))
+
+
+def test_srgb_tagged_and_untagged_images_are_not_colour_converted():
+    for kw in ({"icc_profile": SRGB_NAMED}, {}):
+        # WebP forces preparation (conversion to PNG); the colours must not change.
+        src = encode(Image.new("RGB", (32, 32), (128, 128, 128)), "WEBP", lossless=True, **kw)
+        out, r = prepare_texture(src, 4096)
+        assert "color-converted" not in r.changes
+        assert decode(out).getpixel((5, 5)) == (128, 128, 128)
+
+
+def test_conversion_is_deterministic():
+    src = encode(Image.new("RGB", (64, 64), (200, 120, 40)), "PNG", icc_profile=LINEAR)
+    a, _ = prepare_texture(src, 4096)
+    b, _ = prepare_texture(src, 4096)
+    assert hashlib.sha256(a).digest() == hashlib.sha256(b).digest()

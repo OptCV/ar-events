@@ -12,7 +12,7 @@ import { ImageToArSettings } from '@ar-creator/schema';
 export const USD_CONVERTER_VERSION = 'usd-image-plane@0.1.0';
 
 /** Version of the Python texture preparation (must equal `TEXTURE_CONVERTER_VERSION` in texture.py). */
-export const TEXTURE_CONVERTER_VERSION = 'texture@0.1.0';
+export const TEXTURE_CONVERTER_VERSION = 'texture@0.2.0';
 
 /**
  * Longest texture edge embedded in image objects (ADR-025). Larger images are downscaled once, so GLB and USDZ stay
@@ -21,7 +21,7 @@ export const TEXTURE_CONVERTER_VERSION = 'texture@0.1.0';
 export const TEXTURE_MAX_EDGE = 2048;
 
 /** What was done to the uploaded image to make the embedded texture (empty: the original bytes are embedded). */
-export const TEXTURE_CHANGES = ['converted', 'rotated', 'resized'] as const;
+export const TEXTURE_CHANGES = ['converted', 'rotated', 'resized', 'color-converted'] as const;
 export const TextureInfo = z.object({
   mimeType: z.enum(['image/png', 'image/jpeg']),
   width: z.number().int().positive(),

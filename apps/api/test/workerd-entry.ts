@@ -15,6 +15,13 @@ export default {
     const url = new URL(req.url);
     const key = url.searchParams.get('key') ?? 'k';
     const store = r2Store(env.BUCKET);
+    if (url.pathname === '/range') {
+      const offset = Number(url.searchParams.get('offset'));
+      const length = Number(url.searchParams.get('length'));
+      const h = await store.head(key);
+      const o = await store.get(key, { offset, length });
+      return Response.json(o && h ? { headSize: h.size, size: o.size, bytes: [...new Uint8Array(await new Response(o.body).arrayBuffer())] } : null);
+    }
     if (url.pathname === '/head') {
       const o = await env.BUCKET.get(key);
       if (!o) return Response.json(null);
