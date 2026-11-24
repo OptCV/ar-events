@@ -298,6 +298,10 @@ The REMOTE-BUILD draft published at once (its build was complete), the status re
 
 Migration 0007 applied to Neon development by the owner. On the dev edge a visitor's view (no session) was counted (204) and read back by the owner as 1 view for the day.
 
+### REMOTE-PUBLIC-RATE-LIMIT — public rate limits on the dev edge — 2026-11-24 — PASS (full remote run 23/23 in 2.0 min)
+
+61 public reads from the runner's real IP: 404s, then 429 with Retry-After > 0 (60/min per IP, ADR-038). REMOTE-HEALTH still passes under its 30/min bucket.
+
 ## Device results
 
 ### AND-IMG-01 — 2026-11-14 (probe 0.1.0) — PARTIAL

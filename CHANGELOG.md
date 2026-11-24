@@ -2,6 +2,11 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-24 — Remote verification of Phase 6 Milestone 20
+
+### Verified
+- Public rate limits on the dev Worker (REMOTE-PUBLIC-RATE-LIMIT). Full remote run 23/23.
+
 ## 2026-11-23 — Phase 6 Milestone 20: hardening (local)
 
 ### Added
