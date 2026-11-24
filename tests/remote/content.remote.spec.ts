@@ -12,7 +12,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { PNG } from 'pngjs';
 import { expect, request as pwRequest, test, type APIRequestContext } from '@playwright/test';
-import { ApiError, AssetListResponse, AssetSummary, BuildSummary, ConversionSummary, CreateUploadResponse, ExperienceDetail, TestBuildResponse } from '@ar-creator/contracts';
+import { ApiError, AssetListResponse, AssetSummary, BuildSummary, ConversionSummary, CreateUploadResponse, ExperienceDetail, PublicationStatus, TestBuildResponse } from '@ar-creator/contracts';
 import { parseSceneViewerIntent } from '@ar-creator/platform-launch';
 
 test.describe.configure({ mode: 'serial' });
@@ -351,6 +351,28 @@ test('REMOTE-BUILD: a draft compiles through the Workflow and the Container into
   }
   // The SPA serves the test page route itself (no session needed).
   expect((await anon.get(b.testUrl!)).status()).toBe(200);
+  await anon.dispose();
+});
+
+test('REMOTE-PUBLISH: the built draft publishes at its stable URL; a visitor without a session gets the live files; unpublish takes it down (Phase 6, ADR-036)', async () => {
+  test.setTimeout(120_000);
+  const list = (await (await api.get('/api/experiences')).json()) as { experiences: { id: string; name: string }[] };
+  const e = list.experiences.find((x) => x.name === 'Remote build')!;
+  const p = await api.post(`/api/experiences/${e.id}/publish`, { headers: json, data: {} });
+  expect(p.status(), await p.text()).toBe(200); // the draft's build is already complete → promoted at once
+  const st = PublicationStatus.parse(await p.json());
+  expect(st).toMatchObject({ state: 'published', upToDate: true });
+  expect(new URL(st.url).origin).toBe(new URL(BASE).origin);
+  const anon = await pwRequest.newContext();
+  const slug = new URL(st.url).pathname.split('/').pop();
+  const page = await anon.get(`${BASE}/api/public/${slug}`);
+  expect(page.status()).toBe(200);
+  const v = TestBuildResponse.parse(await page.json());
+  expect(v).toMatchObject({ mode: 'public', name: 'Remote build', linkExpiresAt: null, id: st.live!.buildId });
+  expect((await anon.get(v.glbUrl!)).status()).toBe(200);
+  expect((await anon.get(st.url)).status()).toBe(200); // the SPA serves /x/{slug}
+  expect((await api.post(`/api/experiences/${e.id}/unpublish`, { headers: json, data: {} })).status()).toBe(200);
+  expect((await anon.get(`${BASE}/api/public/${slug}`)).status()).toBe(404);
   await anon.dispose();
 });
 
