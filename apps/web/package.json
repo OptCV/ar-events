@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "cf-typegen": "wrangler types ../api/worker-configuration.d.ts"
+    "cf-typegen": "wrangler types ../api/worker-configuration.d.ts",
+    "check:bundle": "node --experimental-strip-types scripts/check-bundle.ts"
   },
   "dependencies": {
     "@ar-creator/api": "0.1.0",

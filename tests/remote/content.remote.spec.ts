@@ -380,6 +380,21 @@ test('REMOTE-PUBLISH: the built draft publishes at its stable URL; a visitor wit
   await anon.dispose();
 });
 
+test('REMOTE-PUBLIC-RATE-LIMIT: public reads are limited per client IP at the edge (60/min) with Retry-After (Phase 6, ADR-038)', async () => {
+  test.setTimeout(60_000);
+  const anon = await pwRequest.newContext();
+  const probe = `${BASE}/api/public/remote-rate-limit-probe`;
+  const statuses: number[] = [];
+  for (let i = 0; i < 61; i++) statuses.push((await anon.get(probe)).status());
+  // Earlier checks may already have used part of this minute's budget: some 404s, then 429.
+  expect(statuses.filter((x) => x !== 404 && x !== 429)).toEqual([]);
+  expect(statuses.at(-1)).toBe(429);
+  const r = await anon.get(probe);
+  expect(r.status()).toBe(429);
+  expect(Number(r.headers()['retry-after'])).toBeGreaterThan(0);
+  await anon.dispose();
+});
+
 test('REMOTE-CLEANUP: deleting removes the R2 object and the row; nothing is left behind', async () => {
   const before = AssetListResponse.parse(await (await api.get('/api/assets')).json());
   const poster = before.assets.find((a) => a.filename === 'poster.png' && a.state === 'validated')!;

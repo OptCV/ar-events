@@ -61,10 +61,11 @@ export function PublicExperiencePage() {
   const track = useMemo(() => tracker(slug), [slug]);
   if (q.isPending) return <p role="status">Loading…</p>;
   if (q.isError) {
+    const busy = q.error instanceof ApiRequestError && q.error.status === 429;
     return (
       <section className={styles.page}>
-        <h1>Experience not available</h1>
-        <p>It may have been unpublished, or the link is wrong.</p>
+        <h1>{busy ? 'Busy right now' : 'Experience not available'}</h1>
+        <p>{busy ? 'Too many requests from this network. Try again in a minute.' : 'It may have been unpublished, or the link is wrong.'}</p>
       </section>
     );
   }

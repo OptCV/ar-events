@@ -12,6 +12,7 @@ import { schema } from '@ar-creator/db';
 import type { AppEnv } from '../app.ts';
 import { requireSession } from '../auth/middleware.ts';
 import { err, parseJson } from '../http.ts';
+import { rateLimit } from '../ratelimit.ts';
 
 const { analyticsDaily, experienceRevisions, experiences } = schema;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -20,7 +21,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 export function analyticsRoutes() {
   const r = new Hono<AppEnv>();
 
-  r.post('/public/:slug/events', async (c) => {
+  r.post('/public/:slug/events', rateLimit('public-event'), async (c) => {
     const slug = c.req.param('slug');
     if (!/^[a-z0-9-]{3,64}$/.test(slug)) return c.body(null, 204); // never reveal anything to a counter
     const parsed = await parseJson(c, AnalyticsEventInput);

@@ -1,49 +1,41 @@
 import { createBrowserRouter } from 'react-router';
 import { RequireAuth } from './auth/session.tsx';
 import { AppLayout } from './components/AppLayout.tsx';
-import { AccountPage } from './pages/AccountPage.tsx';
-import { DashboardPage } from './experiences/DashboardPage.tsx';
-import { ExperiencePage } from './experiences/ExperiencePage.tsx';
-import { LibraryPage } from './assets/LibraryPage.tsx';
-import { ImageObjectPage } from './imageObjects/ImageObjectPage.tsx';
-import { NewExperiencePage } from './experiences/NewExperiencePage.tsx';
-import { EmailVerifiedPage, VerifyEmailPage } from './pages/auth/EmailPages.tsx';
-import { ForgotPasswordPage, ResetPasswordPage } from './pages/auth/PasswordPages.tsx';
-import { SignInPage } from './pages/auth/SignInPage.tsx';
-import { SignUpPage } from './pages/auth/SignUpPage.tsx';
 import { HomePage } from './pages/HomePage.tsx';
 import { NotFoundPage } from './pages/NotFoundPage.tsx';
 import { RouteErrorPage } from './pages/RouteErrorPage.tsx';
-import { PublicExperiencePage, TestBuildPage } from './builds/TestBuildPage.tsx';
-import { PrintSheet } from './builds/PrintSheet.tsx';
 
+/**
+ * Every page except the shell is its own chunk (Phase 6 M20, ADR-038): a visitor opening a public experience
+ * downloads the viewer, not the editor; `npm run check:bundle -w @ar-creator/web` enforces the budgets.
+ */
 export const router = createBrowserRouter([
   {
     element: <AppLayout />,
     errorElement: <RouteErrorPage />,
     children: [
       { index: true, element: <HomePage /> },
-      { path: 'sign-in', element: <SignInPage /> },
-      { path: 'sign-up', element: <SignUpPage /> },
-      { path: 'verify-email', element: <VerifyEmailPage /> },
-      { path: 'email-verified', element: <EmailVerifiedPage /> },
-      { path: 'forgot-password', element: <ForgotPasswordPage /> },
-      { path: 'reset-password', element: <ResetPasswordPage /> },
+      { path: 'sign-in', lazy: async () => ({ Component: (await import('./pages/auth/SignInPage.tsx')).SignInPage }) },
+      { path: 'sign-up', lazy: async () => ({ Component: (await import('./pages/auth/SignUpPage.tsx')).SignUpPage }) },
+      { path: 'verify-email', lazy: async () => ({ Component: (await import('./pages/auth/EmailPages.tsx')).VerifyEmailPage }) },
+      { path: 'email-verified', lazy: async () => ({ Component: (await import('./pages/auth/EmailPages.tsx')).EmailVerifiedPage }) },
+      { path: 'forgot-password', lazy: async () => ({ Component: (await import('./pages/auth/PasswordPages.tsx')).ForgotPasswordPage }) },
+      { path: 'reset-password', lazy: async () => ({ Component: (await import('./pages/auth/PasswordPages.tsx')).ResetPasswordPage }) },
       // Public device test page: the signed link in the URL is the credential (ADR-034).
-      { path: 'test/:id', element: <TestBuildPage /> },
+      { path: 'test/:id', lazy: async () => ({ Component: (await import('./builds/TestBuildPage.tsx')).TestBuildPage }) },
       // Published experiences at their stable public URL (ADR-036).
-      { path: 'x/:slug', element: <PublicExperiencePage /> },
-      { path: 'x/:slug/print', element: <PrintSheet /> },
+      { path: 'x/:slug', lazy: async () => ({ Component: (await import('./builds/TestBuildPage.tsx')).PublicExperiencePage }) },
+      { path: 'x/:slug/print', lazy: async () => ({ Component: (await import('./builds/PrintSheet.tsx')).PrintSheet }) },
       // Protected routes: everything under RequireAuth needs a valid server-side session.
       {
         element: <RequireAuth />,
         children: [
-          { path: 'dashboard', element: <DashboardPage /> },
-          { path: 'experiences/new', element: <NewExperiencePage /> },
-          { path: 'experiences/:id', element: <ExperiencePage /> },
-          { path: 'library', element: <LibraryPage /> },
-          { path: 'library/:assetId/ar-object', element: <ImageObjectPage /> },
-          { path: 'account', element: <AccountPage /> },
+          { path: 'dashboard', lazy: async () => ({ Component: (await import('./experiences/DashboardPage.tsx')).DashboardPage }) },
+          { path: 'experiences/new', lazy: async () => ({ Component: (await import('./experiences/NewExperiencePage.tsx')).NewExperiencePage }) },
+          { path: 'experiences/:id', lazy: async () => ({ Component: (await import('./experiences/ExperiencePage.tsx')).ExperiencePage }) },
+          { path: 'library', lazy: async () => ({ Component: (await import('./assets/LibraryPage.tsx')).LibraryPage }) },
+          { path: 'library/:assetId/ar-object', lazy: async () => ({ Component: (await import('./imageObjects/ImageObjectPage.tsx')).ImageObjectPage }) },
+          { path: 'account', lazy: async () => ({ Component: (await import('./pages/AccountPage.tsx')).AccountPage }) },
         ],
       },
       { path: '*', element: <NotFoundPage /> },

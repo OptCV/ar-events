@@ -39,6 +39,6 @@ export default defineConfig(({ command }) => ({
   },
   // Client source maps would be deployed as public static assets → off. Worker maps are uploaded privately
   // (`upload_source_maps` in wrangler.jsonc) for readable stack traces in Workers Observability.
-  build: { sourcemap: false },
+  build: { sourcemap: false, manifest: process.env.BUNDLE_MANIFEST === '1' },
   environments: { ar_creator: { build: { sourcemap: true } } },
 }));

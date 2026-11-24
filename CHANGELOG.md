@@ -2,6 +2,16 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-23 — Phase 6 Milestone 20: hardening (local)
+
+### Added
+- Rate limits on public endpoints (60 page reads, 30 analytics events per minute per IP). ADR-038.
+- Bundle budget check (`npm run check:bundle -w @ar-creator/web`); automated accessibility audit (axe, WCAG 2.2 A/AA); local load check.
+
+### Changed
+- Pages load as separate chunks: visitors of a published experience no longer download the editor (first JavaScript 163 kB gzip, was 192 kB for the main bundle alone).
+- The public page explains "Too many requests from this network" on 429.
+
 ## 2026-11-23 — Remote verification of Phase 6 Milestone 19
 
 ### Verified

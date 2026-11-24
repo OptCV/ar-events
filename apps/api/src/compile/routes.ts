@@ -27,6 +27,7 @@ import type { AppEnv } from '../app.ts';
 import { requireSession } from '../auth/middleware.ts';
 import { assetSigningKey, signAssetUrl, verifyAssetUrl } from '../assets/signing.ts';
 import { err } from '../http.ts';
+import { rateLimit } from '../ratelimit.ts';
 import { logError } from '../db.ts';
 import { MIME_GLB, MIME_USDZ } from '../conversions/pipeline.ts';
 import { isBuildError, planBuild, platformOf, promoteBuild, runtimeFor, type BuildJobInput, type PublishIntent } from './pipeline.ts';
@@ -360,7 +361,7 @@ export function buildRoutes() {
   });
 
   // ---------- public: the published experience (no session; stable URL /x/{slug})
-  r.get('/public/:slug', async (c) => {
+  r.get('/public/:slug', rateLimit('public-read'), async (c) => {
     const slug = c.req.param('slug');
     const secret = signingSecret(c);
     if (!/^[a-z0-9-]{3,64}$/.test(slug) || !secret) return notFound(c);
@@ -378,7 +379,7 @@ export function buildRoutes() {
   });
 
   // ---------- public: the device test page (no session; the signed link is the credential)
-  r.get('/test-builds/:id', async (c) => {
+  r.get('/test-builds/:id', rateLimit('public-read'), async (c) => {
     const id = c.req.param('id');
     const secret = signingSecret(c);
     if (!UUID.test(id) || !secret) return notFound(c);

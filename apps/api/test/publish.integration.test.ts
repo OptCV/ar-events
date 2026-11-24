@@ -228,3 +228,63 @@ describe('anonymous analytics (ADR-037)', () => {
     expect((await h.req(`/api/experiences/${e.id}`, { method: 'DELETE', jar: alice })).status).toBe(204);
   });
 });
+
+describe('public rate limits (ADR-038)', () => {
+  it('limits public reads and analytics events per client IP per minute, with Retry-After; other IPs are unaffected', async () => {
+    const e = ExperienceDetail.parse(await (await h.req('/api/experiences', { body: { name: 'Limited', placementMode: 'floor' }, jar: alice })).json());
+    await setNodes(alice, e.id, [node('b', { kind: 'primitive', shape: 'box' })]);
+    await publish(alice, e.id);
+    await h.conversions.idle();
+    const ip = '203.0.113.77';
+    for (let i = 0; i < 30; i++) expect((await h.req(`/api/public/${e.slug}/events`, { body: { event: 'view', detail: 'desktop' }, ip })).status).toBe(204);
+    const limited = await h.req(`/api/public/${e.slug}/events`, { body: { event: 'view', detail: 'desktop' }, ip });
+    expect(limited.status).toBe(429);
+    expect(Number(limited.headers.get('retry-after'))).toBeGreaterThan(0);
+    expect(ApiError.parse(await limited.json()).error.code).toBe('too_many_requests');
+    // Reads have their own bucket (60/min) and the limited events were not counted.
+    for (let i = 0; i < 60; i++) expect((await h.req(`/api/public/${e.slug}`, { ip })).status).toBe(200);
+    expect((await h.req(`/api/public/${e.slug}`, { ip })).status).toBe(429);
+    expect((await h.req(`/api/public/${e.slug}`, { ip: '203.0.113.78' })).status).toBe(200);
+    const a = AnalyticsSummary.parse(await (await h.req(`/api/experiences/${e.id}/analytics?days=1`, { jar: alice })).json());
+    expect(a.totals.views).toBe(30);
+    // A new window starts after a minute (simulated by ageing the stored window).
+    await h.sql(`UPDATE rate_limit SET last_request = last_request - 61000 WHERE key = 'app:public-read:${ip}'`);
+    expect((await h.req(`/api/public/${e.slug}`, { ip })).status).toBe(200);
+  });
+});
+
+describe('load check (ADR-038)', () => {
+  // Locally every request opens its own Postgres connection (Docker Postgres: max 100), so at most 50 visitors are in
+  // flight at once; on Cloudflare, Hyperdrive pools connections (an edge load run needs the owner's approval).
+  it('200 visitors (distinct IPs, 50 in flight) each load the public page and send a view: all answered, no count lost', async () => {
+    const e = ExperienceDetail.parse(await (await h.req('/api/experiences', { body: { name: 'Busy', placementMode: 'floor' }, jar: alice })).json());
+    await setNodes(alice, e.id, [node('b', { kind: 'primitive', shape: 'box' })]);
+    await publish(alice, e.id);
+    await h.conversions.idle();
+    const N = 200;
+    const IN_FLIGHT = 50;
+    const started = performance.now();
+    const times: number[] = [];
+    const results: number[][] = [];
+    let next = 0;
+    await Promise.all(
+      Array.from({ length: IN_FLIGHT }, async () => {
+        while (next < N) {
+          const i = next++;
+          const ip = `10.0.${i % 250}.${1 + Math.floor(i / 250)}`;
+          const t0 = performance.now();
+          const page = await h.req(`/api/public/${e.slug}`, { ip });
+          const ev = await h.req(`/api/public/${e.slug}/events`, { body: { event: 'view', detail: 'ios' }, ip });
+          times.push(performance.now() - t0);
+          results.push([page.status, ev.status]);
+        }
+      }),
+    );
+    const total = performance.now() - started;
+    expect(results.filter(([p, v]) => p !== 200 || v !== 204)).toEqual([]);
+    const a = AnalyticsSummary.parse(await (await h.req(`/api/experiences/${e.id}/analytics?days=1`, { jar: alice })).json());
+    expect(a.totals.views).toBe(N); // concurrent upserts on one counter row: none lost
+    times.sort((x, y) => x - y);
+    console.log(`load check: ${N} visitors in ${total.toFixed(0)} ms; per visitor p50 ${times[N / 2]!.toFixed(0)} ms, p95 ${times[Math.floor(N * 0.95)]!.toFixed(0)} ms (local Node + Docker Postgres)`);
+  }, 120_000);
+});
