@@ -154,7 +154,7 @@ The runtimes that execute the plan (USDZ/GLB exporters, WebXR viewer, public pag
 | Milestone | Scope | Status |
 |---|---|---|
 | M18 Publish and stable URL | Publish promotes a ready build atomically (draft unchanged → its build; otherwise build first, promote only when every file is ready — a failed build never replaces the live one); stable public page `/x/{slug}` (same routing as the test page, no expiry); unpublish; superseded builds pruned, the published one kept; publishing status in the editor and dashboard | **Done; on the dev edge** (ADR-036, REMOTE-PUBLISH 2026-11-23); **Phase 6 gate met in tests** |
-| M19 Public page and analytics | Landing page polish (description, share QR, print sheet for image targets), anonymous aggregate analytics (views, AR launches per runtime; no personal data) | **Done locally** (ADR-037); Neon migration 0007 + deploy pending |
+| M19 Public page and analytics | Landing page polish (description, share QR, print sheet for image targets), anonymous aggregate analytics (views, AR launches per runtime; no personal data) | **Done; on the dev edge** (ADR-037, migration 0007 applied, REMOTE-PUBLISH 2026-11-23) |
 | M20 Hardening | Security review of public endpoints (rate limits), performance (lazy routes, bundle budget), accessibility audit, load check | Not started |
 
 **Phase 1 risks:** Hyperdrive caching of auth reads (ADR-013 §5); request-body size limits for large model uploads; Better Auth minor-version churn (pin exact, review changelogs); `@cloudflare/vite-plugin` + monorepo layout (validated locally in M1; edge deploy pending). Client bundle is 133 KB gzip for a skeleton, mostly React + Zod 4; watch it as features land (consider `zod/mini` on the client).

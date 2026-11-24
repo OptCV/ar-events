@@ -2,6 +2,11 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-23 — Remote verification of Phase 6 Milestone 19
+
+### Verified
+- Migration 0007 on Neon development (8/8); anonymous counting on the dev Worker (REMOTE-PUBLISH). Full remote run 22/22.
+
 ## 2026-11-23 — Phase 6 Milestone 19: public page sharing and anonymous analytics (local)
 
 ### Added
