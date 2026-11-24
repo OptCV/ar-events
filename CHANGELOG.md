@@ -5,7 +5,7 @@ This changelog records actual specification and implementation changes. Do not c
 ## 2026-11-23 — Phase 6 Milestone 20: hardening (local)
 
 ### Added
-- Rate limits on public endpoints (60 page reads, 30 analytics events per minute per IP). ADR-038.
+- Rate limits on public endpoints (60 page reads, 30 analytics events, 30 health checks per minute per IP). ADR-038.
 - Bundle budget check (`npm run check:bundle -w @ar-creator/web`); automated accessibility audit (axe, WCAG 2.2 A/AA); local load check.
 
 ### Changed

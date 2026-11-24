@@ -14,6 +14,7 @@ import { r2Store, type ObjectStore } from './assets/store.ts';
 import { conversionRoutes } from './conversions/routes.ts';
 import { buildRoutes } from './compile/routes.ts';
 import { analyticsRoutes } from './analytics/routes.ts';
+import { rateLimit } from './ratelimit.ts';
 import { workflowRunner, type ConversionRunner } from './conversions/runner.ts';
 
 export interface BuildInfo {
@@ -139,7 +140,7 @@ export function createApp(info: BuildInfo, deps: AppDeps = {}) {
     if (!c.res.headers.has('Cache-Control')) c.header('Cache-Control', 'no-store');
   });
 
-  app.get('/health', async (c) => {
+  app.get('/health', rateLimit('health'), async (c) => {
     let database: DatabaseCheck;
     try {
       const handle = await c.get('db')();

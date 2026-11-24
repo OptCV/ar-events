@@ -41,7 +41,7 @@ Plan and slice order: `ROADMAP.md` "Phase 1 plan".
 - [x] `ar-creator-db-dev` Hyperdrive → `ar_app` (caching disabled). Production `ar-creator-db` still `neondb_owner` (later, with approval).
 - [ ] Apply migrations to Neon production — **only with owner approval** (`--approved`; procedure in NEON.md).
 - [ ] Edge verification of Hyperdrive: deploy, `/api/health` shows `database.status: ok`, confirm caching disabled (`wrangler hyperdrive get`), check latency.
-- [ ] Rate limiting or brief caching for `/api/health` before public launch (it opens a DB connection per call).
+- [x] Rate limiting or brief caching for `/api/health` before public launch (it opens a DB connection per call). *(30/min per IP, ADR-038)*
 - [x] **Milestone 3 / P1-3 (local):** Better Auth 1.7.16 in `apps/api` (per-request instance, allowlisted endpoints, fail-closed config, DB rate limits, token stripping, CSRF + redirect guards), `/api/auth-config`, `/api/session`, `/api/me`, `requireSession`; React sign-in/up, verify, forgot/reset, account, `RequireAuth`; dev mailbox; Resend mailer (ADR-019). Verified locally: integration 30/30, e2e 36/36.
 - [x] P1-3 edge verification on the isolated `ar-creator-dev` Worker (REMOTE-AUTH-01, 9/9): Hyperdrive as `ar_app`, `__Secure-` cookies, immediate revocation, CF-Connecting-IP unspoofable, edge rate limiting, guards.
 - [ ] Read sign-in CPU time in Workers Observability for `ar-creator-dev`.
@@ -107,7 +107,7 @@ Plan and slice order: `ROADMAP.md` "Phase 1 plan".
 - [x] Stable public URL, QR and share/download actions. *(P6 M18 URL + QR; M19 Share and exact-size print sheet)*
 - [x] Anonymous aggregate analytics (views, AR button taps per viewer, link taps). *(P6 M19, ADR-037)*
 - [x] Retry/error reporting and partial readiness. *(builds: bounded retries, per-platform failures, partially ready; publishing reports failures and keeps the live version — ADR-034/036)*
-- [ ] Full device matrix, accessibility, security and load checks.
+- [-] Full device matrix, accessibility, security and load checks. *(automated a11y audit, public rate limits and local load check done — ADR-038; device matrix, screen-reader passes and edge load test pending)*
 - [ ] Documentation and changelog updated with verified evidence.
 
 ## Change handling

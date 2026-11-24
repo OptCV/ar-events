@@ -288,3 +288,11 @@ describe('load check (ADR-038)', () => {
     console.log(`load check: ${N} visitors in ${total.toFixed(0)} ms; per visitor p50 ${times[N / 2]!.toFixed(0)} ms, p95 ${times[Math.floor(N * 0.95)]!.toFixed(0)} ms (local Node + Docker Postgres)`);
   }, 120_000);
 });
+
+describe('health rate limit (ADR-038)', () => {
+  it('limits /api/health to 30 per minute per IP', async () => {
+    const ip = '203.0.113.90';
+    for (let i = 0; i < 30; i++) expect((await h.req('/api/health', { ip })).status).toBe(200);
+    expect((await h.req('/api/health', { ip })).status).toBe(429);
+  });
+});
