@@ -102,6 +102,17 @@ describe('test builds (ADR-034)', () => {
     expect(page.status).toBe(200);
     const t = TestBuildResponse.parse(await page.json());
     expect(t).toMatchObject({ name: 'Build me', placementMode: 'floor', tracking: null, unavailable: { ios: null, android: null }, primary: { label: 'Shop now', url: 'https://example.com/shop' } });
+    // What the Android image viewer runs (ADR-035): every action with what it does.
+    expect(t.xr).toEqual({
+      actions: [
+        { id: 'shop', type: 'link', label: 'Shop now', href: 'https://example.com/shop' },
+        { id: 'mail', type: 'link', label: 'Send email', href: 'mailto:hello@example.com' },
+        { id: 'call', type: 'link', label: 'Call', href: 'tel:+15550100000' },
+      ],
+      taps: {},
+      hotspots: [],
+      primaryActionId: 'shop',
+    });
     expect(t.links).toEqual([
       { label: 'Shop now', href: 'https://example.com/shop', primary: true },
       { label: 'Send email', href: 'mailto:hello@example.com', primary: false },
@@ -125,6 +136,20 @@ describe('test builds (ADR-034)', () => {
     // Bob cannot build or read alice's experience.
     expect((await build(bob, e.id)).status).toBe(404);
     expect((await h.req(`/api/experiences/${e.id}/builds/latest`, { jar: bob })).status).toBe(404);
+  });
+
+  it('taps, hotspots and show/hide reach the viewer data', async () => {
+    const e = await floorExperience(
+      alice,
+      [node('lamp', { kind: 'primitive', shape: 'sphere', actionId: 'tog' }), node('pin', { kind: 'hotspot', actionId: 'tog' })],
+      [{ id: 'tog', type: 'toggle-visibility', nodeId: 'lamp' }],
+    );
+    await build(alice, e.id);
+    await h.conversions.idle();
+    const b = await latest(alice, e.id);
+    const t = TestBuildResponse.parse(await (await h.req(testApiUrl(b.testUrl!), { origin: null })).json());
+    expect(t.xr).toEqual({ actions: [{ id: 'tog', type: 'toggle-visibility', label: 'Show or hide', nodeId: 'lamp' }], taps: { lamp: 'tog', pin: 'tog' }, hotspots: ['pin'], primaryActionId: null });
+    expect(t.links).toEqual([]);
   });
 
   it('a changed draft makes a new build and the older one is removed (link and files)', async () => {

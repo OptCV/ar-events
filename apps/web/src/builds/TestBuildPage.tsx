@@ -11,6 +11,8 @@ import { QrCode } from './QrCode.tsx';
 import styles from './Builds.module.css';
 
 const ModelPreview = lazy(() => import('../imageObjects/ModelPreview.tsx'));
+/** three.js + WebXR load only for Android image placement. */
+const ImageViewer = lazy(() => import('./xr/ImageViewer.tsx'));
 /** Quick Look opens only from `<a rel="ar">` whose first child is an image. */
 const PIXEL = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 
@@ -24,7 +26,8 @@ function deviceEnv(): DeviceEnv {
 /**
  * Public device test page (Phase 5 M16, ADR-034). Opened from the signed test link; no sign-in. Routes per
  * PLATFORM_ROUTING.md: iPhone → AR Quick Look (main button as the banner, handled here), Android floor/wall → Scene
- * Viewer (main button as `link`), Android image → the WebXR viewer (M17), desktop → 3D preview and a QR code.
+ * Viewer (main button as `link`), Android image → the experimental WebXR image viewer (M17), desktop → 3D preview
+ * and a QR code.
  * Every link of the experience is listed below on every device (ADR-031).
  */
 export function TestBuildPage() {
@@ -103,11 +106,11 @@ function Launch({ t, env }: { t: TestBuildResponse; env: DeviceEnv }) {
   }
   if (env.os === 'android') {
     if (t.placementMode === 'image') {
+      if (!t.glbUrl) return <Alert tone="error">The Android file could not be made: {t.unavailable.android ?? 'unknown reason'}</Alert>;
       return (
-        <>
-          <Alert tone="info">Image tracking on Android uses the experimental WebXR viewer, which arrives with the next milestone. Here is the 3D preview.</Alert>
-          <Preview t={t} />
-        </>
+        <Suspense fallback={<p role="status">Loading the AR viewer…</p>}>
+          <ImageViewer t={t} />
+        </Suspense>
       );
     }
     if (!t.glbUrl) return <Alert tone="error">The Android file could not be made: {t.unavailable.android ?? 'unknown reason'}</Alert>;

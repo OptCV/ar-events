@@ -483,3 +483,14 @@ Accepted decisions may be superseded by new numbered entries; never rewrite prev
 6. **Test page routing** (PLATFORM_ROUTING.md): iPhone → `<a rel="ar">` to the USDZ with the main button as `callToAction`; the banner tap is handled on the page (`onQuickLookTap`) and opens the link · Android floor/wall → Scene Viewer intent with `link` and a fallback back to the page · Android image → explanation + 3D preview until the WebXR viewer (M17) · desktop → QR code and 3D preview. Every link is listed on all devices. The page is labelled "Test build — not published".
 7. Editor: **Test on device** (QR code via `qrcode-generator` 2.0.4, MIT, rendered as SVG), per-platform state, warnings and reasons, "The draft has changed since this build".
 **Consequences:** Publishing (stable URL, last-good revision) is P6 and will promote builds. Device acceptance runs now have a path: build, scan, test.
+
+## ADR-035 — Android WebXR image viewer in the test page (Phase 5 Milestone 17)
+
+**Date:** 2026-11-23
+**Status:** Accepted (browser tests of the non-AR paths; the AR session itself is NOT device-tested).
+**Decision:**
+1. For **Android + image placement**, the test page loads a lazy viewer built on `@ar-creator/webxr-image` (the adapter and anchor tracker proven by the P0 probe, AND-IMG-01 partial): preflight (HTTPS, WebXR, immersive-ar) and preload (tracking image bitmap + the build's composed GLB) before the tap, so **Start AR** calls `requestSession` synchronously; image tracking and DOM overlay are optional session features so a missing one is reported, not fatal.
+2. The GLB is drawn on the tracked image through `ImageAnchorTracker` (scanning / tracked / emulated / lost with hysteresis) with the **identity image-frame correction (ADR-005 H3, still unverified)**.
+3. **Interactions per the plan (ADR-031)**, from new `xr` data in the test-build response: every link as an **on-screen button** in the DOM overlay (main button first); **taps** via XR select events and a raycast that walks up to the scene node (GLB wrapper names = scene ids, ADR-032); **show/hide** toggles the node; **play animation** finds the clip by name within the target's subtree (handles the same model placed twice) and plays it once; links end the session and then navigate. **Hotspots** get a marker drawn by the viewer on their empty GLB node. Overlay taps never also hit the scene (`beforexrselect`). The logic is a pure module with unit tests.
+4. **Honest states:** no AR support → the checks, the Chrome flag help and the 3D preview; image tracking not granted → "AR works, but this browser did not turn on image tracking" + flag help; untrackable image; start errors mapped to plain messages (permission, security, unsupported).
+**Consequences:** All six runtimes now have a path from the editor to a device. The Phase 5 gate (device acceptance) can be run.

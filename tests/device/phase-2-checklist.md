@@ -131,3 +131,10 @@ and section 4 passes on both or has a recorded budget decision. Everything else 
 3. iPhone (Safari): **View in AR** → Quick Look. Check anchoring (floor: horizontal; wall: vertical; image: on the printed tracking image at the printed width shown on the page), every object at its editor position and size, text/panels readable, and the main button as Quick Look's banner — tapping it opens the link.
 4. Android floor/wall (Chrome): **View in AR** → Scene Viewer. Same checks; the main button is Scene Viewer's link button. Image placement on Android waits for M17.
 5. Record per case: device, OS, viewer, build id (in the URL), what was seen, screenshots.
+
+### Android image placement (WebXR, M17)
+
+1. Chrome on an ARCore phone; for tracking, enable chrome://flags → "WebXR Incubations" and relaunch (record the flag state).
+2. Open the test link of an **image** build, check the three AR checks are ticked, print the tracking image at the width shown, tap **Start AR**.
+3. Expect: status "Point your camera at the printed image" → "Image found"; the scene sits on the print as in the editor (ADR-005 H3 orientation: image top away from you), at its real size; on-screen buttons for every link (main first); tapping an object with a tap action runs it (show/hide, animation, link); hotspots show a blue marker and respond to taps; moving the print out of view shows "Image lost" and the scene hides; Exit AR returns to the page.
+4. With the flag **off**: Start AR then "AR works, but this browser did not turn on image tracking" with the flag help (AND-IMG-02).

@@ -2,6 +2,11 @@
 
 This changelog records actual specification and implementation changes. Do not claim features are shipped because they are listed in a prompt.
 
+## 2026-11-23 — Phase 5 Milestone 17: Android WebXR image viewer (local)
+
+### Added
+- The test page runs the experimental WebXR image viewer on Android for image placement: AR checks, Start AR, tracking states, the scene on the tracked image, links as on-screen buttons, taps, show/hide, animations, hotspot markers; clear messages and the 3D preview when image tracking is not available. ADR-035.
+
 ## 2026-11-23 — Remote verification of Phase 5 Milestones 14–16
 
 ### Verified

@@ -19,7 +19,7 @@ import {
   type BuildSummary,
   type TestBuildResponse,
 } from '@ar-creator/contracts';
-import { pagePlan, planInteractions } from '@ar-creator/capabilities';
+import { buttonLabel, pagePlan, planInteractions } from '@ar-creator/capabilities';
 import { schema, type Database } from '@ar-creator/db';
 import { DraftExperienceScene, ExperienceScene } from '@ar-creator/schema';
 import type { AppEnv } from '../app.ts';
@@ -233,6 +233,20 @@ export function buildRoutes() {
       const href = a.type === 'open-url' ? a.url : a.type === 'mailto' ? `mailto:${a.address}` : a.type === 'tel' ? `tel:${a.number.replace(/[\s()-]/g, '')}` : '';
       return { label: p.label, href, primary: p.primary };
     });
+    // Interactions the WebXR image viewer runs (ADR-031): every action with what it does; taps from objects and hotspots.
+    const hrefOf = (a: (typeof scene.actions)[number]) => (a.type === 'open-url' ? a.url : a.type === 'mailto' ? `mailto:${a.address}` : a.type === 'tel' ? `tel:${a.number.replace(/[\s()-]/g, '')}` : null);
+    const xr: TestBuildResponse['xr'] = {
+      actions: scene.actions.map((a) => {
+        const label = buttonLabel(a);
+        const href = hrefOf(a);
+        if (href) return { id: a.id, type: 'link' as const, label, href };
+        if (a.type === 'toggle-visibility') return { id: a.id, type: 'toggle-visibility' as const, label, nodeId: a.nodeId };
+        return { id: a.id, type: 'play-animation' as const, label, nodeId: (a as { nodeId: string }).nodeId, clip: (a as { clip: string }).clip };
+      }),
+      taps: Object.fromEntries(scene.nodes.filter((n) => n.actionId).map((n) => [n.id, n.actionId!])),
+      hotspots: scene.nodes.filter((n) => n.kind === 'hotspot').map((n) => n.id),
+      primaryActionId: plan.primary?.actionId ?? null,
+    };
     const body: TestBuildResponse = {
       id,
       name: row.name,
@@ -243,6 +257,7 @@ export function buildRoutes() {
       unavailable: { ios: why('ios'), android: why('android') },
       primary: plan.primary ? { label: plan.primary.label, url: plan.primary.url } : null,
       links,
+      xr,
       filesExpireAt: new Date(Date.now() + ttl * 1000).toISOString(),
       linkExpiresAt: new Date(Date.now() + v.expiresInSeconds * 1000).toISOString(),
     };

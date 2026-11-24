@@ -1,0 +1,13 @@
+/* Android WebXR image viewer (Phase 5 M17). */
+.viewer { display: grid; gap: var(--ui-space-3); }
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: var(--ui-text-sm); }
+.ok::before { content: '✓ '; color: var(--ui-success); }
+.bad::before { content: '✗ '; color: var(--ui-danger); }
+.start { justify-self: start; min-width: 200px; }
+.preview { min-height: 280px; }
+/* The DOM overlay root covers the camera view during the session (the browser makes it fullscreen). */
+.overlay { display: flex; flex-direction: column; justify-content: space-between; gap: var(--ui-space-3); padding: max(var(--ui-space-4), env(safe-area-inset-top)) var(--ui-space-4) max(var(--ui-space-4), env(safe-area-inset-bottom)); pointer-events: none; }
+.overlay[hidden] { display: none; }
+.status { align-self: center; margin: 0; padding: var(--ui-space-2) var(--ui-space-4); color: #fff; background: rgb(0 0 0 / 0.6); border-radius: 999px; font-weight: 600; }
+.note { align-self: center; margin: 0; padding: var(--ui-space-2) var(--ui-space-3); color: #fff; background: rgb(0 0 0 / 0.6); border-radius: var(--ui-radius-sm); }
+.overlayButtons { display: grid; gap: var(--ui-space-2); pointer-events: auto; }

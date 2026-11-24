@@ -61,6 +61,27 @@ export const BuildSummary = z.object({
 });
 export type BuildSummary = z.infer<typeof BuildSummary>;
 
+/**
+ * What the Android image viewer (WebXR, M17) runs, from the interaction plan (ADR-031): links as on-screen buttons and
+ * taps; show/hide and animations from taps on objects or hotspots. Scene node ids match the GLB wrapper node names.
+ */
+export const XrAction = z.discriminatedUnion('type', [
+  z.object({ id: z.string(), type: z.literal('link'), label: z.string(), href: z.string() }),
+  z.object({ id: z.string(), type: z.literal('toggle-visibility'), label: z.string(), nodeId: z.string() }),
+  z.object({ id: z.string(), type: z.literal('play-animation'), label: z.string(), nodeId: z.string(), clip: z.string() }),
+]);
+export type XrAction = z.infer<typeof XrAction>;
+export const XrInteractions = z.object({
+  actions: z.array(XrAction),
+  /** Tap targets: scene node id → action id (objects and hotspots). */
+  taps: z.record(z.string(), z.string()),
+  /** Hotspot node ids (the viewer draws a marker; the GLB has an empty node there). */
+  hotspots: z.array(z.string()),
+  /** The main button's action (shown first and highlighted among the on-screen buttons). */
+  primaryActionId: z.string().nullable(),
+});
+export type XrInteractions = z.infer<typeof XrInteractions>;
+
 /** What the public test page gets (no session; authorised by the signed test link). */
 export const TestBuildResponse = z.object({
   id: z.string(),
@@ -76,6 +97,8 @@ export const TestBuildResponse = z.object({
   primary: z.object({ label: z.string(), url: z.string() }).nullable(),
   /** Experience-page buttons, main button first. */
   links: z.array(z.object({ label: z.string(), href: z.string(), primary: z.boolean() })),
+  /** Image placement: what the Android WebXR viewer runs. */
+  xr: XrInteractions,
   /** File URLs expire sooner than the link; the page refetches. */
   filesExpireAt: z.string(),
   linkExpiresAt: z.string(),

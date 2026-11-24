@@ -108,3 +108,48 @@ test('test page on phones: iPhone gets Quick Look with the main button as its ba
   await expect(android.page.getByTestId('page-link')).toHaveText(['Shop now', 'Send email']);
   await android.ctx.close();
 });
+
+test('Android image placement: the WebXR viewer checks AR support, explains when it is missing (3D preview instead) and reports start errors', async ({ page, request, browser }) => {
+  test.setTimeout(150_000);
+  const { readFileSync } = await import('node:fs');
+  await verifiedSignedIn(page, request, 'p5xr');
+  await createExperience(page, 'Poster test', 'Image anchored');
+  await page.getByTestId('tracking-image').locator('input[type=file]').setInputFiles({ name: 'poster.png', mimeType: 'image/png', buffer: readFileSync('tests/fixtures/images/tracking_target_20cm.png') });
+  await expect(page.getByTestId('tracking-image').getByTestId('printed-size')).toHaveText('Printed size: 20 × 13.3 cm');
+  await page.getByTestId('add-content').getByRole('button', { name: 'Add shape' }).click();
+  await expect(page.getByTestId('save-status')).toHaveText('All changes saved');
+  const panel = page.getByTestId('test-on-device');
+  await panel.getByRole('button', { name: 'Make a test build' }).click();
+  await expect(panel.getByTestId('build-status')).toHaveAttribute('data-state', 'ready', { timeout: 90_000 });
+  await expect(panel.getByTestId('build-output-android')).toContainText('Android (GLB): ready');
+  const link = (await panel.getByTestId('test-link').getAttribute('href'))!;
+
+  // A desktop-class browser on an Android UA: no AR sessions → explained, with the flag help and the 3D preview.
+  const a = await stranger(browser, PHONES.android);
+  await a.page.goto(link);
+  const viewer = a.page.getByTestId('xr-viewer');
+  await expect(viewer).toHaveAttribute('data-phase', 'unsupported', { timeout: 15_000 });
+  await expect(viewer).toContainText('WebXR Incubations');
+  await expect(viewer.getByTestId('model-preview')).toHaveAttribute('data-state', 'ready', { timeout: 20_000 });
+  await expect(a.page.getByTestId('tracking-print')).toContainText('exactly 20 cm wide');
+  await a.ctx.close();
+
+  // AR reported as supported, but the session is refused (permission): the reason is shown and Start AR comes back.
+  const b = await stranger(browser, PHONES.android);
+  await b.page.addInitScript(() => {
+    Object.defineProperty(navigator, 'xr', {
+      configurable: true,
+      value: {
+        isSessionSupported: async () => true,
+        requestSession: () => Promise.reject(Object.assign(new Error('denied'), { name: 'NotAllowedError' })),
+      },
+    });
+  });
+  await b.page.goto(link);
+  const v2 = b.page.getByTestId('xr-viewer');
+  await expect(v2).toHaveAttribute('data-phase', 'ready', { timeout: 15_000 });
+  await v2.getByTestId('xr-start').click();
+  await expect(v2).toContainText('Camera or AR permission was denied.');
+  await expect(v2.getByTestId('xr-start')).toBeEnabled();
+  await b.ctx.close();
+});
